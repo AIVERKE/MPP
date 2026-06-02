@@ -1,0 +1,7 @@
+/* para que los submenues esten al mismo nivel del menu */
+.no-indent .v-list-group__items .v-list-item {
+  padding-inline-start: 36px !important;
+}
+
+
+
