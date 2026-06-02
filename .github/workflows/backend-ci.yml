@@ -2,12 +2,12 @@ name: Backend CI MPP
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
     paths:
       - "backend/**"
       - ".github/workflows/backend-ci.yml"
   pull_request:
-    branches: [main]
+    branches: [ main ] # Esto es lo que permite que el check se valide en los PRs
     paths:
       - "backend/**"
       - ".github/workflows/backend-ci.yml"
