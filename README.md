@@ -46,7 +46,7 @@ docker compose version
 - npm.
 - PostgreSQL (16 recomendado, 14+ compatible).
 
-Verifica con:
+Verifica con los siguientes comandos:
 
 ```bash
 node -v
