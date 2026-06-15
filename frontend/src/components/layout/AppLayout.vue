@@ -6,11 +6,17 @@
 <script setup>
 import { ref } from "vue";
 import { useAuthStore } from "../../stores/auth";
+import { useTheme } from "vuetify";
 
 const authStore = useAuthStore();
+const theme = useTheme();
 const drawer = ref(true);
 const sidebarWidth = ref(260);
 const isResizing = ref(false);
+
+const toggleTheme = () => {
+  theme.global.name.value = theme.global.current.value.dark ? "light" : "dark";
+};
 
 const handleLogout = () => {
   authStore.logout();
@@ -52,8 +58,12 @@ const stopResizing = () => {
       <v-spacer></v-spacer>
 
       <!-- Nuevo iconos a la derecha -->
-      <v-btn icon variant="text" class="mr-2">
-        <v-icon>mdi-theme-light-dark</v-icon>
+      <v-btn icon variant="text" class="mr-2" @click="toggleTheme">
+        <v-icon>{{
+          theme.global.current.value.dark
+            ? "mdi-weather-sunny"
+            : "mdi-weather-night"
+        }}</v-icon>
       </v-btn>
 
       <v-badge color="error" content="45" class="mr-2">
@@ -96,6 +106,32 @@ const stopResizing = () => {
             title="Usuarios"
             to="/usuarios"
           ></v-list-item>
+          
+          <v-list-group
+            class="no-indent"
+            prepend-icon="mdi-sitemap"
+            value="MOF"
+          >
+            <template #activator="{ props }">
+              <v-list-item v-bind="props" title="MOF"></v-list-item>
+            </template>
+            <v-list-item
+              prepend-icon="mdi-sitemap"
+              title="Organigrama"
+              to="/mof/organigrama-unidades"
+            ></v-list-item>
+            <v-list-item
+              prepend-icon="mdi-list-box"
+              title="Listar Unidades"
+              to="/mof/listar-unidades"
+            ></v-list-item>
+            <v-list-item
+              prepend-icon="mdi-tree"
+              title="Árbol Unidades"
+              to="/mof/arbol-unidades"
+            ></v-list-item>
+          </v-list-group>
+
           <v-list-group
             class="no-indent"
             prepend-icon="mdi-package-variant"
@@ -104,19 +140,6 @@ const stopResizing = () => {
             <template #activator="{ props }">
               <v-list-item v-bind="props" title="MPP"></v-list-item>
             </template>
-
-            <v-list-item
-              prepend-icon="mdi-list-box"
-              title="Listar Unidades"
-              to="/mpp/listar-unidades"
-            >
-            </v-list-item>
-
-            <v-list-item
-              prepend-icon="mdi-tree"
-              title="Arbol Unidades"
-              to="/mpp/arbol-unidades"
-            ></v-list-item>
 
             <v-list-item
               prepend-icon="mdi-sitemap"
@@ -131,7 +154,23 @@ const stopResizing = () => {
               class="text-primary font-weight-bold"
             ></v-list-item>
 
-            </v-list-group>
+          </v-list-group>
+
+          <v-list-group prepend-icon="mdi-chart-bar" value="Reportes">
+            <template #activator="{ props }">
+              <v-list-item v-bind="props" title="Reportes"></v-list-item>
+            </template>
+            <v-list-item
+              prepend-icon="mdi-view-dashboard-outline"
+              title="Dashboard Ejecutivo"
+              to="/reportes/ejecutivo"
+            ></v-list-item>
+            <v-list-item
+              prepend-icon="mdi-domain"
+              title="Dashboard Facultativo"
+              to="/reportes/facultativo"
+            ></v-list-item>
+          </v-list-group>
           
           <v-list-item
             prepend-icon="mdi-cog"

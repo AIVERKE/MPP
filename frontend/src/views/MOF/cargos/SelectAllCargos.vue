@@ -1,6 +1,6 @@
-﻿<script setup>
+<script setup>
 import { onMounted, computed, ref } from 'vue';
-import { useAllCargosMppStore } from '../../../stores/cargos_mpp';
+import { useAllCargosMofStore } from '../../../stores/cargos_mof';
 
 const props = defineProps({
   modelValue: {
@@ -10,12 +10,13 @@ const props = defineProps({
 });
 const emit = defineEmits(['update:modelValue']);
 
-const cargosStore = useAllCargosMppStore();
+const cargosStore = useAllCargosMofStore();
 
-// Estados para gestiÃ³n de catÃ¡logo
+// Estados para gestión de catálogo
 const dialog = ref(false);
 const editingCargo = ref(null);
 const cargoName = ref("");
+const cargoActivo = ref(true);
 const search = ref("");
 
 /**
@@ -49,14 +50,16 @@ const value = computed({
   }
 });
 
-// Funciones de gestiÃ³n
+// Funciones de gestión
 function openDialog(item = null) {
   if (item) {
     editingCargo.value = item;
     cargoName.value = item.descripcion;
+    cargoActivo.value = item.activo ?? true;
   } else {
     editingCargo.value = null;
-    cargoName.value = search.value; // Pre-cargar lo que el usuario escribiÃ³ en la bÃºsqueda
+    cargoName.value = search.value; // Pre-cargar lo que el usuario escribió en la búsqueda
+    cargoActivo.value = true;
   }
   dialog.value = true;
 }
@@ -66,16 +69,16 @@ async function saveCargo() {
 
   let success = false;
   if (editingCargo.value) {
-    success = await cargosStore.updateCargo(editingCargo.value.id, cargoName.value.trim());
+    success = await cargosStore.updateCargo(editingCargo.value.id, cargoName.value.trim(), cargoActivo.value);
   } else {
-    success = await cargosStore.createCargo(cargoName.value.trim());
+    success = await cargosStore.createCargo(cargoName.value.trim(), cargoActivo.value);
   }
 
   if (success) {
     dialog.value = false;
     cargoName.value = "";
+    cargoActivo.value = true;
     editingCargo.value = null;
-    // Si fue creaciÃ³n, podrÃ­as querer seleccionarlo automÃ¡ticamente, pero en multi-select es complejo
   }
 }
 
@@ -116,23 +119,37 @@ onMounted(async () => {
 
             <!-- Slot para cada item en la lista -->
             <template v-slot:item="{ props, item }">
-              <v-list-item v-bind="props" :title="item.title">
+              <v-list-item v-bind="props" :title="item.title" :class="{ 'opacity-50 text-grey-darken-1': !item.raw.activo }">
                 <template v-slot:prepend>
                   <v-checkbox-btn :model-value="value.includes(String(item.value))"></v-checkbox-btn>
                 </template>
                 <template v-slot:append>
-                  <v-btn
-                    icon="mdi-pencil"
-                    variant="text"
-                    size="small"
-                    color="grey-darken-1"
-                    @click.stop="openDialog(item.raw)"
-                  ></v-btn>
+                  <div class="d-flex align-center">
+                    <v-btn
+                      variant="text"
+                      size="small"
+                      color="warning"
+                      class="mr-1"
+                      @click.stop="openDialog(item.raw)"
+                    >
+                      <v-icon size="18">mdi-pencil</v-icon>
+                      <v-tooltip activator="parent" location="top">Editar cargo</v-tooltip>
+                    </v-btn>
+                    <v-btn
+                      variant="text"
+                      size="small"
+                      color="error"
+                      @click.stop="cargosStore.deleteCargo(item.raw.id)"
+                    >
+                      <v-icon size="18">mdi-delete</v-icon>
+                      <v-tooltip activator="parent" location="top">Eliminar cargo</v-tooltip>
+                    </v-btn>
+                  </div>
                 </template>
               </v-list-item>
             </template>
 
-            <!-- BotÃ³n extra al final de la lista -->
+            <!-- Botón extra al final de la lista -->
             <template v-slot:append-item>
                 <v-divider />
                 <v-list-item @click="openDialog()" color="primary">
@@ -140,27 +157,51 @@ onMounted(async () => {
                         <v-icon color="primary">mdi-plus-circle</v-icon>
                     </template>
                     <v-list-item-title class="text-primary font-weight-bold">
-                        AÃ‘ADIR NUEVO CARGO AL CATÃLOGO
+                        AÑADIR NUEVO CARGO AL CATÁLOGO
                     </v-list-item-title>
                 </v-list-item>
             </template>
         </v-autocomplete>
 
-        <!-- DiÃ¡logo para crear/editar -->
-        <v-dialog v-model="dialog" max-width="400">
+        <!-- Diálogo para crear/editar -->
+         <v-dialog v-model="dialog" max-width="400">
             <v-card>
                 <v-card-title class="text-h6">
                     {{ editingCargo ? 'Editar Cargo' : 'Nuevo Cargo' }}
                 </v-card-title>
-                <v-card-text>
+                <v-divider />
+                <v-card-text class="pt-4">
                     <v-text-field
                         v-model="cargoName"
-                        label="Nombre del Cargo (CatÃ¡logo)"
+                        label="Nombre del Cargo (Catálogo)"
                         variant="outlined"
                         autofocus
                         @keyup.enter="saveCargo"
                         hide-details
+                        class="mb-6"
                     ></v-text-field>
+                    
+                    <div 
+                        class="d-flex align-center justify-space-between pa-3 rounded cursor-pointer transition-colors" 
+                        :class="{ 'bg-green-lighten-5 border-s-4 border-green': cargoActivo, 'bg-grey-lighten-4 border-s-4 border-grey-darken-1': !cargoActivo }"
+                        @click="cargoActivo = !cargoActivo"
+                    >
+                        <div class="flex-grow-1">
+                            <div class="text-caption font-weight-bold" :class="{ 'text-green-darken-2': cargoActivo, 'text-grey-darken-1': !cargoActivo }">
+                                Estado: <span class="font-weight-bold">{{ cargoActivo ? 'ACTIVO' : 'INACTIVO' }}</span>
+                            </div>
+                            <div class="text-xs text-grey-darken-1">
+                                {{ cargoActivo ? 'Este cargo será visible y disponible' : 'Este cargo estará oculto' }}
+                            </div>
+                        </div>
+                        <v-checkbox
+                            :model-value="cargoActivo"
+                            hide-details
+                            density="compact"
+                            class="ml-2"
+                            @click.stop="cargoActivo = !cargoActivo"
+                        ></v-checkbox>
+                    </div>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer></v-spacer>

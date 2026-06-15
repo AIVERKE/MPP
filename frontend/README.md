@@ -12,19 +12,6 @@ Este sistema es un cliente que consume datos. **Debes tener el Backend corriendo
 ### 1. Requisitos Técnicos
 - **Node.js:** Versión 18 o superior (puedes verificar con `node -v`).
 - **Navegador:** Chrome, Edge o Firefox (versiones actualizadas).
-- **Opcional Docker:** Docker + Compose v2 si quieres levantar todo el proyecto con contenedores.
-
-### Levantar con Docker (stack completo)
-Desde la raíz del repositorio:
-
-```bash
-docker compose up --build
-```
-
-Luego abre:
-
-- Frontend: `http://localhost:5173`
-- Backend: `http://localhost:3000`
 
 ### 2. Pasos para iniciar
 
@@ -79,16 +66,6 @@ El frontend utiliza un stack moderno y reactivo:
 | `npm run dev`     | Inicia el servidor de desarrollo (Modo edición en vivo).               |
 | `npm run build`   | Prepara el sistema para ser subido a un servidor real.                 |
 | `npm run preview` | Prueba la versión final antes de subirla.                              |
-
-### Ejecución manual (sin Docker)
-
-1. Levanta el backend primero (`backend/README.md`).
-2. En `frontend/` ejecuta:
-
-```bash
-npm install
-npm run dev
-```
 
 ---
 

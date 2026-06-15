@@ -2,10 +2,10 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 
 /**
- * Store para la gestión de cargos del Manual de Perfiles de Puestos (MPP)
+ * Store para la gestión de cargos del Manual de Organización y Funciones (MOF)
  */
-export const useAllCargosMppStore = defineStore(
-    "cargos_mpp",
+export const useAllCargosMofStore = defineStore(
+    "cargos_mof",
     () => {
         // --- Estado (State) ---
         const cargos = ref([]);      // Listado de cargos obtenidos de la API
@@ -14,6 +14,14 @@ export const useAllCargosMppStore = defineStore(
         
         // URL base para las peticiones de cargos
         const API_URL = "https://correspondencia.fcpn.edu.bo/umsa-core/api/v1/unidades/cargos";
+
+        const getHeaders = () => {
+          const token = localStorage.getItem('token') || '';
+          return {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          };
+        };
 
         // --- Acciones (Actions) ---
         
@@ -24,7 +32,7 @@ export const useAllCargosMppStore = defineStore(
             loading.value = true;
             error.value = null;
             try {
-                const response = await fetch(API_URL);
+                const response = await fetch(API_URL, { headers: getHeaders() });
                 if (!response.ok) throw new Error("Error al obtener los cargos");
                 
                 const data = await response.json();
@@ -32,7 +40,6 @@ export const useAllCargosMppStore = defineStore(
                 cargos.value = data.data;
             } catch (err) {
                 error.value = err.message;
-                console.error("Error en getFetchCargos:", err);
             } finally {
                 loading.value = false;
             }
@@ -41,16 +48,17 @@ export const useAllCargosMppStore = defineStore(
         /**
          * Crea un nuevo cargo en el catálogo maestro.
          * @param {string} descripcion - Nombre del nuevo cargo.
+         * @param {boolean} activo - Estado del cargo
          * @returns {Promise<boolean>}
          */
-        const createCargo = async (descripcion) => {
+        const createCargo = async (descripcion, activo = true) => {
             loading.value = true;
             error.value = null;
             try {
                 const response = await fetch(API_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ descripcion })
+                    headers: getHeaders(),
+                    body: JSON.stringify({ descripcion, activo })
                 });
                 if (!response.ok) throw new Error("Error al crear el cargo");
                 await getFetchCargos(); // Refrescar catálogo local
@@ -68,16 +76,17 @@ export const useAllCargosMppStore = defineStore(
          * Este cambio afecta a todas las unidades que usen este cargo.
          * @param {number|string} id - ID del cargo en el catálogo.
          * @param {string} descripcion - Nuevo nombre del cargo.
+         * @param {boolean} activo - Estado del cargo
          * @returns {Promise<boolean>}
          */
-        const updateCargo = async (id, descripcion) => {
+        const updateCargo = async (id, descripcion, activo = true) => {
             loading.value = true;
             error.value = null;
             try {
                 const response = await fetch(`${API_URL}/${id}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ descripcion })
+                    headers: getHeaders(),
+                    body: JSON.stringify({ descripcion, activo })
                 });
                 if (!response.ok) throw new Error("Error al actualizar el cargo");
                 await getFetchCargos(); // Refrescar catálogo local

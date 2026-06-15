@@ -2,11 +2,13 @@
 import { ref, onMounted, onUnmounted, watch, computed } from "vue";
 import { useMppCoreStore } from "@/stores/mpp_core";
 import DisenadorMatriz from "./DisenadorMatriz.vue";
+import FormularioComplementario from "./FormularioComplementario.vue";
 
 const mppStore = useMppCoreStore();
 
 // --- ESTADOS DE UI Y NAVEGACIÓN ---
 const isLocked = ref(false);
+const currentScreen = ref("setup"); // "setup", "matrix", "complementary"
 const isSaving = ref(false);
 const lastSaved = ref(null);
 
@@ -222,6 +224,7 @@ const confirmEstructura = async () => {
       color: "primary",
     };
     isLocked.value = true;
+    currentScreen.value = "matrix";
   } catch (e) {
     snackbar.value = {
       show: true,
@@ -493,7 +496,7 @@ onUnmounted(() => {
   <v-container fluid class="pa-0 fill-height bg-grey-lighten-4 overflow-hidden">
     <!-- PANTALLA 1: CONFIGURADOR -->
     <v-row
-      v-if="!isLocked"
+      v-if="currentScreen === 'setup'"
       justify="center"
       align="center"
       class="fill-height ma-0"
@@ -637,12 +640,22 @@ onUnmounted(() => {
 
     <!-- PANTALLA 2: DISEÑADOR MATRIZ -->
     <DisenadorMatriz 
-        v-else 
+        v-else-if="currentScreen === 'matrix'" 
         :procesoId="selectedProceso" 
         :procedimientoId="selectedProcedimiento" 
         :cargoId="selectedCargo" 
         :unidadesIds="entityData.id_unidades"
-        @back="isLocked = false"
+        @back="currentScreen = 'setup'; isLocked = false;"
+        @finalize="currentScreen = 'complementary'"
+    />
+
+    <!-- PANTALLA 3: FORMULARIO COMPLEMENTARIO (KPIs, Instalaciones, etc.) -->
+    <FormularioComplementario
+        v-else-if="currentScreen === 'complementary'"
+        :procedimientoId="selectedProcedimiento"
+        :procesoId="selectedProceso"
+        @back="currentScreen = 'matrix'"
+        @exit="currentScreen = 'setup'; isLocked = false;"
     />
 
     <!-- MODALES UNIFICADOS (Chameleon Engine) -->

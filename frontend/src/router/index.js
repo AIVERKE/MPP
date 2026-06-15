@@ -1,8 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import ListarUnidades from '../views/MPP/ListarUnidades.vue'
-import RegistrarUnidad from '../views/MPP/RegistrarUnidad.vue'
-import TreeUnidades from '../views/MPP/TreeUnidades.vue'
 import Login from '../views/Login.vue'
 
 const router = createRouter({
@@ -33,24 +30,6 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
-      path:"/mpp/listar-unidades",
-      name:'listar_unidades',
-      component: ListarUnidades,
-      meta: { requiresAuth: true }
-    },
-    {
-        path:"/mpp/registrar-unidad",
-        name:"registro_unidad",
-        component: RegistrarUnidad,
-        meta: { requiresAuth: true }
-    },
-    {
-        path:"/mpp/arbol-unidades",
-        name:"tree_unidades",
-        component:TreeUnidades,
-        meta: { requiresAuth: true }
-    },
-    {
         path:"/mpp/gestion-mpp",
         name:"gestion_mpp",
         component: () => import('../views/MPP/GestionEstructura.vue')
@@ -59,6 +38,43 @@ const router = createRouter({
       path: "/mpp/diagrama-flujos",
       name: "diagrama_flujos",
       component: () => import('../views/MPP/DisenadorFlujos.vue'),
+      meta: { requiresAuth: true }
+    },
+    // Rutas MOF del repositorio anterior
+    {
+      path: '/reportes/ejecutivo',
+      name: 'dashboard_ejecutivo',
+      component: () => import('../views/MOF/DashboardEjecutivo.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/reportes/facultativo',
+      name: 'dashboard_facultativo',
+      component: () => import('../views/MOF/DashboardFacultativo.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: "/mof/listar-unidades",
+      name: 'mof_listar_unidades',
+      component: () => import('../views/MOF/ListarUnidades.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: "/mof/registrar-unidad",
+      name: "mof_registro_unidad",
+      component: () => import('../views/MOF/RegistrarUnidad.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: "/mof/arbol-unidades",
+      name: "mof_tree_unidades",
+      component: () => import('../views/MOF/TreeUnidades.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: "/mof/organigrama-unidades",
+      name: "organigrama_unidades",
+      component: () => import('../views/MOF/OrganigramaVueFlow.vue'),
       meta: { requiresAuth: true }
     }
   ]

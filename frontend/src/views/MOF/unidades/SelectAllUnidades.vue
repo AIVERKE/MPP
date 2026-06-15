@@ -1,12 +1,16 @@
-﻿<script setup>
-import { computed, onMounted } from 'vue';
-import { useAllUnidadesMppStore } from '../../../stores/unidades_mpp';
+<script setup>
+import { computed, onMounted, watch, ref } from 'vue';
+import { useAllUnidadesMofStore } from '../../../stores/unidades_mof';
 
 const props = defineProps({
     modelValue: [Number, String, Array, null],
     type: {
         type: String,
-        default: 'select'//valor por defecto para select normal
+        default: 'select'
+    },
+    label: {
+        type: String,
+        default: 'Unidades'
     },
     excludeId: {
         type: [Number, String, null],
@@ -20,12 +24,9 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue']);
 
-const undadesAllUnidadesStore = useAllUnidadesMppStore();
+const undadesAllUnidadesStore = useAllUnidadesMofStore();
+const updateKey = ref(0);
 
-/**
- * Gestiona la selecciÃ³n bidireccional permitiendo que el componente
- * funcione tanto en formularios de creaciÃ³n como de ediciÃ³n.
- */
 const value = computed({
   get() {
     return props.modelValue;
@@ -36,17 +37,18 @@ const value = computed({
 });
 
 onMounted(async () => {
-    // Solo carga si el store estÃ¡ vacÃ­o para optimizar peticiones
     if (undadesAllUnidadesStore.unidades.length === 0) {
         await undadesAllUnidadesStore.getFetchUnidades();
     }
 });
 
-/**
- * Filtra la lista para evitar que una unidad se seleccione a sÃ­ misma
- * (Ãºtil en dependencias funcionales o cambio de padre).
- */
+// Fuerza re-render cuando props.items cambia
+watch(() => props.items, () => {
+    updateKey.value++;
+});
+
 const filteredUnidades = computed(() => {
+    updateKey.value; // Hacer que dependa del watcher
     const list = props.items || undadesAllUnidadesStore.unidades;
     if (props.excludeId) {
         return list.filter(u => String(u.id) !== String(props.excludeId));
@@ -54,7 +56,6 @@ const filteredUnidades = computed(() => {
     return list;
 });
 
-//Adicionando las nuevas propiedades 
 const autocompleteProps = computed(() => {
     if (props.type !== 'autocomplete') return {};
     return {
@@ -70,7 +71,7 @@ const autocompleteProps = computed(() => {
     <component 
         :is="props.type === 'autocomplete' ? 'v-autocomplete' : 'v-select'"
         v-model="value"
-        label="Unidades" 
+        :label="props.label || 'Unidades'" 
         :items="filteredUnidades" 
         item-title="nombre" 
         item-value="id" 
@@ -79,4 +80,3 @@ const autocompleteProps = computed(() => {
         :loading="undadesAllUnidadesStore.loading"
     />
 </template>
-

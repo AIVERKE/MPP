@@ -9,6 +9,7 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
     const procedimientos = ref([]);
     const cargoProcesos = ref([]);
     const acciones = ref([]);
+    const figuras = ref([]); 
     const pasos = ref([]); 
     const operaciones = ref([]); 
     
@@ -18,6 +19,7 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
     const normativas = ref([]);
     const indicadores = ref([]);
     const equipos = ref([]);
+    const instalaciones = ref([]);
     const sistemasInformacion = ref([]);
     const documentosReferencia = ref([]);
 
@@ -45,7 +47,7 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
                 { key: "periodicidad", label: "Periodicidad", type: "text" },
                 { key: "version", label: "Versión", type: "text", default: "1.0" },
                 { key: "estado", label: "Estado", type: "select", options: ["Activo", "Inactivo", "En Revisión"], default: "Activo" },
-                { key: "id_instalaciones", label: "Instalaciones", type: "select-multiple", optionsSource: "unidades", itemTitle: "nombre", itemValue: "id_unidad" }
+                { key: "id_instalaciones", label: "Instalaciones", type: "select-multiple", optionsSource: "instalaciones", itemTitle: "nombre", itemValue: "id_instalacion" }
             ],
             endpoints: { save: "procedimientos", update: "procedimientos", fetch: "procedimientos" }
         },
@@ -61,6 +63,15 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
             ],
             endpoints: { save: "normativas", update: "normativas", fetch: "normativas" },
             parentLink: { key: "id_procedimientos", type: "array" }
+        },
+        accion: {
+            title: "Acción / Verbo",
+            icon: "mdi-play-network-outline",
+            fields: [
+                { key: "nombre_accion", label: "Nombre de la Acción (Verbo)", type: "text", required: true },
+                { key: "id_figura", label: "Figura Visual", type: "select", optionsSource: "figuras", itemTitle: "nombre", itemValue: "id_figura", required: true }
+            ],
+            endpoints: { save: "acciones", update: "acciones", fetch: "acciones" }
         }
     });
 
@@ -85,11 +96,29 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
         finally { loading.value = false; }
     };
 
+    const fetchFiguras = async () => {
+        loading.value = true;
+        try {
+            const response = await axios.get(`${BASE_URL_FLUX}/figuras`);
+            figuras.value = response.data.data || response.data;
+        } catch (err) { error.value = err.message; }
+        finally { loading.value = false; }
+    };
+
     const fetchUnidades = async () => {
         loading.value = true;
         try {
             const response = await axios.get(`${BASE_URL_ORG}/unidades`);
             unidades.value = response.data.data || response.data;
+        } catch (err) { error.value = err.message; }
+        finally { loading.value = false; }
+    };
+
+    const fetchInstalaciones = async () => {
+        loading.value = true;
+        try {
+            const response = await axios.get(`${BASE_URL_ORG}/instalaciones`);
+            instalaciones.value = response.data.data || response.data;
         } catch (err) { error.value = err.message; }
         finally { loading.value = false; }
     };
@@ -106,7 +135,7 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
     const fetchProcesos = async () => {
         loading.value = true;
         try {
-            await fetchUnidades();
+            await Promise.all([fetchUnidades(), fetchInstalaciones()]);
             const response = await axios.get(`${BASE_URL_MPP}/procesos`);
             procesos.value = response.data.data || response.data;
         } catch (err) { error.value = err.message; }
@@ -234,7 +263,7 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
     };
 
     const saveMatrixRow = async (row, procedimientoId) => {
-        console.log(`[Store] saveMatrixRow iniciado para fila ${row.nro}`, { row, procedimientoId });
+        console.log(`📡 [API-Store] saveMatrixRow - Fila: ${row.nro}, responsableCargoId: ${row.responsableCargoId}, savedIds:`, JSON.stringify(row.savedIds));
         try {
             const savedIds = row.savedIds || {};
             const pId = Number(procedimientoId);
@@ -242,31 +271,50 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
             // 1. Operación
             const opData = { id_procedimiento: pId, orden: Number(row.nro), salida: row.salida || "", plazo: Number(row.plazo || 0) };
             let opId = savedIds.operacion ? Number(savedIds.operacion) : null;
-            if (opId) await axios.patch(`${BASE_URL_FLUX}/operaciones/${opId}`, opData);
-            else {
+            if (opId) {
+                console.log(`📡 [API-Store] PATCH /operaciones/${opId} con data:`, JSON.stringify(opData));
+                await axios.patch(`${BASE_URL_FLUX}/operaciones/${opId}`, opData);
+            } else {
+                console.log(`📡 [API-Store] POST /operaciones con data:`, JSON.stringify(opData));
                 const res = await axios.post(`${BASE_URL_FLUX}/operaciones`, opData);
                 opId = Number(res.data.data?.id_operaciones || res.data.id_operaciones || res.data.id);
+                console.log(`📡 [API-Store] Operación creada con ID: ${opId}`);
             }
 
             // 2. Actividad
             const actData = { id_operaciones: opId, descripcion: row.actividad || "Sin descripción", orden: 1 };
             let actId = savedIds.actividad ? Number(savedIds.actividad) : null;
-            if (actId) await axios.patch(`${BASE_URL_FLUX}/actividades/${actId}`, actData);
-            else {
+            if (actId) {
+                console.log(`📡 [API-Store] PATCH /actividades/${actId} con data:`, JSON.stringify(actData));
+                await axios.patch(`${BASE_URL_FLUX}/actividades/${actId}`, actData);
+            } else {
+                console.log(`📡 [API-Store] POST /actividades con data:`, JSON.stringify(actData));
                 const res = await axios.post(`${BASE_URL_FLUX}/actividades`, actData);
                 actId = Number(res.data.data?.id_actividad || res.data.id_actividad || res.data.id);
+                console.log(`📡 [API-Store] Actividad creada con ID: ${actId}`);
             }
 
             // 3. Tarea
             let tareaId = savedIds.tarea ? Number(savedIds.tarea) : null;
             if (row.accionId && actId) {
-                const tareaData = { id_actividad: actId, id_accion: Number(row.accionId), descripcion: (row.tarea || "Nueva Tarea").trim(), orden: 1 };
-                if (tareaId) await axios.patch(`${BASE_URL_FLUX}/tareas/${tareaId}`, tareaData);
-                else {
+                const tareaData = { 
+                    id_actividad: actId, 
+                    id_accion: Number(row.accionId), 
+                    descripcion: (row.tarea || "Nueva Tarea").trim(), 
+                    texto_figura: (row.texto_figura || row.tarea || "Nueva Tarea").trim(),
+                    orden: 1 
+                };
+                if (tareaId) {
+                    console.log(`📡 [API-Store] PATCH /tareas/${tareaId} con data:`, JSON.stringify(tareaData));
+                    await axios.patch(`${BASE_URL_FLUX}/tareas/${tareaId}`, tareaData);
+                } else {
+                    console.log(`📡 [API-Store] POST /tareas con data:`, JSON.stringify(tareaData));
                     const res = await axios.post(`${BASE_URL_FLUX}/tareas`, tareaData);
                     tareaId = Number(res.data.data?.id_tarea || res.data.id_tarea || res.data.id);
+                    console.log(`📡 [API-Store] Tarea creada con ID: ${tareaId}`);
                 }
             } else if (tareaId) {
+                console.log(`📡 [API-Store] DELETE /tareas/${tareaId} (acción vacía o actividad ausente)`);
                 await axios.delete(`${BASE_URL_FLUX}/tareas/${tareaId}`).catch(() => {});
                 tareaId = null;
             }
@@ -275,13 +323,26 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
             let respId = savedIds.responsable ? Number(savedIds.responsable) : null;
             if (row.responsableCargoId) {
                 const respData = { id_operacion: opId, id_cargo: Number(row.responsableCargoId), tipo_participacion: 'Responsable' };
-                if (respId) await axios.patch(`${BASE_URL_FLUX}/operacion-cargos/${respId}`, respData);
-                else {
+                if (respId) {
+                    console.log(`🔄 [API-Store] Cambiando Cargo Responsable. Eliminando anterior relacion ID: ${respId} y creando nueva relacion para Cargo: ${row.responsableCargoId}`);
+                    await axios.delete(`${BASE_URL_FLUX}/operacion-cargos/${respId}`).catch((err) => {
+                        console.warn(`⚠️ [API-Store] Falló DELETE /operacion-cargos/${respId} (probablemente ya borrado).`, err.message);
+                    });
+                    console.log(`📡 [API-Store] POST /operacion-cargos con data:`, JSON.stringify(respData));
                     const res = await axios.post(`${BASE_URL_FLUX}/operacion-cargos`, respData);
                     respId = Number(res.data.data?.id || res.data.id);
+                    console.log(`✨ [API-Store] Nueva relación Responsable creada con ID: ${respId}`);
+                } else {
+                    console.log(`➕ [API-Store] Creando Asignación de Cargo Responsable. POST /operacion-cargos con data:`, JSON.stringify(respData));
+                    const res = await axios.post(`${BASE_URL_FLUX}/operacion-cargos`, respData);
+                    respId = Number(res.data.data?.id || res.data.id);
+                    console.log(`✨ [API-Store] Relación Responsable creada con ID: ${respId}`);
                 }
             } else if (respId) {
-                await axios.delete(`${BASE_URL_FLUX}/operacion-cargos/${respId}`).catch(() => {});
+                console.log(`➖ [API-Store] Eliminando Cargo Responsable anterior. DELETE /operacion-cargos/${respId}`);
+                await axios.delete(`${BASE_URL_FLUX}/operacion-cargos/${respId}`).catch((err) => {
+                    console.warn(`⚠️ [API-Store] Falló DELETE /operacion-cargos/${respId}`, err.message);
+                });
                 respId = null;
             }
 
@@ -335,7 +396,7 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
     };
 
     const fetchMatrixData = async (procedimientoId) => {
-        console.log(`[Store] Iniciando fetchMatrixData para procedimiento ${procedimientoId}`);
+        console.log(`📡 [API-Store] Iniciando fetchMatrixData para procedimiento ID: ${procedimientoId}`);
         loading.value = true;
         try {
             const pId = Number(procedimientoId);
@@ -388,11 +449,9 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
                 const solicitanteReq = todosReqs.find(req => req.tipo_entrada === 'solicitante') || {};
                 const referencia = allRefs.find(ref => Array.isArray(ref.operaciones) && ref.operaciones.some(o => Number(o.id_operaciones || o.id) === idOp)) || {};
 
-                console.log(`[Store] Fila ${op.orden} -> R:${!!riesgo.id_riesgo}, C:${!!control.id_control}, T:${!!tarea.id_tarea}, S:${!!solicitanteReq.id_requisitos}`);
-
                 return {
                     id: `db-${idOp}`, nro: op.orden || 1, requisitos: reqEntrada.descripcion || "", actividad: actividad.descripcion || "",
-                    tarea: tarea.descripcion || "", referencia: referencia.nombre || "", solicitante: solicitanteReq.descripcion || "",
+                    tarea: tarea.descripcion || "", texto_figura: tarea.texto_figura || tarea.descripcion || "", referencia: referencia.nombre || "", solicitante: solicitanteReq.descripcion || "",
                     riesgo: riesgo.descripcion || "", control: control.descripcion || "",
                     salida: op.salida || "", plazo: op.plazo || 0, accionId: tarea.id_accion || null, responsableCargoId: responsable.id_cargo || null,
                     status: 'idle',
@@ -447,11 +506,11 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
     };
 
     return {
-        unidades, cargos, procesos, procedimientos, cargoProcesos, pasos, operaciones, acciones,
-        riesgos, controles, requisitos, normativas, indicadores, equipos, sistemasInformacion, documentosReferencia,
+        unidades, cargos, procesos, procedimientos, cargoProcesos, pasos, operaciones, acciones, figuras,
+        riesgos, controles, requisitos, normativas, indicadores, equipos, instalaciones, sistemasInformacion, documentosReferencia,
         currentContext, loading, error, schemas,
-        fetchUnidades, fetchRiesgos, fetchControles, fetchRequisitos, fetchNormativas, fetchIndicadores, fetchEquipos, fetchSistemasInformacion, fetchDocumentosReferencia,
-        syncUnidades, syncCargos, fetchCargos, fetchProcesos, fetchProcedimientos, fetchCargoProcesos, fetchOperaciones, fetchPasos, fetchAcciones,
+        fetchUnidades, fetchRiesgos, fetchControles, fetchRequisitos, fetchNormativas, fetchIndicadores, fetchEquipos, fetchInstalaciones, fetchSistemasInformacion, fetchDocumentosReferencia,
+        syncUnidades, syncCargos, fetchCargos, fetchProcesos, fetchProcedimientos, fetchCargoProcesos, fetchOperaciones, fetchPasos, fetchAcciones, fetchFiguras,
         saveProceso, updateProceso, deleteProceso,
         saveProcedimiento, updateProcedimiento, deleteProcedimiento,
         saveCargoProceso, updateCargoProceso, deleteCargoProceso,

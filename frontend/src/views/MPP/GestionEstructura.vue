@@ -3,7 +3,7 @@ import { ref, onMounted, onUnmounted, watch, computed } from "vue";
 import { useMppCoreStore } from "@/stores/mpp_core";
 import { rules } from "@/utils/rules";
 import DisenadorMatriz from "./DisenadorMatriz.vue";
-import SpotlightGuide from "@/components/SpotlightGuide.vue";
+import FormularioComplementario from "./FormularioComplementario.vue";
 
 const mppStore = useMppCoreStore();
 
@@ -22,6 +22,7 @@ const isStep3Valid = computed(() =>
 const canStartDesign = computed(() => isStep1Valid.value && isStep2Valid.value && isStep3Valid.value && !isProcedimientoInactivo.value);
 
 const isLocked = ref(false);
+const currentScreen = ref("setup"); // "setup", "matrix", "complementary"
 const isSaving = ref(false);
 const lastSaved = ref(null);
 
@@ -62,18 +63,6 @@ const resourceData = ref({
 });
 
 const snackbar = ref({ show: false, text: "", color: "success" });
-
-// --- LÓGICA DE SPOTLIGHT (GUÍA RÁPIDA ILUSTRADA) ---
-const showSpotlight = ref(true); // Se activa al entrar
-const guide = {
-  title: "Arquitectura Operativa",
-  subtitle: "Configuración de Cabecera",
-  desc: "Este módulo permite establecer la estructura formal de los Procesos y Procedimientos. Aquí definirá el contexto de origen, designará a los responsables técnicos y vinculará el marco normativo vigente para garantizar la validez legal del proceso.",
-  icon: "mdi-file-document-edit-outline",
-  color: "primary"
-};
-
-// Eliminar el watch(step) que activaba el spotlight en cada paso
 
 // --- TIMERS ---
 let debounceTimer = null;
@@ -180,6 +169,7 @@ const confirmEstructura = async () => {
     await Promise.all([saveProcedureHeader(true), saveCargoRelation(true), saveProcessUnits(true)]);
     snackbar.value = { show: true, text: "ESTRUCTURA SINCRONIZADA", color: "primary" };
     isLocked.value = true;
+    currentScreen.value = "matrix";
   } catch (e) {
     snackbar.value = { show: true, text: "ERROR AL INICIAR: " + e.message, color: "error" };
   } finally {
@@ -405,7 +395,7 @@ onUnmounted(() => {
 <template>
   <v-container fluid class="pa-0 fill-height bg-grey-lighten-4 overflow-hidden">
     <!-- PANTALLA 1: GESTIÓN POR PASOS (STEPPER) -->
-    <v-row v-if="!isLocked" justify="center" align="center" class="fill-height ma-0">
+    <v-row v-if="currentScreen === 'setup'" justify="center" align="center" class="fill-height ma-0">
       <v-col cols="12" sm="11" md="10" lg="8">
         <v-card elevation="12" class="rounded-xl border-top-primary overflow-hidden">
           <v-toolbar color="white" flat class="px-4">
@@ -531,7 +521,24 @@ onUnmounted(() => {
     </v-row>
 
     <!-- PANTALLA 2: DISEÑADOR MATRIZ -->
-    <DisenadorMatriz v-else :procesoId="selectedProceso" :procedimientoId="selectedProcedimiento" :cargoId="selectedCargo" :unidadesIds="entityData.id_unidades" @back="isLocked = false" />
+    <DisenadorMatriz 
+        v-else-if="currentScreen === 'matrix'" 
+        :procesoId="selectedProceso" 
+        :procedimientoId="selectedProcedimiento" 
+        :cargoId="selectedCargo" 
+        :unidadesIds="entityData.id_unidades" 
+        @back="currentScreen = 'setup'; isLocked = false;" 
+        @finalize="currentScreen = 'complementary'"
+    />
+
+    <!-- PANTALLA 3: FORMULARIO COMPLEMENTARIO (KPIs, Instalaciones, etc.) -->
+    <FormularioComplementario
+        v-else-if="currentScreen === 'complementary'"
+        :procedimientoId="selectedProcedimiento"
+        :procesoId="selectedProceso"
+        @back="currentScreen = 'matrix'"
+        @exit="currentScreen = 'setup'; isLocked = false;"
+    />
 
     <!-- MODALES UNIFICADOS (Chameleon Engine) -->
     <v-dialog v-model="showEntityDialog" max-width="600px">
@@ -581,16 +588,6 @@ onUnmounted(() => {
         </v-card-actions>
       </v-card>
     </v-dialog>
-
-    <!-- SPOTLIGHT REUTILIZABLE -->
-    <SpotlightGuide
-      v-model="showSpotlight"
-      :title="guide.title"
-      :subtitle="guide.subtitle"
-      :desc="guide.desc"
-      :icon="guide.icon"
-      :color="guide.color"
-    />
 
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000">{{ snackbar.text }}</v-snackbar>
   </v-container>
