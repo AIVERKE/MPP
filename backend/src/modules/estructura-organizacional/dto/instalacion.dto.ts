@@ -28,7 +28,8 @@ export class CreateInstalacionDto {
   descripcion?: string;
 
   @ApiProperty({
-    description: 'ID de la unidad organizacional a la que pertenece la instalación',
+    description:
+      'ID de la unidad organizacional a la que pertenece la instalación',
     example: 1,
   })
   id_unidad: number;

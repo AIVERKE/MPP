@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddFiguraToAccionAndTarea1779660290327
-  implements MigrationInterface
-{
+export class AddFiguraToAccionAndTarea1779660290327 implements MigrationInterface {
   name = 'AddFiguraToAccionAndTarea1779660290327';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

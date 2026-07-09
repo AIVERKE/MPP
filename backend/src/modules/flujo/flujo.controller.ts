@@ -171,7 +171,8 @@ export class FlujoController {
   @Get('figuras')
   @ApiOperation({
     summary: 'Listar todas las figuras',
-    description: 'Catálogo completo de formas disponibles para asignar a acciones.',
+    description:
+      'Catálogo completo de formas disponibles para asignar a acciones.',
   })
   @ApiOkResponse({
     description: 'Lista de figuras obtenida exitosamente.',
