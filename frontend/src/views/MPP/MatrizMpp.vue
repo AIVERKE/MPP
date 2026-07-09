@@ -32,6 +32,7 @@ const isSavingAction = ref(false);
 
 // Ref para exportar diagrama
 const diagramContainer = ref(null);
+const scrollWrapper = ref(null);
 
 // Obtener nombres dinámicos
 const procedimientoNombre = computed(() => {
@@ -601,6 +602,7 @@ onMounted(async () => {
     nextTick(() => {
       isHydrating.value = false; // APAGAR ESCUDO
       console.log("👉 [Matriz-UI] Escudo de hidratación apagado. Auto-guardado de matriz activo.");
+      calculateEditorConnections();
     });
   }
 });
@@ -613,14 +615,16 @@ const calculateConnections = () => {
   nextTick(() => {
     setTimeout(() => {
       const container = diagramContainer.value;
-      const containerRect = container.getBoundingClientRect();
+      const wrapper = container.querySelector(".diagram-scroll-wrapper");
+      if (!wrapper) return;
+      const wrapperRect = wrapper.getBoundingClientRect();
       const nodes = container.querySelectorAll(".preview-node");
       
       const pts = [];
       nodes.forEach((node, index) => {
         const rect = node.getBoundingClientRect();
-        const cx = rect.left - containerRect.left + rect.width / 2;
-        const cy = rect.top - containerRect.top + rect.height / 2;
+        const cx = rect.left - wrapperRect.left + rect.width / 2;
+        const cy = rect.top - wrapperRect.top + rect.height / 2;
         
         // Asociar cada nodo al paso de la fila correspondiente por data-row-nro
         const rowNro = Number(node.getAttribute("data-row-nro"));
@@ -637,7 +641,7 @@ const calculateConnections = () => {
 
       const newPaths = [];
       
-      // 1. Dibujar conexiones secuenciales lineales (Azules)
+      // 1. Dibujar conexiones secuenciales lineales (Indigo, Ortogonales)
       for (let i = 0; i < pts.length - 1; i++) {
         const start = pts[i];
         const end = pts[i + 1];
@@ -648,57 +652,158 @@ const calculateConnections = () => {
         const x2 = end.cx;
         const y2 = end.cy - end.h / 2;
 
-        const offsetCtrl = Math.abs(y2 - y1) * 0.4;
-        const path = `M ${x1} ${y1} C ${x1} ${y1 + offsetCtrl}, ${x2} ${y2 - offsetCtrl}, ${x2} ${y2}`;
-        newPaths.push({ path, color: "#6366f1", dash: "2,2", isReturn: false });
+        let path = "";
+        if (Math.abs(x1 - x2) < 8) {
+          path = `M ${x1} ${y1} L ${x2} ${y2}`;
+        } else {
+          const yMid = y1 + (y2 - y1) / 2;
+          path = `M ${x1} ${y1} L ${x1} ${yMid} L ${x2} ${yMid} L ${x2} ${y2}`;
+        }
+        newPaths.push({ path, color: "#4f46e5", isReturn: false });
       }
 
       // Función helper para buscar el paso destino de retorno en el texto
       const getReturnTarget = (text) => {
         if (!text) return null;
-        // Captura: "vuelve a X", "vuelve al paso X", "retorna al paso X", "no -> X", etc.
         const match = text.match(/(?:vuelve\s+a|vuelve\s+al|retorna\s+a|retorna\s+al|regresa\s+a|regresa\s+al|no\s*->|->|ir\s+a|paso)\s*(?:paso\s+)?(\d+)/i);
         return match ? parseInt(match[1], 10) : null;
       };
 
-      // 2. Dibujar retornos/bucles condicionales (Rojos) si se detecta texto de retorno
+      // 2. Dibujar retornos/bucles condicionales (Rojos, Ortogonales)
       pts.forEach((start) => {
         const targetNro = getReturnTarget(start.rowText);
         if (targetNro && targetNro !== start.nro) {
           const dest = pts.find(p => p.nro === targetNro);
           if (dest) {
-            // El retorno sale por el lado derecho y sube haciendo un arco hacia el lado derecho del destino
             const xStart = start.cx + start.w / 2;
             const yStart = start.cy;
             const xEnd = dest.cx + dest.w / 2;
             const yEnd = dest.cy;
 
-            // Offset horizontal hacia la derecha proporcional a la distancia y posición
-            const offset = Math.max(120, Math.abs(xStart - xEnd) + 100);
-            const path = `M ${xStart} ${yStart} C ${xStart + offset} ${yStart}, ${xEnd + offset} ${yEnd}, ${xEnd} ${yEnd}`;
-            newPaths.push({ path, color: "#ef4444", dash: "3,3", isReturn: true });
+            const xRight = Math.max(xStart, xEnd) + 40;
+            const path = `M ${xStart} ${yStart} L ${xRight} ${yStart} L ${xRight} ${yEnd} L ${xEnd} ${yEnd}`;
+            newPaths.push({ path, color: "#ef4444", isReturn: true });
           }
         }
       });
 
       connectionPaths.value = newPaths;
-    }, 150); // Tiempo para estabilización de renderizado en DOM
+    }, 250);
   });
 };
 
-watch(showPreview, (val) => {
-  if (val) {
+watch([showPreview, scrollWrapper], () => {
+  if (showPreview.value && scrollWrapper.value) {
     calculateConnections();
   }
-});
+}, { immediate: true });
+
+const editorConnectionPaths = ref([]);
+const matrixEditorContainer = ref(null);
+
+const calculateEditorConnections = () => {
+  if (!matrixEditorContainer.value) return;
+  nextTick(() => {
+    setTimeout(() => {
+      const container = matrixEditorContainer.value;
+      const wrapper = container.querySelector(".editor-scroll-wrapper");
+      if (!wrapper) return;
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const nodes = container.querySelectorAll(".cell-flow-node");
+      
+      const pts = [];
+      nodes.forEach((node, index) => {
+        const rect = node.getBoundingClientRect();
+        const cx = rect.left - wrapperRect.left + rect.width / 2;
+        const cy = rect.top - wrapperRect.top + rect.height / 2;
+        
+        const parentTr = node.closest("tr");
+        let rowNro = index + 1;
+        if (parentTr) {
+          const cells = Array.from(parentTr.parentNode.children);
+          const trIndex = cells.indexOf(parentTr);
+          if (trIndex !== -1) {
+            const trRow = rows.value[trIndex];
+            if (trRow) rowNro = trRow.nro;
+          }
+        }
+        
+        const row = rows.value.find(r => Number(r.nro) === Number(rowNro)) || rows.value[index];
+        pts.push({
+          cx,
+          cy,
+          w: rect.width,
+          h: rect.height,
+          nro: row ? row.nro : rowNro,
+          rowText: row ? (row.texto_figura || row.tarea || "") : ""
+        });
+      });
+
+      const newPaths = [];
+      
+      // Conexiones secuenciales en el editor (Ortogonales)
+      for (let i = 0; i < pts.length - 1; i++) {
+        const start = pts[i];
+        const end = pts[i + 1];
+
+        const x1 = start.cx;
+        const y1 = start.cy + start.h / 2;
+
+        const x2 = end.cx;
+        const y2 = end.cy - end.h / 2;
+
+        let path = "";
+        if (Math.abs(x1 - x2) < 8) {
+          path = `M ${x1} ${y1} L ${x2} ${y2}`;
+        } else {
+          const yMid = y1 + (y2 - y1) / 2;
+          path = `M ${x1} ${y1} L ${x1} ${yMid} L ${x2} ${yMid} L ${x2} ${y2}`;
+        }
+        newPaths.push({ path, color: "#4f46e5", isReturn: false });
+      }
+
+      const getReturnTarget = (text) => {
+        if (!text) return null;
+        const match = text.match(/(?:vuelve\s+a|vuelve\s+al|retorna\s+a|retorna\s+al|regresa\s+a|regresa\s+al|no\s*->|->|ir\s+a|paso)\s*(?:paso\s+)?(\d+)/i);
+        return match ? parseInt(match[1], 10) : null;
+      };
+
+      // Conexiones de retorno en el editor (Ortogonales)
+      pts.forEach((start) => {
+        const targetNro = getReturnTarget(start.rowText);
+        if (targetNro && targetNro !== start.nro) {
+          const dest = pts.find(p => p.nro === targetNro);
+          if (dest) {
+            const xStart = start.cx + start.w / 2;
+            const yStart = start.cy;
+            const xEnd = dest.cx + dest.w / 2;
+            const yEnd = dest.cy;
+
+            const xRight = Math.max(xStart, xEnd) + 40;
+            const path = `M ${xStart} ${yStart} L ${xRight} ${yStart} L ${xRight} ${yEnd} L ${xEnd} ${yEnd}`;
+            newPaths.push({ path, color: "#ef4444", isReturn: true });
+          }
+        }
+      });
+
+      editorConnectionPaths.value = newPaths;
+    }, 250);
+  });
+};
+
+watch([matrixEditorContainer, () => rows.value], () => {
+  if (matrixEditorContainer.value && rows.value.length > 0) {
+    calculateEditorConnections();
+  }
+}, { deep: true, immediate: true });
 </script>
 
 <template>
-  <div class="matrix-designer fill-height d-flex flex-column bg-white">
+  <div class="matrix-designer fill-height d-flex flex-column bg-surface">
     <!-- TOOLBAR SUPERIOR -->
     <v-toolbar
       density="compact"
-      color="white"
+      color="surface"
       border
       class="px-4 flex-shrink-0"
     >
@@ -716,10 +821,10 @@ watch(showPreview, (val) => {
 
       <v-btn
         variant="tonal"
-        color="indigo"
+        color="primary"
         @click="showCreateAction = true"
         prepend-icon="mdi-plus-box-multiple"
-        class="mr-2"
+        class="mr-2 rounded-lg font-weight-bold text-uppercase text-caption"
         >Crear Verbo/Acción</v-btn
       >
 
@@ -728,7 +833,7 @@ watch(showPreview, (val) => {
         color="secondary"
         @click="showPreview = true"
         prepend-icon="mdi-eye-outline"
-        class="mr-2"
+        class="mr-2 rounded-lg font-weight-bold text-uppercase text-caption"
         >Vista Previa Flujo</v-btn
       >
 
@@ -737,7 +842,7 @@ watch(showPreview, (val) => {
         color="info"
         @click="showLaneManager = true"
         prepend-icon="mdi-account-multiple-plus"
-        class="mr-2"
+        class="mr-2 rounded-lg font-weight-bold text-uppercase text-caption"
         >Gestionar Unidades</v-btn
       >
 
@@ -746,7 +851,7 @@ watch(showPreview, (val) => {
         color="success"
         @click="emit('finalize')"
         prepend-icon="mdi-check-decagram"
-        class="mr-2 rounded-lg font-weight-bold"
+        class="mr-2 rounded-lg font-weight-bold text-uppercase text-caption"
         >Finalizar Flujo</v-btn
       >
 
@@ -768,8 +873,9 @@ watch(showPreview, (val) => {
     </v-toolbar>
 
     <!-- ÁREA DE LA MATRIZ -->
-    <div class="flex-grow-1 pa-2 bg-grey-lighten-5 overflow-visible">
-      <table class="mpp-matrix-table">
+    <div class="flex-grow-1 pa-2 bg-slate-50 overflow-x-auto" ref="matrixEditorContainer">
+      <div class="editor-scroll-wrapper" style="position: relative; display: inline-block; min-width: 100%;">
+        <table class="mpp-matrix-table" style="position: relative; z-index: 2;">
         <thead>
           <tr>
             <th rowspan="2" class="sticky-col nro-col">Nro</th>
@@ -994,6 +1100,47 @@ watch(showPreview, (val) => {
           </tr>
         </tbody>
       </table>
+
+      <!-- SVG para conectar nodos en el editor directo (Sólido y Elegante) -->
+      <svg 
+        v-if="allDisplayCargos.length > 0"
+        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3;"
+      >
+        <defs>
+          <marker 
+            id="editor-arrow" 
+            viewBox="0 0 10 10" 
+            refX="7" 
+            refY="5" 
+            markerWidth="6" 
+            markerHeight="6" 
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#4f46e5"/>
+          </marker>
+          <marker 
+            id="editor-arrow-return" 
+            viewBox="0 0 10 10" 
+            refX="7" 
+            refY="5" 
+            markerWidth="6" 
+            markerHeight="6" 
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#ef4444"/>
+          </marker>
+        </defs>
+        <path 
+          v-for="(path, i) in editorConnectionPaths" 
+          :key="i"
+          :d="path.path"
+          :stroke="path.color"
+          stroke-width="2"
+          fill="none"
+          :marker-end="path.isReturn ? 'url(#editor-arrow-return)' : 'url(#editor-arrow)'"
+        />
+      </svg>
+    </div>
       <div class="mt-4 pb-16">
         <v-btn
           color="secondary"
@@ -1028,7 +1175,7 @@ watch(showPreview, (val) => {
               flex-direction: column;
             "
           >
-            <div class="pa-4 bg-grey-lighten-4">
+            <div class="pa-4 bg-slate-50">
               <v-text-field
                 v-model="unitSearch"
                 placeholder="Buscar unidad..."
@@ -1036,7 +1183,7 @@ watch(showPreview, (val) => {
                 variant="outlined"
                 hide-details
                 prepend-inner-icon="mdi-magnify"
-                bg-color="white"
+                bg-color="surface"
               ></v-text-field>
             </div>
             <v-list density="compact" class="flex-grow-1 overflow-y-auto">
@@ -1068,13 +1215,13 @@ watch(showPreview, (val) => {
 
           <div
             style="flex: 1; display: flex; flex-direction: column"
-            class="bg-grey-lighten-5"
+            class="bg-slate-50"
           >
             <div v-if="selectedUnitId" class="pa-4">
               <div class="text-overline font-weight-black mb-2 text-primary">
                 Seleccionar Cargos
               </div>
-              <v-list density="compact" class="rounded-lg border bg-white">
+              <v-list density="compact" class="rounded-lg border bg-surface">
                 <v-list-item
                   v-for="c in activeUnitCargos"
                   :key="c.id_cargo"
@@ -1114,10 +1261,10 @@ watch(showPreview, (val) => {
               display: flex;
               flex-direction: column;
             "
-            class="bg-white"
+            class="bg-surface"
           >
             <div
-              class="pa-4 text-overline font-weight-black border-bottom bg-grey-lighten-4"
+              class="pa-4 text-overline font-weight-black border-bottom bg-slate-50"
             >
               Columnas Activas
             </div>
@@ -1155,10 +1302,9 @@ watch(showPreview, (val) => {
           <v-spacer></v-spacer>
           <v-btn
             color="primary"
-            variant="elevated"
-            width="250"
+            variant="flat"
+            class="rounded-lg font-weight-bold text-uppercase text-caption px-6"
             @click="showLaneManager = false"
-            height="45"
             >Cerrar y Actualizar Matriz</v-btn
           >
         </v-card-actions>
@@ -1168,7 +1314,7 @@ watch(showPreview, (val) => {
     <!-- MODAL REGISTRO RÁPIDO DE ACCIÓN -->
     <v-dialog v-model="showCreateAction" max-width="450">
       <v-card class="rounded-xl overflow-hidden">
-        <v-toolbar color="indigo" dark density="compact">
+        <v-toolbar color="primary" dark density="compact">
           <v-toolbar-title class="text-subtitle-1 font-weight-bold"
             >REGISTRO RÁPIDO DE VERBO/ACCIÓN</v-toolbar-title
           >
@@ -1198,8 +1344,8 @@ watch(showPreview, (val) => {
         <v-divider></v-divider>
         <v-card-actions class="pa-3">
           <v-spacer></v-spacer>
-          <v-btn color="grey-darken-1" variant="text" @click="showCreateAction = false">Cancelar</v-btn>
-          <v-btn color="indigo" variant="elevated" @click="createQuickAction" :loading="isSavingAction">Guardar Acción</v-btn>
+          <v-btn color="primary" variant="outlined" class="rounded-lg font-weight-bold text-uppercase text-caption mr-2" @click="showCreateAction = false">Cancelar</v-btn>
+          <v-btn color="primary" variant="flat" class="rounded-lg font-weight-bold text-uppercase text-caption px-4" @click="createQuickAction" :loading="isSavingAction">Guardar Acción</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -1207,7 +1353,7 @@ watch(showPreview, (val) => {
     <!-- DIÁLOGO DE PREVISUALIZACIÓN -->
     <v-dialog v-model="showPreview" max-width="950">
       <v-card class="rounded-xl overflow-hidden">
-        <v-toolbar color="indigo" dark density="compact">
+        <v-toolbar color="primary" dark density="compact">
           <v-toolbar-title class="text-subtitle-1 font-weight-bold"
             >VISTA PREVIA DEL DIAGRAMA DE FLUJO (SWIMLANES)</v-toolbar-title
           >
@@ -1240,17 +1386,17 @@ watch(showPreview, (val) => {
           <v-btn icon="mdi-close" @click="showPreview = false"></v-btn>
         </v-toolbar>
 
-        <div class="pa-8 bg-grey-lighten-4 overflow-y-auto" style="max-height: 75vh">
+        <div class="pa-8 bg-slate-50 overflow-y-auto" style="max-height: 75vh">
           <div 
             ref="diagramContainer"
-            class="pa-8 bg-white rounded-lg border overflow-x-auto"
-            style="min-height: 400px; min-width: 100%; position: relative;"
+            class="pa-8 bg-surface rounded-lg border overflow-x-auto"
+            style="min-height: 400px; min-width: 100%;"
           >
             <!-- TÍTULO DEL DIAGRAMA -->
             <div class="text-center mb-6">
-              <h2 class="text-h6 font-weight-black uppercase text-indigo-darken-3 mb-1">{{ procedimientoNombre }}</h2>
+              <h2 class="text-h6 font-weight-black uppercase text-primary-darken-3 mb-1">{{ procedimientoNombre }}</h2>
               <div class="d-flex justify-center align-center">
-                <v-chip size="x-small" color="indigo" variant="tonal" class="font-weight-bold uppercase">{{ procesoNombre }}</v-chip>
+                <v-chip size="x-small" color="primary" variant="tonal" class="font-weight-bold uppercase">{{ procesoNombre }}</v-chip>
               </div>
             </div>
 
@@ -1261,99 +1407,111 @@ watch(showPreview, (val) => {
               <p class="text-caption">Cierra esta ventana, gestiona las unidades y selecciona cargos para poder generar el diagrama.</p>
             </div>
 
-            <!-- TABLA DE SWIMLANES -->
-            <table v-else class="preview-swimlane-table" style="position: relative; z-index: 2;">
-              <thead>
-                <!-- Fila de Unidades -->
-                <tr>
-                  <th class="preview-step-header text-center">Paso</th>
-                  <th
-                    v-for="group in swimlaneGroups"
-                    :key="group.id"
-                    :colspan="group.cargos.length"
-                    class="preview-unit-header text-center"
-                  >
-                    {{ group.name }}
-                  </th>
-                </tr>
-                <!-- Fila de Cargos -->
-                <tr>
-                  <th class="preview-step-subheader"></th>
-                  <th
-                    v-for="cargo in allDisplayCargos"
-                    :key="cargo.id_cargo"
-                    class="preview-cargo-header text-center"
-                  >
-                    {{ cargo.nombre }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="row in rows" :key="row.id">
-                  <!-- Número de Paso -->
-                  <td class="text-center font-weight-bold preview-step-cell">
-                    <span class="step-badge">{{ row.nro }}</span>
-                  </td>
-                  
-                  <!-- Celdas de los carriles -->
-                  <td
-                    v-for="cargo in allDisplayCargos"
-                    :key="cargo.id_cargo"
-                    class="preview-lane-cell text-center"
-                  >
-                    <!-- Si este cargo es responsable, renderizar la figura -->
-                    <div 
-                      v-if="row.responsableCargoId == cargo.id_cargo"
-                      class="preview-node d-flex align-center justify-center text-center pa-4 mx-auto"
-                      :data-row-nro="row.nro"
-                      :class="getActionVisuals(row.accionId).codigoFigura"
-                      :style="{ backgroundColor: getActionVisuals(row.accionId).colorHex }"
+            <!-- Contenedor alineable para SVG y Tabla -->
+            <div v-else ref="scrollWrapper" class="diagram-scroll-wrapper" style="position: relative; display: inline-block; min-width: 100%;">
+              <!-- TABLA DE SWIMLANES -->
+              <table class="preview-swimlane-table" style="position: relative; z-index: 2;">
+                <thead>
+                  <!-- Fila de Unidades -->
+                  <tr>
+                    <th class="preview-step-header text-center">Paso</th>
+                    <th
+                      v-for="group in swimlaneGroups"
+                      :key="group.id"
+                      :colspan="group.cargos.length"
+                      class="preview-unit-header text-center"
                     >
-                      <span class="preview-text font-weight-bold">
-                        {{ row.texto_figura || row.tarea || 'Sin texto' }}
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                      {{ group.name }}
+                    </th>
+                  </tr>
+                  <!-- Fila de Cargos -->
+                  <tr>
+                    <th class="preview-step-subheader"></th>
+                    <th
+                      v-for="cargo in allDisplayCargos"
+                      :key="cargo.id_cargo"
+                      class="preview-cargo-header text-center"
+                    >
+                      {{ cargo.nombre }}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in rows" :key="row.id">
+                    <!-- Número de Paso -->
+                    <td class="text-center font-weight-bold preview-step-cell">
+                      <span class="step-badge">{{ row.nro }}</span>
+                    </td>
+                    
+                    <!-- Celdas de los carriles -->
+                    <td
+                      v-for="cargo in allDisplayCargos"
+                      :key="cargo.id_cargo"
+                      class="preview-lane-cell text-center"
+                    >
+                      <!-- Si este cargo es responsable, renderizar la figura -->
+                      <div 
+                        v-if="row.responsableCargoId == cargo.id_cargo"
+                        class="preview-node d-flex align-center justify-center text-center pa-4 mx-auto"
+                        :data-row-nro="row.nro"
+                        :class="getActionVisuals(row.accionId).codigoFigura"
+                        :style="{ backgroundColor: getActionVisuals(row.accionId).colorHex }"
+                      >
+                        <span class="preview-text font-weight-bold">
+                          {{ row.texto_figura || row.tarea || 'Sin texto' }}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
 
-            <!-- SVG para dibujar las líneas de conexión -->
-            <svg 
-              v-if="allDisplayCargos.length > 0"
-              style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;"
-            >
-              <defs>
-                <marker 
-                  id="arrow" 
-                  viewBox="0 0 10 10" 
-                  refX="6" 
-                  refY="5" 
-                  markerWidth="6" 
-                  markerHeight="6" 
-                  orient="auto-start-reverse"
-                >
-                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#6366f1"/>
-                </marker>
-              </defs>
-              <path 
-                v-for="(path, i) in connectionPaths" 
-                :key="i"
-                :d="path"
-                stroke="#6366f1"
-                stroke-width="2"
-                fill="none"
-                marker-end="url(#arrow)"
-                stroke-dasharray="2,2"
-              />
-            </svg>
+              <!-- SVG para conectar nodos (Sólido y Elegante) -->
+              <svg 
+                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3;"
+              >
+                <defs>
+                  <marker 
+                    id="arrow" 
+                    viewBox="0 0 10 10" 
+                    refX="7" 
+                    refY="5" 
+                    markerWidth="6" 
+                    markerHeight="6" 
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#4f46e5"/>
+                  </marker>
+                  <marker 
+                    id="arrow-return" 
+                    viewBox="0 0 10 10" 
+                    refX="7" 
+                    refY="5" 
+                    markerWidth="6" 
+                    markerHeight="6" 
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#ef4444"/>
+                  </marker>
+                </defs>
+                <path 
+                  v-for="(path, i) in connectionPaths" 
+                  :key="i"
+                  :d="path.path"
+                  :stroke="path.color"
+                  stroke-width="2"
+                  fill="none"
+                  :marker-end="path.isReturn ? 'url(#arrow-return)' : 'url(#arrow)'"
+                />
+              </svg>
+            </div>
           </div>
         </div>
         
         <v-divider></v-divider>
         <v-card-actions class="pa-4 bg-grey-lighten-4">
           <v-spacer></v-spacer>
-          <v-btn color="grey-darken-2" variant="tonal" @click="showPreview = false">Cerrar</v-btn>
+          <v-btn color="primary" variant="outlined" class="rounded-lg font-weight-bold text-uppercase text-caption px-6" @click="showPreview = false">Cerrar</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -1793,49 +1951,54 @@ watch(showPreview, (val) => {
 .preview-swimlane-table {
   width: 100%;
   border-collapse: collapse;
-  background: white;
+  background: #ffffff;
   margin-top: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .preview-swimlane-table th,
 .preview-swimlane-table td {
   border: 1px solid #e2e8f0;
-  padding: 12px 6px;
+  padding: 16px 8px;
   position: relative;
 }
 
 .preview-step-header {
   width: 65px;
-  background: #1e293b !important;
-  color: white !important;
-  font-size: 0.65rem !important;
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+  font-size: 0.7rem !important;
   font-weight: 800;
   text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #cbd5e1 !important;
 }
 
 .preview-step-subheader {
-  background: #1e293b !important;
-  border-bottom: 1px solid #475569 !important;
+  background: #f8fafc !important;
+  border-bottom: 1px solid #e2e8f0 !important;
   width: 65px;
 }
 
 .preview-unit-header {
-  background: #0f172a !important;
-  color: #38bdf8 !important;
-  font-size: 0.7rem !important;
-  font-weight: 900;
+  background: #f1f5f9 !important;
+  color: #1e293b !important;
+  font-size: 0.75rem !important;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 2px solid #38bdf8 !important;
+  border-bottom: 2px solid #94a3b8 !important;
 }
 
 .preview-cargo-header {
-  background: #1e293b !important;
-  color: #e2e8f0 !important;
-  font-size: 0.6rem !important;
+  background: #f8fafc !important;
+  color: #475569 !important;
+  font-size: 0.7rem !important;
   font-weight: 700;
   text-transform: uppercase;
-  border-bottom: 1px solid #475569 !important;
+  border-bottom: 1px solid #e2e8f0 !important;
 }
 
 .preview-step-cell {
@@ -1850,22 +2013,20 @@ watch(showPreview, (val) => {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: #6366f1;
+  background: #64748b;
   color: white;
   font-size: 0.7rem;
-  font-weight: 900;
-  box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
+  font-weight: 800;
 }
 
 .preview-lane-cell {
   background: #ffffff;
   vertical-align: middle;
-  min-width: 110px;
-  height: 85px;
+  min-width: 125px;
+  height: 90px;
 }
 
 .preview-lane-cell:empty {
-  background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
-  background-size: 10px 10px;
+  background: #fafafa;
 }
 </style>

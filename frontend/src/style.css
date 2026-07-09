@@ -1,7 +1,270 @@
+/* Fuente global Inter */
+:root, body, .v-application {
+  font-family: 'Inter', sans-serif !important;
+}
+
 /* para que los submenues esten al mismo nivel del menu */
 .no-indent .v-list-group__items .v-list-item {
   padding-inline-start: 36px !important;
 }
 
+/* Clases de colores de texto Slate (Gris) y sus overrides para modo oscuro */
+.text-slate-800 {
+  color: #1e293b !important;
+}
+.text-slate-700 {
+  color: #334155 !important;
+}
+.text-slate-600 {
+  color: #475569 !important;
+}
+.text-slate-500 {
+  color: #64748b !important;
+}
 
+/* Overrides para Modo Oscuro de Vuetify (.v-theme--dark) */
+.v-theme--dark .text-slate-800 {
+  color: #f1f5f9 !important;
+}
+.v-theme--dark .text-slate-700 {
+  color: #e2e8f0 !important;
+}
+.v-theme--dark .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+.v-theme--dark .text-slate-500 {
+  color: #94a3b8 !important;
+}
 
+/* Clases de colores de fondo Slate y bordes con soporte para modo oscuro */
+.bg-slate-50 {
+  background-color: #f8fafc !important;
+}
+.border-b-thin {
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+.v-theme--dark .bg-slate-50 {
+  background-color: #030712 !important; /* Slate 950 - Fondo más oscuro para distinguir filas no oficiales */
+}
+.v-theme--dark .border-b-thin {
+  border-bottom: 1px solid #1e293b !important; /* Slate 800 - Borde oscuro */
+}
+
+/* Adaptación de bg-indigo-lighten-5 para Modo Oscuro (usado en cabeceras de tablas) */
+.bg-indigo-lighten-5 {
+  background-color: #e8eaf6 !important;
+}
+.v-theme--dark .bg-indigo-lighten-5 {
+  background-color: #1a227e5b !important; /* Indigo oscuro */
+  color: #e8eaf6 !important;
+}
+.v-theme--dark .bg-indigo-lighten-5 th {
+  color: #e8eaf6 !important;
+}
+
+/* Mejorar la visibilidad de los v-btn-toggle en Modo Oscuro */
+.v-theme--dark .v-btn-toggle {
+  border: 1px solid #475569 !important;
+  background-color: #1e293b !important;
+}
+.v-theme--dark .v-btn-toggle .v-btn {
+  color: #94a3b8 !important;
+}
+.v-theme--dark .v-btn-toggle .v-btn--active {
+  background-color: #4f46e5 !important;
+  color: #ffffff !important;
+}
+
+/* Definición de la clase grayscale (escala de grises) */
+.grayscale {
+  /* Desactivado para conservar los colores originales de los nodos (barras de color y chips) */
+  filter: none !important;
+}
+
+/* Ajustes para filas no oficiales / atenuadas (aplica a modo claro y oscuro) */
+.opacity-60 .v-chip {
+  color: #1e293b !important; /* Letras oscuras para contrastar sobre el fondo de color del chip */
+}
+
+/* Ajustes para filas no oficiales / atenuadas en modo oscuro para garantizar legibilidad y clara diferenciación */
+.v-theme--dark .opacity-60 {
+  opacity: 0.45 !important; /* Reducir opacidad para notar claramente la diferencia de oficialidad */
+}
+.v-theme--dark .opacity-60 .v-chip {
+  opacity: 1 !important; /* Opacidad completa para el chip en modo oscuro */
+}
+
+/* Ajustes de contraste para los chips de Nivel en Modo Oscuro */
+.v-theme--dark .chip-nivel[class*="teal"] {
+  color: #80cbc4 !important; /* Teal claro */
+  background-color: rgba(128, 203, 196, 0.15) !important;
+}
+.v-theme--dark .chip-nivel[class*="indigo"] {
+  color: #9fa8da !important; /* Indigo claro */
+  background-color: rgba(159, 168, 218, 0.15) !important;
+}
+
+/* Ajustes de contraste para los chips de Relación en Modo Oscuro */
+.v-theme--dark .chip-relacion[class*="purple"] {
+  color: #b39ddb !important; /* Purple claro */
+  border-color: #b39ddb !important;
+  background-color: rgba(179, 157, 219, 0.1) !important;
+}
+
+/* Tarjetas métricas del dashboard en modo oscuro (letras y números blancos) */
+.v-theme--dark .card-metrica div {
+  color: #FFFFFF !important;
+}
+
+/* --- OVERRIDES DE MODO OSCURO PARA MPP (MATRIZ Y SWIMLANES) --- */
+
+.v-theme--dark .mpp-matrix-table {
+  background-color: #0F172A !important; /* Slate 900 */
+}
+
+.v-theme--dark .mpp-matrix-table th {
+  background-color: #030712 !important; /* Slate 950 */
+  color: #e2e8f0 !important;
+}
+
+.v-theme--dark .mpp-matrix-table td,
+.v-theme--dark .mpp-matrix-table th {
+  border-color: #1e293b !important; /* Slate 800 */
+}
+
+.v-theme--dark .cell-textarea {
+  color: #f1f5f9 !important;
+}
+
+.v-theme--dark .cell-textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* Swimlanes Preview */
+.v-theme--dark .preview-swimlane-table {
+  background-color: #0F172A !important; /* Slate 900 */
+}
+
+.v-theme--dark .preview-swimlane-table td,
+.v-theme--dark .preview-swimlane-table th {
+  border-color: #1e293b !important;
+}
+
+.v-theme--dark .preview-step-header {
+  background-color: #030712 !important;
+  color: #ffffff !important;
+}
+
+.v-theme--dark .preview-step-subheader {
+  background-color: #030712 !important;
+  border-bottom-color: #1e293b !important;
+}
+
+.v-theme--dark .preview-unit-header {
+  background-color: #1a237e5b !important; /* Indigo oscuro adaptativo */
+  color: #818cf8 !important; /* Indigo 400 */
+  border-bottom-color: #818cf8 !important;
+}
+
+.v-theme--dark .preview-cargo-header {
+  background-color: #030712 !important;
+  color: #cbd5e1 !important;
+  border-bottom-color: #1e293b !important;
+}
+
+.v-theme--dark .preview-step-cell {
+  background-color: #030712 !important;
+}
+
+.v-theme--dark .preview-lane-cell {
+  background-color: #0f172a !important;
+}
+
+.v-theme--dark .preview-lane-cell:empty {
+  background-image: radial-gradient(#334155 1px, transparent 1px) !important;
+}
+
+/* Tarjetas de unidades en PieMpp (Instalaciones) */
+.installation-card-selected {
+  background-color: #EEF2F6 !important;
+  border-color: #818CF8 !important;
+}
+
+.installation-card-unselected {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+}
+
+.v-theme--dark .installation-card-selected {
+  background-color: rgba(129, 140, 248, 0.15) !important;
+  border-color: #818CF8 !important;
+}
+
+.v-theme--dark .installation-card-unselected {
+  background-color: #0F172A !important;
+  border-color: #1E293B !important;
+}
+
+/* Overrides para Cabeceras y Celdas de la Matriz (MatrizMpp.vue) en Modo Oscuro */
+.v-theme--dark .cell-textarea:focus {
+  background-color: #141833 !important; /* surface color */
+  color: #FFFFFF !important;
+}
+
+.v-theme--dark .group-header {
+  background-color: #1E293B !important; /* Slate 800 */
+  color: #FFFFFF !important;
+}
+
+.v-theme--dark .sub-header {
+  background-color: #0F172A !important; /* Slate 900 */
+  color: #cbd5e1 !important;
+}
+
+.v-theme--dark .solicitante-header,
+.v-theme--dark .solicitante-sub {
+  background-color: #1e3a8a3b !important; /* Azul oscuro adaptativo */
+  color: #93c5fd !important; /* Azul claro */
+}
+
+.v-theme--dark .accion-header,
+.v-theme--dark .accion-sub {
+  background-color: #1a237e5b !important; /* Indigo oscuro adaptativo */
+  color: #a5b4fc !important; /* Indigo claro */
+}
+
+.v-theme--dark .swimlane-header {
+  background-color: #141833 !important;
+  color: #818cf8 !important;
+  border-bottom-color: #818cf8 !important;
+}
+
+.v-theme--dark .cargo-header {
+  background-color: #0F172A !important;
+  color: #cbd5e1 !important;
+}
+
+.v-theme--dark .diagram-cell {
+  background-color: #0F172A !important;
+  border-left-color: #1E293B !important;
+  border-right-color: #1E293B !important;
+}
+
+.v-theme--dark .diagram-cell:hover {
+  background-color: #1A1C38 !important;
+}
+
+.v-theme--dark .texto-figura-input-native:focus {
+  background-color: #141833 !important;
+  color: #818cf8 !important;
+}
+
+.v-theme--dark .flow-connector .arrow {
+  background-color: #0F172A !important;
+}
+
+/* Borde superior adaptativo de tarjetas principales */
+.border-top-primary {
+  border-top: 8px solid var(--v-theme-primary) !important;
+}

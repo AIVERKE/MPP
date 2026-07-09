@@ -6,7 +6,7 @@ export const rules = {
   
   codigo: value => {
     if (!value) return 'El código es requerido';
-    if (!/^[A-Z0-9-]+$/i.test(value)) return 'Solo letras, números y guiones';
+    if (!/^[A-Z0-9.-]+$/i.test(value)) return 'Solo letras, números, puntos y guiones';
     return true;
   }
 };

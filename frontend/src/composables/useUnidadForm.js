@@ -183,7 +183,7 @@ export function useUnidadForm(stores) {
     const dataToSend = {
       codigo: formData.value.codigo?.trim() || "",
       nombre: formData.value.nombre?.trim() || "",
-      parentId: pIdVal || 0,
+      parentId: pIdVal || null,
       tipo: getSafeId(formData.value.tipo) || 1,
       nivel: getSafeId(formData.value.nivel) || 1,
       relacion: getSafeId(formData.value.relacion) || 1,

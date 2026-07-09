@@ -49,7 +49,7 @@ watch(localFormValid, (val) => emit("update:formValid", val));
 
 /**
  * Watcher para prioridad de color:
- * Cuando cambia la Clase (Unidad Organizacional), el color de la unidad
+ * Cuando cambia la Clase (Instancia), el color de la unidad
  * toma automáticamente el color institucional de esa clase.
  */
 watch(
@@ -270,7 +270,7 @@ function eliminarFuncion(index) {
             <v-col cols="12" md="6">
               <SelectAllClases
                 v-model="formData.clase"
-                label="Unidad Organizacional"
+                label="Instancia"
                 :rules="[rules.required]"
               />
             </v-col>

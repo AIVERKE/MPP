@@ -32,7 +32,7 @@ export const useAllCargosMofStore = defineStore(
             loading.value = true;
             error.value = null;
             try {
-                const response = await fetch(API_URL, { headers: getHeaders() });
+                const response = await fetch(`${API_URL}?t=${Date.now()}`, { headers: getHeaders() });
                 if (!response.ok) throw new Error("Error al obtener los cargos");
                 
                 const data = await response.json();

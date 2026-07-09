@@ -213,7 +213,7 @@ async function handleBajar(id) {
   emit('updated');
 }
 
-// --- Lógica de Redimensionamiento ---
+// --- Lógica de Redimensionamiento (Mouse) ---
 const isResizing = ref(false);
 const startResizing = () => {
   isResizing.value = true;
@@ -233,19 +233,64 @@ const stopResizing = () => {
   document.removeEventListener("mouseup", stopResizing);
   document.body.style.cursor = "default";
 };
-onUnmounted(() => stopResizing());
+
+// --- Soporte Táctil (Móviles / Tablets) ---
+const startResizingTouch = () => {
+  isResizing.value = true;
+  document.addEventListener("touchmove", resizeTouch);
+  document.addEventListener("touchend", stopResizingTouch);
+};
+const resizeTouch = (e) => {
+  if (isResizing.value && e.touches.length > 0) {
+    const newWidth = window.innerWidth - e.touches[0].clientX;
+    if (newWidth > 350 && newWidth < 900) emit('resize', newWidth);
+  }
+};
+const stopResizingTouch = () => {
+  isResizing.value = false;
+  document.removeEventListener("touchmove", resizeTouch);
+  document.removeEventListener("touchend", stopResizingTouch);
+};
+
+onUnmounted(() => {
+  stopResizing();
+  stopResizingTouch();
+});
+
+const getDependencies = (item) => {
+  if (!item) return [];
+  const queryId = String(item.id).trim();
+  const queryText = String(item.descripcion || "").trim().toUpperCase();
+
+  return unidadesStore.unidades.filter(u => {
+    let uField = null;
+    if (tab.value === 0) uField = u.clase;
+    else if (tab.value === 1) uField = u.nivel;
+    else if (tab.value === 2) uField = u.tipo;
+    else if (tab.value === 3) uField = u.relacion;
+
+    if (!uField) return false;
+    if (typeof uField === "object") {
+      const uFieldId = String(uField.id ?? uField.value ?? "").trim();
+      const uFieldDesc = String(uField.descripcion || uField.description || "").trim().toUpperCase();
+      return uFieldId === queryId || uFieldDesc === queryText;
+    }
+    const uFieldStr = String(uField).trim();
+    return uFieldStr === queryId || uFieldStr.toUpperCase() === queryText;
+  });
+};
 </script>
 
 <template>
   <v-card flat class="fill-height d-flex flex-column resizable-container">
-    <div class="resize-handle" @mousedown="startResizing"></div>
+    <div class="resize-handle" @mousedown="startResizing" @touchstart="startResizingTouch"></div>
 
     <v-toolbar color="secondary" dark density="compact">
       <v-toolbar-title class="text-subtitle-1 font-weight-bold">
         Gestión de Catálogos MOF
       </v-toolbar-title>
       <v-spacer></v-spacer>
-      <v-btn icon @click="emit('resize', props.width > 500 ? 450 : 850)">
+      <v-btn v-if="!$vuetify.display.xs" icon @click="emit('resize', props.width > 500 ? 450 : 850)">
         <v-icon>{{ props.width > 500 ? 'mdi-arrow-collapse-right' : 'mdi-arrow-expand-left' }}</v-icon>
         <v-tooltip activator="parent" location="bottom">{{ props.width > 500 ? 'Restaurar' : 'Expandir' }}</v-tooltip>
       </v-btn>
@@ -258,7 +303,7 @@ onUnmounted(() => stopResizing());
     <v-tabs v-model="tab" color="primary" show-arrows>
       <v-tab :value="0">
         <v-badge color="grey" :content="clasesStore.clases.length" inline>
-          <v-icon start>mdi-office-building</v-icon> Unid. Org.
+          <v-icon start>mdi-office-building</v-icon> Instancias
         </v-badge>
       </v-tab>
       <v-tab :value="1">
@@ -280,19 +325,21 @@ onUnmounted(() => stopResizing());
 
     <v-progress-linear v-if="loading" indeterminate color="primary"></v-progress-linear>
 
-    <v-window v-model="tab" class="flex-grow-1 overflow-hidden">
+    <v-window v-model="tab" class="flex-grow-1 overflow-hidden" :transition="false" :reverse-transition="false">
       
-      <!-- TAB 0: UNIDAD ORGANIZACIONAL -->
+      <!-- TAB 0: INSTANCIAS -->
       <v-window-item :value="0">
         <div class="fill-height d-flex flex-column">
-          <v-alert type="info" variant="tonal" density="compact" class="ma-3 text-caption">
-            Define la jerarquía visual del organigrama. ({{ clasesStore.clases.length }} ítems)
-          </v-alert>
-          <div class="px-3 mb-2">
-            <v-btn block color="primary" prepend-icon="mdi-plus" size="small" @click="openDialog()">
-              Añadir U. Organizacional
-              <v-tooltip activator="parent" location="top">Crear nueva clase organizativa</v-tooltip>
-            </v-btn>
+          <div class="flex-shrink-0">
+            <v-alert type="info" variant="tonal" density="compact" class="mx-3 my-2 text-caption">
+              Define la jerarquía visual del organigrama. ({{ clasesStore.clases.length }} ítems)
+            </v-alert>
+            <div class="px-3 mb-2">
+              <v-btn block color="primary" prepend-icon="mdi-plus" size="small" @click="openDialog()">
+                Añadir Instancia
+                <v-tooltip activator="parent" location="top">Crear nueva instancia</v-tooltip>
+              </v-btn>
+            </div>
           </div>
           <v-list class="flex-grow-1 overflow-y-auto px-2 pb-16">
             <v-list-item v-for="(item, index) in clasesStore.clases" :key="item.id" 
@@ -304,10 +351,25 @@ onUnmounted(() => stopResizing());
                   <span class="text-caption font-weight-bold text-grey">{{ index + 1 }}</span>
                 </div>
               </template>
-              <v-list-item-title class="font-weight-bold text-body-2" :class="{ 'text-grey': !item.activo }">
-                {{ item.descripcion }}
+              <v-list-item-title class="font-weight-bold text-body-2 d-flex align-center flex-wrap" :class="{ 'text-grey': !item.activo }">
+                <span>{{ item.descripcion }}</span>
                 <span v-if="item.oficial" class="text-success font-weight-black ml-1" style="font-size: 8px;">OFICIAL</span>
                 <span v-if="!item.activo" class="text-caption font-italic ml-1">(Inactivo)</span>
+                
+                <v-chip v-if="getDependencies(item).length > 0" size="x-small" color="primary" variant="tonal" class="ml-2 px-1">
+                  {{ getDependencies(item).length }} {{ getDependencies(item).length === 1 ? 'unidad' : 'unidades' }}
+                  <v-tooltip activator="parent" location="top" class="custom-tooltip">
+                    <div class="text-caption font-weight-bold mb-1">Unidades vinculadas:</div>
+                    <div style="max-height: 200px; overflow-y: auto;" class="text-caption">
+                      <div v-for="u in getDependencies(item)" :key="u.id" class="mb-1">
+                        • {{ u.nombre || u.denominacion }} ({{ u.codigo }})
+                      </div>
+                    </div>
+                  </v-tooltip>
+                </v-chip>
+                <v-chip v-else size="x-small" color="grey-darken-1" variant="outlined" class="ml-2 px-1 text-xxs">
+                  Sin uso activo
+                </v-chip>
               </v-list-item-title>
               <template v-slot:append>
                 <div class="d-flex align-center">
@@ -339,21 +401,38 @@ onUnmounted(() => stopResizing());
       <!-- TAB 1: NIVELES -->
       <v-window-item :value="1">
         <div class="fill-height d-flex flex-column">
-          <v-alert type="info" variant="tonal" density="compact" class="ma-3 text-caption">Administre los Niveles Jerárquicos. ({{ nivelesStore.niveles.length }} ítems)</v-alert>
-          <div class="px-3 mb-2">
-            <v-btn block color="primary" prepend-icon="mdi-plus" size="small" @click="openDialog()">
-              Añadir Nivel
-              <v-tooltip activator="parent" location="top">Crear nuevo nivel descriptivo</v-tooltip>
-            </v-btn>
+          <div class="flex-shrink-0">
+            <v-alert type="info" variant="tonal" density="compact" class="mx-3 my-2 text-caption">Administre los Niveles Jerárquicos. ({{ nivelesStore.niveles.length }} ítems)</v-alert>
+            <div class="px-3 mb-2">
+              <v-btn block color="primary" prepend-icon="mdi-plus" size="small" @click="openDialog()">
+                Añadir Nivel
+                <v-tooltip activator="parent" location="top">Crear nuevo nivel descriptivo</v-tooltip>
+              </v-btn>
+            </div>
           </div>
           <v-list class="flex-grow-1 overflow-y-auto px-2 pb-16">
             <v-list-item v-for="item in nivelesStore.niveles" :key="item.id" 
               class="mb-2 rounded-lg border"
               :class="{ 'inactive-item': !item.activo }">
-              <v-list-item-title class="font-weight-bold text-body-2" :class="{ 'text-grey': !item.activo }">
-                {{ item.descripcion }}
+              <v-list-item-title class="font-weight-bold text-body-2 d-flex align-center flex-wrap" :class="{ 'text-grey': !item.activo }">
+                <span>{{ item.descripcion }}</span>
                 <span v-if="item.oficial" class="text-success font-weight-black ml-1" style="font-size: 8px;">OFICIAL</span>
                 <span v-if="!item.activo" class="text-caption font-italic ml-1">(Inactivo)</span>
+                
+                <v-chip v-if="getDependencies(item).length > 0" size="x-small" color="primary" variant="tonal" class="ml-2 px-1">
+                  {{ getDependencies(item).length }} {{ getDependencies(item).length === 1 ? 'unidad' : 'unidades' }}
+                  <v-tooltip activator="parent" location="top" class="custom-tooltip">
+                    <div class="text-caption font-weight-bold mb-1">Unidades vinculadas:</div>
+                    <div style="max-height: 200px; overflow-y: auto;" class="text-caption">
+                      <div v-for="u in getDependencies(item)" :key="u.id" class="mb-1">
+                        • {{ u.nombre || u.denominacion }} ({{ u.codigo }})
+                      </div>
+                    </div>
+                  </v-tooltip>
+                </v-chip>
+                <v-chip v-else size="x-small" color="grey-darken-1" variant="outlined" class="ml-2 px-1 text-xxs">
+                  Sin uso activo
+                </v-chip>
               </v-list-item-title>
               <template v-slot:append>
                 <v-btn icon variant="text" size="small" color="orange" @click="openDialog(item)">
@@ -373,21 +452,38 @@ onUnmounted(() => stopResizing());
       <!-- TAB 2: TIPOS -->
       <v-window-item :value="2">
         <div class="fill-height d-flex flex-column">
-          <v-alert type="info" variant="tonal" density="compact" class="ma-3 text-caption">Administre los Tipos de Unidad. ({{ tiposStore.tipos.length }} ítems)</v-alert>
-          <div class="px-3 mb-2">
-            <v-btn block color="primary" prepend-icon="mdi-plus" size="small" @click="openDialog()">
-              Añadir Tipo
-              <v-tooltip activator="parent" location="top">Crear nuevo tipo de unidad</v-tooltip>
-            </v-btn>
+          <div class="flex-shrink-0">
+            <v-alert type="info" variant="tonal" density="compact" class="mx-3 my-2 text-caption">Administre los Tipos de Unidad. ({{ tiposStore.tipos.length }} ítems)</v-alert>
+            <div class="px-3 mb-2">
+              <v-btn block color="primary" prepend-icon="mdi-plus" size="small" @click="openDialog()">
+                Añadir Tipo
+                <v-tooltip activator="parent" location="top">Crear nuevo tipo de unidad</v-tooltip>
+              </v-btn>
+            </div>
           </div>
           <v-list class="flex-grow-1 overflow-y-auto px-2 pb-16">
             <v-list-item v-for="item in tiposStore.tipos" :key="item.id" 
               class="mb-2 rounded-lg border"
               :class="{ 'inactive-item': !item.activo }">
-              <v-list-item-title class="font-weight-bold text-body-2" :class="{ 'text-grey': !item.activo }">
-                {{ item.descripcion }}
+              <v-list-item-title class="font-weight-bold text-body-2 d-flex align-center flex-wrap" :class="{ 'text-grey': !item.activo }">
+                <span>{{ item.descripcion }}</span>
                 <span v-if="item.oficial" class="text-success font-weight-black ml-1" style="font-size: 8px;">OFICIAL</span>
                 <span v-if="!item.activo" class="text-caption font-italic ml-1">(Inactivo)</span>
+                
+                <v-chip v-if="getDependencies(item).length > 0" size="x-small" color="primary" variant="tonal" class="ml-2 px-1">
+                  {{ getDependencies(item).length }} {{ getDependencies(item).length === 1 ? 'unidad' : 'unidades' }}
+                  <v-tooltip activator="parent" location="top" class="custom-tooltip">
+                    <div class="text-caption font-weight-bold mb-1">Unidades vinculadas:</div>
+                    <div style="max-height: 200px; overflow-y: auto;" class="text-caption">
+                      <div v-for="u in getDependencies(item)" :key="u.id" class="mb-1">
+                        • {{ u.nombre || u.denominacion }} ({{ u.codigo }})
+                      </div>
+                    </div>
+                  </v-tooltip>
+                </v-chip>
+                <v-chip v-else size="x-small" color="grey-darken-1" variant="outlined" class="ml-2 px-1 text-xxs">
+                  Sin uso activo
+                </v-chip>
               </v-list-item-title>
               <template v-slot:append>
                 <v-btn icon variant="text" size="small" color="orange" @click="openDialog(item)">
@@ -407,21 +503,38 @@ onUnmounted(() => stopResizing());
       <!-- TAB 3: RELACIONES -->
       <v-window-item :value="3">
         <div class="fill-height d-flex flex-column">
-          <v-alert type="info" variant="tonal" density="compact" class="ma-3 text-caption">Administre los Tipos de Relación. ({{ relacionesStore.relaciones.length }} ítems)</v-alert>
-          <div class="px-3 mb-2">
-            <v-btn block color="primary" prepend-icon="mdi-plus" size="small" @click="openDialog()">
-              Añadir Relación
-              <v-tooltip activator="parent" location="top">Crear nuevo tipo de relación</v-tooltip>
-            </v-btn>
+          <div class="flex-shrink-0">
+            <v-alert type="info" variant="tonal" density="compact" class="mx-3 my-2 text-caption">Administre los Tipos de Relación. ({{ relacionesStore.relaciones.length }} ítems)</v-alert>
+            <div class="px-3 mb-2">
+              <v-btn block color="primary" prepend-icon="mdi-plus" size="small" @click="openDialog()">
+                Añadir Relación
+                <v-tooltip activator="parent" location="top">Crear nuevo tipo de relación</v-tooltip>
+              </v-btn>
+            </div>
           </div>
           <v-list class="flex-grow-1 overflow-y-auto px-2 pb-16">
             <v-list-item v-for="item in relacionesStore.relaciones" :key="item.id" 
               class="mb-2 rounded-lg border"
               :class="{ 'inactive-item': !item.activo }">
-              <v-list-item-title class="font-weight-bold text-body-2" :class="{ 'text-grey': !item.activo }">
-                {{ item.descripcion }}
+              <v-list-item-title class="font-weight-bold text-body-2 d-flex align-center flex-wrap" :class="{ 'text-grey': !item.activo }">
+                <span>{{ item.descripcion }}</span>
                 <span v-if="item.oficial" class="text-success font-weight-black ml-1" style="font-size: 8px;">OFICIAL</span>
                 <span v-if="!item.activo" class="text-caption font-italic ml-1">(Inactivo)</span>
+                
+                <v-chip v-if="getDependencies(item).length > 0" size="x-small" color="primary" variant="tonal" class="ml-2 px-1">
+                  {{ getDependencies(item).length }} {{ getDependencies(item).length === 1 ? 'unidad' : 'unidades' }}
+                  <v-tooltip activator="parent" location="top" class="custom-tooltip">
+                    <div class="text-caption font-weight-bold mb-1">Unidades vinculadas:</div>
+                    <div style="max-height: 200px; overflow-y: auto;" class="text-caption">
+                      <div v-for="u in getDependencies(item)" :key="u.id" class="mb-1">
+                        • {{ u.nombre || u.denominacion }} ({{ u.codigo }})
+                      </div>
+                    </div>
+                  </v-tooltip>
+                </v-chip>
+                <v-chip v-else size="x-small" color="grey-darken-1" variant="outlined" class="ml-2 px-1 text-xxs">
+                  Sin uso activo
+                </v-chip>
               </v-list-item-title>
               <template v-slot:append>
                 <v-btn icon variant="text" size="small" color="orange" @click="openDialog(item)">
@@ -441,7 +554,7 @@ onUnmounted(() => stopResizing());
     </v-window>
 
     <v-divider></v-divider>
-    <div class="pa-4 bg-grey-lighten-5">
+    <div class="pa-4 bg-slate-50">
       <v-btn block color="secondary" variant="flat" prepend-icon="mdi-refresh" @click="refreshData">
         Forzar Sincronización
         <v-tooltip activator="parent" location="top">Sincronizar todos los catálogos con el servidor</v-tooltip>
@@ -453,7 +566,7 @@ onUnmounted(() => stopResizing());
       <v-card>
         <v-card-title class="text-h6 font-weight-bold pa-4">
           {{ editingItem ? 'Editar' : 'Añadir' }} 
-          {{ tab === 0 ? 'U. Organizacional' : tab === 1 ? 'Nivel' : tab === 2 ? 'Tipo' : 'Relación' }}
+          {{ tab === 0 ? 'Instancia' : tab === 1 ? 'Nivel' : tab === 2 ? 'Tipo' : 'Relación' }}
         </v-card-title>
         <v-divider />
         <v-card-text class="pa-4">
@@ -473,7 +586,7 @@ onUnmounted(() => stopResizing());
             <v-switch v-model="form.oficial" color="primary" hide-details inset density="compact" />
           </div>
 
-          <!-- Solo mostramos el color si estamos en la pestaña 0 (Unidad Organizacional) -->
+          <!-- Solo mostramos el color si estamos en la pestaña 0 (Instancia) -->
           <div v-if="tab === 0">
             <v-menu v-model="colorMenu" :close-on-content-click="false">
               <template v-slot:activator="{ props }">
@@ -562,9 +675,26 @@ onUnmounted(() => stopResizing());
 </template>
 
 <style scoped>
-.resizable-container { position: relative; transition: none !important; }
+.resizable-container { 
+  position: relative; 
+  transition: none !important; 
+  height: 100% !important;
+  overflow: hidden;
+}
+:deep(.v-window) {
+  height: calc(100% - 96px) !important;
+}
+:deep(.v-window-item) {
+  height: 100% !important;
+}
 .resize-handle { position: absolute; top: 0; left: 0; width: 6px; height: 100%; cursor: col-resize; z-index: 100; background: transparent; }
 .resize-handle:hover { background: rgba(var(--v-theme-primary), 0.3); }
 .pb-16 { padding-bottom: 64px !important; }
 .inactive-item { background-color: #f5f5f5 !important; border-style: dashed !important; }
+
+@media (max-width: 600px) {
+  .resize-handle {
+    display: none !important;
+  }
+}
 </style>

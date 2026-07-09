@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
+import { useTheme } from "vuetify";
 import { useAllUnidadesMofStore } from "@/stores/unidades_mof";
 import { useAllClasesMofStore } from "@/stores/clases_mof";
 import { useAllNivelesMofStore } from "@/stores/niveles_mof";
@@ -13,6 +14,9 @@ import {
   getClaseColor,
   isUnidadOficial,
 } from "@/utils/mofHelpers";
+
+const theme = useTheme();
+const isDark = computed(() => theme.global.current.value.dark);
 
 const unidadesStore = useAllUnidadesMofStore();
 const clasesStore = useAllClasesMofStore();
@@ -149,7 +153,7 @@ const agrupar = (campo, resolver) => {
 
 const agrupaciones = computed(() => ({
   clase: {
-    title: "TIPO UNIDAD ORGANIZACIONAL",
+    title: "TIPO DE INSTANCIA",
     icon: "mdi-office-building",
     color: "primary",
     data: agrupar("clase", resolveClase),
@@ -184,15 +188,22 @@ const getChartOptions = (key, chartInfo) => {
       key === "clase" ? getClaseColor(name, clasesStore.clases) : undefined,
   }));
 
+  const textColor = isDark.value ? "#E2E8F0" : "#333333";
+  const labelColor = isDark.value ? "#94A3B8" : "#666666";
+
   const baseOptions = {
     chart: {
       type: type,
       backgroundColor: "transparent",
       height: 350,
-      style: { fontFamily: "inherit" },
+      style: { fontFamily: "inherit", color: textColor },
     },
     title: { text: null },
     credits: { enabled: false },
+    legend: {
+      itemStyle: { color: textColor },
+      itemHoverStyle: { color: isDark.value ? "#FFFFFF" : "#000000" }
+    },
     tooltip: {
       headerFormat: '<span style="font-size:10px">{point.key}</span><br>',
       pointFormat:
@@ -205,9 +216,16 @@ const getChartOptions = (key, chartInfo) => {
       ...baseOptions,
       xAxis: {
         categories: data.map((d) => d.name),
-        labels: { style: { fontSize: "9px", fontWeight: "bold" } },
+        labels: { style: { fontSize: "9px", fontWeight: "bold", color: textColor } },
+        lineColor: isDark.value ? "#475569" : "#CCD6EB",
+        tickColor: isDark.value ? "#475569" : "#CCD6EB"
       },
-      yAxis: { title: { text: "Unidades" }, min: 0 },
+      yAxis: {
+        title: { text: "Unidades", style: { color: textColor } },
+        labels: { style: { color: labelColor } },
+        gridLineColor: isDark.value ? "#334155" : "#E6E6E6",
+        min: 0
+      },
       plotOptions: {
         column: {
           colorByPoint: true,
@@ -215,7 +233,7 @@ const getChartOptions = (key, chartInfo) => {
           dataLabels: {
             enabled: true,
             format: "{point.y}",
-            style: { fontSize: "10px" },
+            style: { fontSize: "10px", color: textColor, textOutline: "none" },
           },
         },
       },
@@ -237,7 +255,7 @@ const getChartOptions = (key, chartInfo) => {
           dataLabels: {
             enabled: true,
             format: "<b>{point.name}</b>: {point.y}",
-            style: { fontSize: "9px" },
+            style: { fontSize: "9px", color: textColor, textOutline: "none" },
           },
           showInLegend: true,
         },
@@ -258,10 +276,10 @@ const getChartOptions = (key, chartInfo) => {
   <v-container fluid class="pa-0">
     <!-- Header & Breadcrumb -->
     <div class="mb-6">
-      <h1 class="text-h4 font-weight-black mb-1" style="color: #1e293b">
+      <h1 class="text-h4 font-weight-black mb-1 text-slate-800">
         Reporte Ejecutivo
       </h1>
-      <div class="text-body-2 d-flex align-center" style="color: #64748b">
+      <div class="text-body-2 d-flex align-center text-slate-500">
         <v-icon size="18" class="mr-2">mdi-chart-bar</v-icon>
         <span>Reportes</span>
         <v-icon size="16" class="mx-1">mdi-chevron-right</v-icon>
@@ -279,7 +297,7 @@ const getChartOptions = (key, chartInfo) => {
             <v-select
               v-model="filtroClase"
               :items="listaClases"
-              label="TIPO UNIDAD ORGANIZACIONAL"
+              label="TIPO DE INSTANCIA"
               variant="outlined"
               hide-details
               clearable
@@ -390,7 +408,7 @@ const getChartOptions = (key, chartInfo) => {
                 style="max-height: 400px; display: flex; flex-direction: column"
               >
                 <v-card-title
-                  class="pa-4 d-flex align-center bg-slate-50 border-b"
+                  class="pa-4 d-flex align-center bg-indigo-lighten-5 border-b"
                 >
                   <v-avatar
                     :color="group.color + '-lighten-4'"
@@ -476,7 +494,7 @@ const getChartOptions = (key, chartInfo) => {
         class="rounded-xl border-0 shadow-sm mb-6 overflow-hidden"
         elevation="3"
       >
-        <v-card-title class="pa-5 d-flex align-center bg-slate-50 border-b">
+        <v-card-title class="pa-5 d-flex align-center bg-indigo-lighten-5 border-b">
           <v-icon color="primary" class="mr-3">mdi-chart-areaspline</v-icon>
           <span class="text-h6 font-weight-black text-slate-800"
             >ANÁLISIS ESTADÍSTICO</span
@@ -495,7 +513,7 @@ const getChartOptions = (key, chartInfo) => {
                 class="rounded-xl border-slate-200 overflow-hidden shadow-xs"
               >
                 <v-card-title
-                  class="pa-4 d-flex align-center justify-space-between bg-white border-b"
+                  class="pa-4 d-flex align-center justify-space-between bg-indigo-lighten-5 border-b"
                 >
                   <div class="d-flex align-center">
                     <v-icon :color="chart.color" size="20" class="mr-2">{{
@@ -543,7 +561,7 @@ const getChartOptions = (key, chartInfo) => {
         elevation="3"
         class="rounded-xl border-0 shadow-sm overflow-hidden mb-6"
       >
-        <v-card-title class="pa-5 bg-slate-50 d-flex align-center border-b">
+        <v-card-title class="pa-5 bg-indigo-lighten-5 d-flex align-center border-b">
           <v-icon start color="primary" class="mr-2"
             >mdi-format-list-bulleted</v-icon
           >
@@ -565,7 +583,7 @@ const getChartOptions = (key, chartInfo) => {
               <th class="text-xxs font-weight-black px-4">CÓDIGO</th>
               <th class="text-xxs font-weight-black">UNIDAD ADMINISTRATIVA</th>
               <th class="text-xxs font-weight-black">
-                TIPO UNIDAD ORGANIZACIONAL
+                TIPO DE INSTANCIA
               </th>
               <th class="text-xxs font-weight-black">NIVEL</th>
               <th class="text-xxs font-weight-black">RELACIÓN</th>
@@ -616,7 +634,7 @@ const getChartOptions = (key, chartInfo) => {
                   label
                   variant="tonal"
                   color="teal-darken-2"
-                  class="font-weight-bold"
+                  class="font-weight-bold chip-nivel"
                 >
                   {{ resolveNivel(u.nivel) }}
                 </v-chip>
@@ -627,7 +645,7 @@ const getChartOptions = (key, chartInfo) => {
                   label
                   variant="outlined"
                   color="deep-purple"
-                  class="font-weight-bold"
+                  class="font-weight-bold chip-relacion"
                 >
                   {{ resolveRelacion(u.relacion) }}
                 </v-chip>
@@ -677,24 +695,6 @@ const getChartOptions = (key, chartInfo) => {
 }
 .shadow-lg {
   box-shadow: 0 10px 30px rgba(99, 102, 241, 0.2) !important;
-}
-.border-b-thin {
-  border-bottom: 1px solid #f1f5f9;
-}
-.bg-slate-50 {
-  background-color: #f8fafc;
-}
-.text-slate-800 {
-  color: #1e293b;
-}
-.text-slate-700 {
-  color: #334155;
-}
-.text-slate-600 {
-  color: #475569;
-}
-.text-slate-500 {
-  color: #64748b;
 }
 .uppercase {
   text-transform: uppercase;

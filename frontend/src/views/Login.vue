@@ -1,60 +1,83 @@
 <script setup>
-import { ref } from 'vue'
-import { useAuthStore } from '../stores/auth'
-import { rules } from '../utils/rules'
+import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { useAuthStore } from '../stores/auth';
 
-const authStore = useAuthStore()
+const router = useRouter();
+const authStore = useAuthStore();
 
-const username = ref('')
-const password = ref('')
-const showPassword = ref(false)
-const valid = ref(false)
-const loading = ref(false)
+const username = ref('');
+const password = ref('');
+const showPassword = ref(false);
+const loading = ref(false);
+const error = ref('');
 
 const handleLogin = async () => {
-  if (!valid.value) return
-  
-  loading.value = true
-  // Simulamos un pequeño delay para que se vea el efecto de carga
-  setTimeout(() => {
-    authStore.login({ username: username.value })
-    loading.value = false
-  }, 1000)
-}
+  if (!username.value || !password.value) {
+    error.value = 'Por favor ingrese sus credenciales';
+    return;
+  }
+
+  loading.value = true;
+  error.value = '';
+
+  try {
+    await authStore.login(username.value, password.value);
+    router.push('/');
+  } catch (err) {
+    error.value = 'Usuario o contraseña incorrectos';
+  } finally {
+    loading.value = false;
+  }
+};
 </script>
 
 <template>
-  <v-container fluid class="fill-height login-bg">
-    <v-row no-gutters align="center" justify="center">
+  <v-container fluid class="fill-height bg-grey-lighten-3 login-bg">
+    <v-row align="center" justify="center">
       <v-col cols="12" sm="8" md="4" lg="3">
-        <v-card elevation="12" class="pa-4 rounded-xl">
-          <v-card-text class="text-center pt-8">
-            <v-icon color="primary" size="64" class="mb-4">mdi-view-dashboard</v-icon>
-            <h1 class="text-h4 font-weight-bold mb-2" style="color: #1E293B;">Bienvenido</h1>
-            <p class="text-body-1 mb-8" style="color: #64748B;">S-MAU Dashboard Administrativo</p>
-            
-            <v-form v-model="valid" @submit.prevent="handleLogin">
+        <v-card elevation="12" class="rounded-xl pa-4">
+          <v-card-item class="text-center py-8">
+            <v-avatar color="primary" size="80" class="mb-4">
+              <v-icon size="48" color="white">mdi-view-dashboard</v-icon>
+            </v-avatar>
+            <v-card-title class="text-h4 font-weight-black text-primary">S-MAU</v-card-title>
+            <v-card-subtitle class="mt-2 font-weight-medium">Sistema de Gestión Institucional</v-card-subtitle>
+          </v-card-item>
+
+          <v-card-text>
+            <v-alert
+              v-if="error"
+              type="error"
+              variant="tonal"
+              density="compact"
+              class="mb-4 rounded-lg"
+            >
+              {{ error }}
+            </v-alert>
+
+            <v-form @submit.prevent="handleLogin">
               <v-text-field
                 v-model="username"
-                label="Usuario o Email"
+                label="Usuario"
                 prepend-inner-icon="mdi-account"
                 variant="outlined"
+                density="comfortable"
                 class="mb-2"
-                :rules="[rules.required]"
-                required
+                hide-details
               ></v-text-field>
 
               <v-text-field
                 v-model="password"
-                :type="showPassword ? 'text' : 'password'"
                 label="Contraseña"
                 prepend-inner-icon="mdi-lock"
-                :append-inner-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
+                :type="showPassword ? 'text' : 'password'"
+                :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
                 @click:append-inner="showPassword = !showPassword"
                 variant="outlined"
+                density="comfortable"
                 class="mb-4"
-                :rules="[rules.required, rules.minLength(4)]"
-                required
+                hide-details
               ></v-text-field>
 
               <v-btn
@@ -62,27 +85,25 @@ const handleLogin = async () => {
                 color="primary"
                 size="large"
                 block
-                rounded="lg"
-                class="font-weight-bold py-4"
                 :loading="loading"
-                :disabled="!valid"
-                elevation="2"
+                elevation="4"
+                class="rounded-lg text-button font-weight-bold py-6"
               >
-                Iniciar Sesión
+                INGRESAR
               </v-btn>
             </v-form>
-
-            <div class="mt-8 text-center">
-              <a href="#" class="text-decoration-none text-body-2 font-weight-medium" style="color: #6366F1;">
-                ¿Olvidaste tu contraseña?
-              </a>
-            </div>
           </v-card-text>
+
+          <v-card-actions class="justify-center pb-6">
+            <v-btn variant="text" size="small" color="grey-darken-1" class="text-caption">
+              ¿Olvidó su contraseña?
+            </v-btn>
+          </v-card-actions>
         </v-card>
         
-        <p class="text-center mt-6 text-body-2" style="color: #94A3B8;">
-          © 2026 UMSA - S-MAU. Todos los derechos reservados.
-        </p>
+        <div class="text-center mt-6 text-grey-darken-1 text-caption">
+          © 2026 Universidad Mayor de San Andrés - UMSA
+        </div>
       </v-col>
     </v-row>
   </v-container>
@@ -90,23 +111,9 @@ const handleLogin = async () => {
 
 <style scoped>
 .login-bg {
-  background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
-  min-height: 100vh;
+  background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%) !important;
 }
-
-.rounded-xl {
-  border-radius: 24px !important;
-}
-
-/* Animación suave para el hover del botón */
-.v-btn {
-  text-transform: none;
-  letter-spacing: 0.5px;
-  transition: all 0.3s ease;
-}
-
-.v-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4) !important;
+.v-card {
+  border-top: 8px solid #3730A3;
 }
 </style>

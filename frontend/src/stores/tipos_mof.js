@@ -21,7 +21,7 @@ export const useAllTiposMofStore = defineStore(
       loading.value = true;
       error.value = null;
       try {
-        const response = await fetch(API_URL, { headers: getHeaders() });
+        const response = await fetch(`${API_URL}?t=${Date.now()}`, { headers: getHeaders() });
         const data = await response.json();
         tipos.value = data.data;
       } catch (err) {

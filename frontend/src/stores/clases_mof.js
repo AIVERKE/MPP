@@ -25,7 +25,7 @@ export const useAllClasesMofStore = defineStore(
             loading.value = true;
             error.value = null;
             try {
-                const response = await fetch(API_URL, { headers: getHeaders() });
+                const response = await fetch(`${API_URL}?t=${Date.now()}`, { headers: getHeaders() });
                 if (!response.ok) throw new Error("Error al obtener las clases");
                 
                 const data = await response.json();
@@ -39,6 +39,7 @@ export const useAllClasesMofStore = defineStore(
 
         const parseError = async (response) => {
             const errorText = await response.text();
+            console.error(">>> ERROR DETALLADO DEL BACKEND:", errorText);
             let message = "Error en la operación";
             try {
                 const errorData = JSON.parse(errorText);

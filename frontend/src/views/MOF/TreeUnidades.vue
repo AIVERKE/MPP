@@ -169,13 +169,16 @@ const resolveNivel = (val) => getNivelNombre(val, nivelesStore.niveles);
 
 <template>
   <v-container fluid class="pa-0">
-    <div class="mb-4">
-      <h1 class="text-h4 font-weight-bold" style="color: #1e293b">
+    <div class="mb-6">
+      <h1 class="text-h4 font-weight-black mb-1 text-slate-800">
         Estructura Organizacional
       </h1>
-      <p class="text-body-2 text-grey">
-        Explora la jerarquía institucional de la UMSA
-      </p>
+      <div class="text-body-2 d-flex align-center text-slate-500">
+        <v-icon size="18" class="mr-2">mdi-tree</v-icon>
+        <span>MOF</span>
+        <v-icon size="16" class="mx-1">mdi-chevron-right</v-icon>
+        <span class="font-weight-bold text-primary">Árbol de Unidades</span>
+      </div>
     </div>
 
     <v-progress-linear
@@ -242,10 +245,9 @@ const resolveNivel = (val) => getNivelNombre(val, nivelesStore.niveles);
               <v-chip
                 size="x-small"
                 label
-                :color="resolveClaseColor(item.clase)"
-                theme="dark"
                 density="compact"
-                class="text-xxs px-1"
+                class="text-xxs px-1 font-weight-bold"
+                :style="{ backgroundColor: resolveClaseColor(item.clase), color: '#1E293B' }"
               >
                 {{ resolveClase(item.clase) }}
               </v-chip>

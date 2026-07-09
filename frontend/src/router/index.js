@@ -31,14 +31,15 @@ const router = createRouter({
     },
     {
         path:"/mpp/gestion-mpp",
-        name:"gestion_mpp",
-        component: () => import('../views/MPP/GestionEstructura.vue')
+        name:"cabecera_mpp",
+        component: () => import('../views/MPP/CabeceraMpp.vue'),
+        meta: { requiresAuth: true }
     },
     {
-      path: "/mpp/diagrama-flujos",
-      name: "diagrama_flujos",
-      component: () => import('../views/MPP/DisenadorFlujos.vue'),
-      meta: { requiresAuth: true }
+        path:"/mpp/historial-mpp",
+        name:"historial_mpp",
+        component: () => import('../views/MPP/HistorialMpp.vue'),
+        meta: { requiresAuth: true }
     },
     // Rutas MOF del repositorio anterior
     {

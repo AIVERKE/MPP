@@ -1,25 +1,24 @@
 <template>
-  <v-container fluid>
-    <v-row>
-      <v-col cols="12">
-        <div class="d-flex align-center mb-2">
-          <v-icon color="indigo-darken-2" size="32" class="mr-3"
-            >mdi-office-building-marker</v-icon
-          >
-          <h1 class="text-h4 font-weight-bold">Dashboard Facultativo</h1>
-        </div>
-        <p class="text-subtitle-1 text-medium-emphasis mb-6">
-          Análisis de unidades dependientes: Cantidades, tipos y nombres.
-        </p>
-      </v-col>
-    </v-row>
+  <v-container fluid class="pa-0">
+    <!-- Header & Breadcrumb -->
+    <div class="mb-6">
+      <h1 class="text-h4 font-weight-black mb-1 text-slate-800">
+        Dashboard Facultativo
+      </h1>
+      <div class="text-body-2 d-flex align-center text-slate-500">
+        <v-icon size="18" class="mr-2">mdi-chart-bar</v-icon>
+        <span>Reportes</span>
+        <v-icon size="16" class="mx-1">mdi-chevron-right</v-icon>
+        <span class="font-weight-bold text-primary">Consolidado Facultativo</span>
+      </div>
+    </div>
 
     <!-- ENTRADA: Selección en Cascada -->
     <v-card class="mb-6 rounded-lg" elevation="2" border>
       <v-card-title
         class="bg-indigo-lighten-5 text-indigo-darken-4 text-subtitle-2 font-weight-bold"
       >
-        ENTRADA: ESCOGE TIPO DE UNIDAD ORGANIZACIONAL
+        ENTRADA: ESCOGE TIPO DE INSTANCIA
       </v-card-title>
       <v-card-text class="pt-4">
         <v-row align="center">
@@ -30,7 +29,7 @@
               :items="listaClasesOrdenadas"
               item-title="descripcion"
               item-value="descripcion"
-              label="1. SELECCIONE TIPO DE UNIDAD ORGANIZACIONAL"
+              label="1. SELECCIONE TIPO DE INSTANCIA"
               prepend-inner-icon="mdi-layers-outline"
               variant="outlined"
               hide-details
@@ -51,7 +50,7 @@
               :label="
                 claseSeleccionada
                   ? `2. SELECCIONE ${claseSeleccionada}`
-                  : '2. (PRIMERO SELECCIONE UNA UNIDAD ORGANIZACIONAL)'
+                  : '2. (PRIMERO SELECCIONE UNA INSTANCIA)'
               "
               prepend-inner-icon="mdi-magnify"
               variant="outlined"
@@ -92,7 +91,7 @@
           sm="6"
           md="3"
         >
-          <v-card color="white" class="text-center pa-4 rounded-lg" border flat>
+          <v-card class="text-center pa-4 rounded-lg bg-slate-50 card-metrica" border flat>
             <div class="text-overline mb-1 text-grey-darken-2 font-weight-bold">
               {{ type }}
             </div>
@@ -115,7 +114,7 @@
         <v-col cols="12" lg="6">
           <v-card elevation="2" class="rounded-lg h-100">
             <v-card-title
-              class="pa-4 text-uppercase text-caption font-weight-bold bg-grey-lighten-4"
+              class="pa-4 text-uppercase text-caption font-weight-bold bg-indigo-lighten-5"
             >
               DISTRIBUCIÓN POR TIPO:
               {{ unidadMadre.nombre || unidadMadre.denominacion }}
@@ -131,7 +130,7 @@
         <v-col cols="12" lg="6">
           <v-card elevation="2" class="rounded-lg h-100">
             <v-card-title
-              class="pa-4 d-flex align-center bg-grey-lighten-4 text-caption font-weight-bold"
+              class="pa-4 d-flex align-center bg-indigo-lighten-5 text-caption font-weight-bold"
             >
               <v-icon start color="indigo">mdi-file-tree</v-icon>
               SALIDA REPORTE GENERAL (NOMBRES)
@@ -139,14 +138,14 @@
             <v-divider></v-divider>
             <v-list
               density="compact"
-              class="report-list"
+              class="report-list bg-slate-50"
               style="max-height: 450px; overflow-y: auto"
             >
               <v-list-item
                 v-for="item in arbolDependencias"
                 :key="item.id"
                 :style="{ paddingLeft: item.level * 24 + 16 + 'px' }"
-                class="border-bottom py-2"
+                class="border-b-thin py-2"
                 :class="getRowClass(item)"
               >
                 <template v-slot:prepend>
@@ -173,10 +172,10 @@
                 <template v-slot:append>
                   <v-chip
                     size="x-small"
-                    :color="getClaseColor(item.clase, clasesStore.clases)"
                     variant="flat"
                     label
-                    class="font-weight-bold text-white"
+                    class="font-weight-bold"
+                    :style="{ backgroundColor: getClaseColor(item.clase, clasesStore.clases), color: '#1E293B' }"
                   >
                     {{ resolveClase(item.clase) }}
                   </v-chip>
@@ -192,6 +191,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
+import { useTheme } from "vuetify";
 import { useAllUnidadesMofStore } from "@/stores/unidades_mof";
 import { useAllClasesMofStore } from "@/stores/clases_mof";
 import { useAllNivelesMofStore } from "@/stores/niveles_mof";
@@ -202,6 +202,9 @@ import {
   getClaseColor,
   isUnidadOficial,
 } from "@/utils/mofHelpers";
+
+const theme = useTheme();
+const isDark = computed(() => theme.global.current.value.dark);
 
 const unidadesStore = useAllUnidadesMofStore();
 const clasesStore = useAllClasesMofStore();
@@ -275,7 +278,7 @@ const arbolDependencias = computed(() => {
 
 const getRowClass = (item) => {
   if (!isUnidadOficialCheck(item)) {
-    return "opacity-60 grayscale bg-grey-lighten-4";
+    return "opacity-60 grayscale bg-slate-50";
   }
   return "";
 };
@@ -289,32 +292,49 @@ const conteoDependientes = computed(() => {
   return counts;
 });
 
-const chartOptions = computed(() => ({
-  chart: { type: "bar", backgroundColor: "transparent" },
-  title: { text: null },
-  xAxis: { categories: Object.keys(conteoDependientes.value), crosshair: true },
-  yAxis: { title: { text: "Nro. de Unidades" }, min: 0 },
-  plotOptions: {
-    bar: {
-      color: "#F57C00",
-      borderRadius: 4,
-      dataLabels: { enabled: true },
+const chartOptions = computed(() => {
+  const textColor = isDark.value ? "#E2E8F0" : "#333333";
+  const labelColor = isDark.value ? "#94A3B8" : "#666666";
+
+  return {
+    chart: { type: "bar", backgroundColor: "transparent" },
+    title: { text: null },
+    xAxis: {
+      categories: Object.keys(conteoDependientes.value),
+      crosshair: true,
+      labels: { style: { color: textColor } },
+      lineColor: isDark.value ? "#475569" : "#CCD6EB",
+      tickColor: isDark.value ? "#475569" : "#CCD6EB"
     },
-  },
-  series: [
-    { name: "Dependientes", data: Object.values(conteoDependientes.value) },
-  ],
-  credits: { enabled: false },
-}));
+    yAxis: {
+      title: { text: "Nro. de Unidades", style: { color: textColor } },
+      labels: { style: { color: labelColor } },
+      gridLineColor: isDark.value ? "#334155" : "#E6E6E6",
+      min: 0
+    },
+    plotOptions: {
+      bar: {
+        color: "#F57C00",
+        borderRadius: 4,
+        dataLabels: {
+          enabled: true,
+          style: { color: textColor, textOutline: "none" }
+        },
+      },
+    },
+    series: [
+      { name: "Dependientes", data: Object.values(conteoDependientes.value) },
+    ],
+    legend: {
+      itemStyle: { color: textColor },
+      itemHoverStyle: { color: isDark.value ? "#FFFFFF" : "#000000" }
+    },
+    credits: { enabled: false },
+  };
+});
 </script>
 
 <style scoped>
-.report-list {
-  background-color: #fafafa;
-}
-.border-bottom {
-  border-bottom: 1px solid #f0f0f0;
-}
 .text-xxs {
   font-size: 0.65rem !important;
 }

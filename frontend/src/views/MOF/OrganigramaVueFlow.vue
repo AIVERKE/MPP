@@ -109,6 +109,7 @@ const filterNivel = ref(null);
 const filterTipo = ref(null);
 const filterInstancia = ref(null);
 const filterRelacion = ref(null);
+const activePanels = ref(0); // Abre por defecto el panel de filtros
 
 // --- HELPER WRAPPERS ---
 const resolveNivel = (val) => getNivelNombre(val, nivelesStore.niveles);
@@ -253,27 +254,91 @@ const stats = computed(() => {
 });
 
 // --- ESTRUCTURA VISUAL & LAYOUT ---
+// --- ESTRUCTURA VISUAL & LAYOUT ---
 function getLayoutedElements(nodes, edges) {
+  // 1. Separar nodos normales/invisibles de nodos staff
+  const staffNodes = nodes.filter((n) => n.data && n.data.isStaff);
+  const layoutNodes = nodes.filter((n) => !n.data || !n.data.isStaff);
+
+  // Separar aristas que conectan a nodos staff
+  const staffEdges = edges.filter((e) => {
+    const sourceNode = nodes.find((n) => n.id === e.source);
+    const targetNode = nodes.find((n) => n.id === e.target);
+    return (
+      (sourceNode && sourceNode.data && sourceNode.data.isStaff) ||
+      (targetNode && targetNode.data && targetNode.data.isStaff)
+    );
+  });
+  const layoutEdges = edges.filter((e) => !staffEdges.includes(e));
+
+  // Agrupar staff por parentId para calcular el espacio virtual extra
+  const staffByParent = {};
+  staffNodes.forEach((node) => {
+    if (!staffByParent[node.parentId]) {
+      staffByParent[node.parentId] = [];
+    }
+    staffByParent[node.parentId].push(node);
+  });
+
+  // 2. Hacer layout de Dagre solo con nodos y aristas normales/invisibles
   const dagreGraph = new dagre.graphlib.Graph();
   dagreGraph.setDefaultEdgeLabel(() => ({}));
-  dagreGraph.setGraph({ rankdir: "TB", nodesep: 70, ranksep: 120 });
-  nodes.forEach((node) => {
+  dagreGraph.setGraph({ rankdir: "TB", nodesep: 70, ranksep: 140 });
+
+  layoutNodes.forEach((node) => {
+    // Calculamos el espacio vertical extra necesario si tiene staff
+    const parentStaffs = staffByParent[node.id] || [];
+    // Cada par de staff por lado requiere 240px de espacio vertical extra
+    const extraHeight = Math.ceil(parentStaffs.length / 2) * 240;
+    
     dagreGraph.setNode(node.id, {
-      width: 280,
-      height: node.data.isInvisible ? 60 : 130,
+      width: 320,
+      height: node.data.isInvisible ? 60 : (240 + extraHeight),
     });
   });
-  edges.forEach((edge) => {
+
+  layoutEdges.forEach((edge) => {
     dagreGraph.setEdge(edge.source, edge.target);
   });
+
   dagre.layout(dagreGraph);
-  nodes.forEach((node) => {
+
+  // Asignar posiciones resultantes a los nodos normales
+  layoutNodes.forEach((node) => {
     const nodeWithPosition = dagreGraph.node(node.id);
+    const dagreHeight = dagreGraph.node(node.id).height;
     node.position = {
-      x: nodeWithPosition.x - 140,
-      y: nodeWithPosition.y - (node.data.isInvisible ? 30 : 65),
+      x: nodeWithPosition.x - 160,
+      // Usamos el alto calculado por Dagre para restar el offset
+      y: nodeWithPosition.y - dagreHeight / 2,
     };
   });
+
+  // 3. Posicionar nodos Staff de forma manual a los costados sin solaparse
+  Object.keys(staffByParent).forEach((parentId) => {
+    const parentNode = layoutNodes.find((n) => String(n.id) === String(parentId));
+    const parentStaffs = staffByParent[parentId];
+    if (parentNode) {
+      parentStaffs.forEach((staffNode, index) => {
+        const side = staffNode.data.staffSide || (index % 2 === 0 ? "right" : "left");
+        const multiplier = side === "right" ? 1 : -1;
+        const indexInSide = Math.floor(index / 2);
+
+        staffNode.position = {
+          x: parentNode.position.x + multiplier * (320 + 80),
+          // El padre visual mide 240px, así que su base está en parentNode.position.y + 240.
+          // Colocamos los staff uno debajo del otro con 20px de margen vertical (240px altura + 20px = 260px paso).
+          // El primero arranca 10px abajo del borde inferior del padre para centrarse perfectamente en el gap de 260px.
+          y: parentNode.position.y + 240 + 10 + (indexInSide * 260),
+        };
+      });
+    } else {
+      parentStaffs.forEach((staffNode) => {
+        staffNode.position = { x: 0, y: 0 };
+      });
+    }
+  });
+
   return { nodes, edges };
 }
 
@@ -281,7 +346,8 @@ function procesarEstructuraVisual(unidadesMapeadas) {
   let nodosOriginales = JSON.parse(JSON.stringify(unidadesMapeadas));
   let nodosFinales = [];
   nodosOriginales.forEach((nodo) => {
-    if (nodo.parentId) {
+    // Saltamos la creación de puentes invisibles para los nodos Staff
+    if (nodo.parentId && (!nodo.data || !nodo.data.isStaff)) {
       const padre = nodosOriginales.find(
         (n) => String(n.id) === String(nodo.parentId),
       );
@@ -375,7 +441,7 @@ async function confirmDelete() {
 
 async function cambiarDependencia() {
   await unidadesStore.updateNodo(unidadACambiar.value, {
-    parentId: parseInt(unidadDestino.value),
+    parentId: parseInt(unidadDestino.value) || null,
     razon: unidadRazon.value,
   });
   if (!unidadesStore.error) {
@@ -760,21 +826,45 @@ const updateGraph = () => {
         },
       };
     });
+  
+  // Asignar staffSide a los nodos staff antes de generar edges y layout
+  const staffNodesOnly = baseNodes.filter((n) => n.data && n.data.isStaff);
+  const staffByParentMap = {};
+  staffNodesOnly.forEach((node) => {
+    if (!staffByParentMap[node.parentId]) {
+      staffByParentMap[node.parentId] = [];
+    }
+    staffByParentMap[node.parentId].push(node);
+  });
+
+  Object.keys(staffByParentMap).forEach((parentId) => {
+    const parentStaffs = staffByParentMap[parentId];
+    parentStaffs.forEach((staffNode, index) => {
+      staffNode.data.staffSide = index % 2 === 0 ? "right" : "left";
+    });
+  });
 
   const finalNodes = procesarEstructuraVisual(baseNodes);
   const nodeIds = new Set(finalNodes.map(n => String(n.id)));
   const flowEdges = finalNodes
     .filter((n) => n.parentId && nodeIds.has(String(n.parentId)))
-    .map((n) => ({
-      id: `e${n.parentId}-${n.id}`,
-      source: String(n.parentId),
-      target: String(n.id),
-      style: {
-        stroke: "#bbb",
-        strokeWidth: 2.5,
-        strokeDasharray: n.data.isStaff ? "5 5" : "none",
-      },
-    }));
+    .map((n) => {
+      let targetH = "target-top";
+      if (n.data && n.data.isStaff) {
+        targetH = n.data.staffSide === "right" ? "target-left" : "target-right";
+      }
+      return {
+        id: `e${n.parentId}-${n.id}`,
+        source: String(n.parentId),
+        target: String(n.id),
+        targetHandle: targetH,
+        style: {
+          stroke: "#bbb",
+          strokeWidth: 2.5,
+          strokeDasharray: n.data && n.data.isStaff ? "5 5" : "none",
+        },
+      };
+    });
 
   const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
     finalNodes,
@@ -788,6 +878,9 @@ const updateGraph = () => {
 
 // --- EVENTS ---
 onMounted(async () => {
+  if (typeof window !== "undefined" && window.innerWidth <= 960) {
+    activePanels.value = null; // Colapsar filtros en móviles para ahorrar espacio vertical
+  }
   await Promise.all([
     unidadesStore.getFetchUnidades(),
     tiposStore.getFetchTipos(),
@@ -833,9 +926,25 @@ function resetFilters() {
 <template>
   <v-container
     fluid
-    class="pt-0 px-6 pb-0 h-screen-custom d-flex flex-column overflow-hidden"
+    :class="[
+      'pt-0 px-6 pb-0 d-flex flex-column',
+      $vuetify.display.smAndDown ? 'h-auto overflow-y-auto' : 'h-screen-custom overflow-hidden'
+    ]"
   >
     <div class="flex-none mx-auto w-100" style="max-width: 1400px">
+      <!-- Header & Breadcrumb -->
+      <div class="mb-4 mt-2">
+        <h1 class="text-h4 font-weight-black mb-1 text-slate-800">
+          Estructura Organizacional
+        </h1>
+        <div class="text-body-2 d-flex align-center text-slate-500">
+          <v-icon size="18" class="mr-2">mdi-sitemap</v-icon>
+          <span>MOF</span>
+          <v-icon size="16" class="mx-1">mdi-chevron-right</v-icon>
+          <span class="font-weight-bold text-primary">Organigrama Interactivo</span>
+        </div>
+      </div>
+
       <!-- STATS -->
       <v-row dense class="mb-2">
         <v-col v-for="stat in stats" :key="stat.title" cols="12" sm="6" md="3">
@@ -862,147 +971,159 @@ function resetFilters() {
         </v-col>
       </v-row>
 
-      <!-- FILTROS -->
-      <v-card elevation="2" class="mb-2 rounded-lg overflow-hidden border">
-        <v-card-text class="pa-4">
-          <v-row dense align="center">
-            <v-col cols="12" md="3"
-              ><v-text-field
-                v-model="searchTerm"
-                label="Buscar unidad..."
-                density="compact"
-                hide-details
-                variant="outlined"
-                prepend-inner-icon="mdi-magnify"
-                clearable
-                autocomplete="off"
-            /></v-col>
-            <v-col cols="12" md="3"
-              ><SelectAllNiveles
-                v-model="filterNivel"
-                label="Nivel Jerárquico"
-                density="compact"
-                hide-details
-                variant="outlined"
-                clearable
-                autocomplete="off"
-                :hide-crud="true"
-            /></v-col>
-            <v-col cols="12" md="3"
-              ><SelectAllTipos
-                v-model="filterTipo"
-                label="Tipo de Unidad"
-                density="compact"
-                hide-details
-                variant="outlined"
-                clearable
-                autocomplete="off"
-                :hide-crud="true"
-            /></v-col>
-            <v-col cols="12" md="3"
-              ><SelectAllClases
-                v-model="filterInstancia"
-                label="Unidad Organizacional"
-                density="compact"
-                hide-details
-                variant="outlined"
-                clearable
-                autocomplete="off"
-                :hide-crud="true"
-            /></v-col>
-          </v-row>
-          <v-row dense align="center" class="mt-1">
-            <v-col cols="12" md="3"
-              ><SelectAllRelaciones
-                v-model="filterRelacion"
-                label="Relación"
-                density="compact"
-                hide-details
-                variant="outlined"
-                clearable
-                autocomplete="off"
-                :hide-crud="true"
-            /></v-col>
-          </v-row>
-          <v-divider class="my-2"></v-divider>
-          <v-row dense align="center">
-            <v-col
-              cols="12"
-              lg="7"
-              md="8"
-              class="d-flex align-center flex-wrap"
-            >
-              <span
-                class="text-subtitle-2 mr-3 font-weight-bold text-grey-darken-2"
-                >VISUALIZAR:</span
-              >
-              <v-btn-toggle
-                v-model="vistaModo"
-                mandatory
-                color="primary"
-                variant="outlined"
-                density="comfortable"
-                rounded="lg"
-              >
-                <v-btn value="integral" class="px-3 text-caption">
-                  <v-icon start size="16">mdi-eye</v-icon>
-                  INTEGRAL
-                </v-btn>
-                <v-btn value="analitico" class="px-3 text-caption">
-                  <v-icon start size="16">mdi-chart-scatter-plot</v-icon>
-                  ANALÍTICA
-                </v-btn>
-                <v-btn value="estricto" class="px-3 text-caption">
-                  <v-icon start size="16">mdi-check-decagram</v-icon>
-                  OFICIAL ESTRICTO
-                </v-btn>
-              </v-btn-toggle>
-            </v-col>
-            <v-col cols="12" lg="5" md="4" class="d-flex gap-1 justify-end">
-              <v-btn
-                prepend-icon="mdi-file-export"
-                color="deep-purple-darken-1"
-                variant="flat"
-                size="small"
-                @click="exportarOrganigrama"
-              >
-                PDF
-                <v-tooltip activator="parent" location="top">Exportar organigrama actual a PDF (A3)</v-tooltip>
-              </v-btn>
-              <v-btn
-                prepend-icon="mdi-format-list-numbered"
-                color="info"
-                variant="flat"
-                size="small"
-                @click="hierarchyDrawer = true"
-              >
-                Jerarquías
-                <v-tooltip activator="parent" location="top">Gestionar catálogos y pesos jerárquicos</v-tooltip>
-              </v-btn>
-              <v-btn
-                prepend-icon="mdi-filter-off"
-                variant="tonal"
-                color="grey-darken-1"
-                size="small"
-                @click="resetFilters"
-              >
-                Limpiar
-                <v-tooltip activator="parent" location="top">Restablecer todos los filtros de búsqueda</v-tooltip>
-              </v-btn>
-              <v-btn
-                prepend-icon="mdi-swap-horizontal"
-                color="secondary"
-                variant="elevated"
-                size="small"
-                @click="dialog_nodo_chance = true"
-              >
-                Dependencia
-                <v-tooltip activator="parent" location="top">Cambiar la unidad superior (Padre) de un nodo</v-tooltip>
-              </v-btn>
-            </v-col>
-          </v-row>
-        </v-card-text>
-      </v-card>
+      <!-- FILTROS COLLAPSIBLE -->
+      <v-expansion-panels v-model="activePanels" class="mb-2 rounded-lg border">
+        <v-expansion-panel elevation="2" class="rounded-lg">
+          <v-expansion-panel-title class="py-2 px-4 font-weight-bold text-subtitle-2">
+            <v-icon start color="primary" class="mr-2">mdi-filter-variant</v-icon>
+            Panel de Filtros y Configuración
+            <v-spacer></v-spacer>
+            <span v-if="hasAnyFilter" class="text-caption text-primary font-weight-bold mr-2">(Filtros Activos)</span>
+          </v-expansion-panel-title>
+          <v-expansion-panel-text class="pa-0">
+            <v-card flat>
+              <v-card-text class="pa-4 pt-1">
+                <v-row dense align="center">
+                  <v-col cols="12" md="3"
+                    ><v-text-field
+                      v-model="searchTerm"
+                      label="Buscar unidad..."
+                      density="compact"
+                      hide-details
+                      variant="outlined"
+                      prepend-inner-icon="mdi-magnify"
+                      clearable
+                      autocomplete="off"
+                  /></v-col>
+                  <v-col cols="12" md="3"
+                    ><SelectAllNiveles
+                      v-model="filterNivel"
+                      label="Nivel Jerárquico"
+                      density="compact"
+                      hide-details
+                      variant="outlined"
+                      clearable
+                      autocomplete="off"
+                      :hide-crud="true"
+                  /></v-col>
+                  <v-col cols="12" md="3"
+                    ><SelectAllTipos
+                      v-model="filterTipo"
+                      label="Tipo de Unidad"
+                      density="compact"
+                      hide-details
+                      variant="outlined"
+                      clearable
+                      autocomplete="off"
+                      :hide-crud="true"
+                  /></v-col>
+                  <v-col cols="12" md="3"
+                    ><SelectAllClases
+                      v-model="filterInstancia"
+                      label="Instancia"
+                      density="compact"
+                      hide-details
+                      variant="outlined"
+                      clearable
+                      autocomplete="off"
+                      :hide-crud="true"
+                  /></v-col>
+                </v-row>
+                <v-row dense align="center" class="mt-1">
+                  <v-col cols="12" md="3"
+                    ><SelectAllRelaciones
+                      v-model="filterRelacion"
+                      label="Relación"
+                      density="compact"
+                      hide-details
+                      variant="outlined"
+                      clearable
+                      autocomplete="off"
+                      :hide-crud="true"
+                  /></v-col>
+                </v-row>
+                <v-divider class="my-2"></v-divider>
+                <v-row dense align="center">
+                  <v-col
+                    cols="12"
+                    lg="7"
+                    md="8"
+                    class="d-flex align-center flex-wrap"
+                  >
+                    <span
+                      class="text-subtitle-2 mr-3 font-weight-bold text-grey-darken-2"
+                      >VISUALIZAR:</span
+                    >
+                    <v-btn-toggle
+                      v-model="vistaModo"
+                      mandatory
+                      color="primary"
+                      variant="outlined"
+                      density="comfortable"
+                      rounded="lg"
+                    >
+                      <v-btn value="integral" class="px-3 text-caption">
+                        <v-icon start size="16">mdi-eye</v-icon>
+                        INTEGRAL
+                      </v-btn>
+                      <v-btn value="analitico" class="px-3 text-caption">
+                        <v-icon start size="16">mdi-chart-scatter-plot</v-icon>
+                        ANALÍTICA
+                      </v-btn>
+                      <v-btn value="estricto" class="px-3 text-caption">
+                        <v-icon start size="16">mdi-check-decagram</v-icon>
+                        OFICIAL 
+                      </v-btn>
+                    </v-btn-toggle>
+                  </v-col>
+                  <v-col cols="12" lg="5" md="4" class="d-flex gap-1 justify-end flex-wrap mt-2 mt-md-0">
+                    <v-btn
+                      prepend-icon="mdi-file-export"
+                      color="deep-purple-darken-1"
+                      variant="flat"
+                      size="small"
+                      @click="exportarOrganigrama"
+                    >
+                      PDF
+                      <v-tooltip activator="parent" location="top">Exportar organigrama actual a PDF (A3)</v-tooltip>
+                    </v-btn>
+                    <v-btn
+                      prepend-icon="mdi-format-list-numbered"
+                      color="info"
+                      variant="flat"
+                      size="small"
+                      @click="hierarchyDrawer = true"
+                    >
+                      Jerarquías
+                      <v-tooltip activator="parent" location="top">Gestionar catálogos y pesos jerárquicos</v-tooltip>
+                    </v-btn>
+                    <v-btn
+                      prepend-icon="mdi-filter-off"
+                      variant="tonal"
+                      color="grey-darken-1"
+                      size="small"
+                      @click="resetFilters"
+                    >
+                      Limpiar
+                      <v-tooltip activator="parent" location="top">Restablecer todos los filtros de búsqueda</v-tooltip>
+                    </v-btn>
+                    <v-btn
+                      prepend-icon="mdi-swap-horizontal"
+                      color="secondary"
+                      variant="elevated"
+                      size="small"
+                      @click="dialog_nodo_chance = true"
+                    >
+                      Dependencia
+                      <v-tooltip activator="parent" location="top">Cambiar la unidad superior (Padre) de un nodo</v-tooltip>
+                    </v-btn>
+                  </v-col>
+                </v-row>
+              </v-card-text>
+            </v-card>
+          </v-expansion-panel-text>
+        </v-expansion-panel>
+      </v-expansion-panels>
 
       <!-- LEYENDA DINÁMICA -->
       <v-expand-transition>
@@ -1143,11 +1264,8 @@ function resetFilters() {
             <div class="node-bridge-container">
               <div class="bridge-line" :class="{ dashed: data.isStaff }"></div>
             </div>
-            <Handle type="target" position="top" style="opacity: 0" /><Handle
-              type="source"
-              position="bottom"
-              style="opacity: 0"
-            />
+            <Handle id="target-top" type="target" position="top" style="opacity: 0" />
+            <Handle id="source-bottom" type="source" position="bottom" style="opacity: 0" />
           </template>
           <template #node-custom="{ data, id }">
             <div
@@ -1162,8 +1280,8 @@ function resetFilters() {
                 borderColor: (hasAnyFilter || mostrarDependencias) && !data.isMatch ? '#E0E0E0' : data.isNonOficialInOficialView ? '#BDBDBD' : data.color,
                 '--node-color': data.color,
                 background: data.isNonOficialInOficialView ? '#f5f5f5' : ((hasAnyFilter || mostrarDependencias) && !data.isMatch) ? '#ffffff' : (data.isStaff
-                  ? `linear-gradient(145deg, #fafafa 0%, ${data.color}33 100%)`
-                  : `linear-gradient(145deg, #ffffff 0%, ${data.color}66 100%)`),
+                  ? `color-mix(in srgb, ${data.color} 8%, #FFFFFF)`
+                  : `color-mix(in srgb, ${data.color} 15%, #FFFFFF)`),
                 borderLeft: `10px solid ${(hasAnyFilter || mostrarDependencias) && !data.isMatch ? '#E0E0E0' : data.isNonOficialInOficialView ? '#9E9E9E' : data.color}`,
               }"
             >
@@ -1256,10 +1374,28 @@ function resetFilters() {
                 </v-menu>
               </div>
               <Handle
+                v-if="data.isStaff && data.staffSide === 'right'"
+                id="target-left"
+                type="target"
+                position="left"
+                :style="{ background: data.color }"
+              />
+              <Handle
+                v-else-if="data.isStaff && data.staffSide === 'left'"
+                id="target-right"
+                type="target"
+                position="right"
+                :style="{ background: data.color }"
+              />
+              <Handle
+                v-else
+                id="target-top"
                 type="target"
                 position="top"
                 :style="{ background: data.color }"
-              /><Handle
+              />
+              <Handle
+                id="source-bottom"
                 type="source"
                 position="bottom"
                 :style="{ background: data.color }"
@@ -1323,10 +1459,10 @@ function resetFilters() {
       v-model="hierarchyDrawer"
       location="right"
       temporary
-      :width="hierarchyDrawerWidth"
+      :width="$vuetify.display.xs ? '100%' : hierarchyDrawerWidth"
     >
       <HierarchyManagerDrawer
-        :width="hierarchyDrawerWidth"
+        :width="$vuetify.display.xs ? 360 : hierarchyDrawerWidth"
         @close="hierarchyDrawer = false"
         @updated="refreshChart"
         @resize="(val) => (hierarchyDrawerWidth = val)"
@@ -1341,17 +1477,20 @@ function resetFilters() {
 
 <style scoped>
 .h-screen-custom {
-  height: calc(96vh - 85px) !important;
-  max-height: calc(96vh - 85px) !important;
+  height: calc(100vh - 220px) !important;
+  max-height: calc(100vh - 220px) !important;
 }
 .flow-container {
   width: 100%;
   flex-grow: 1;
-  min-height: 0;
+  min-height: 500px;
   background: #f8f9fa;
 }
+.v-theme--dark .flow-container {
+  background: #030712 !important;
+}
 .node-bridge-container {
-  width: 280px;
+  width: 320px;
   height: 60px;
   display: flex;
   justify-content: center;
@@ -1362,10 +1501,16 @@ function resetFilters() {
   height: 100%;
   background-color: #bbb;
 }
+.v-theme--dark .bridge-line {
+  background-color: #475569;
+}
 .bridge-line.dashed {
   background-color: transparent;
   border-left: 2.5px dashed #bbb;
   width: 0;
+}
+.v-theme--dark .bridge-line.dashed {
+  border-left: 2.5px dashed #475569;
 }
 .custom-node {
   background: white;
@@ -1380,9 +1525,35 @@ function resetFilters() {
   transition: all 0.3s ease;
   overflow: hidden;
 }
+.v-theme--dark .custom-node {
+  /* Mantenemos el fondo de la tarjeta claro y opaco */
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
 .custom-node:hover {
   transform: translateY(-8px);
   box-shadow: 0 12px 30px var(--node-color);
+}
+.v-theme--dark .custom-node:hover {
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.8), 0 0 15px var(--node-color);
+}
+/* Removemos las sobreescrituras de textos claros (.code-line, .title-line, .detail-line) */
+/* para que el texto permanezca oscuro y legible sobre el fondo claro del nodo */
+.v-theme--dark .vue-flow__minimap {
+  background-color: #0f172a !important;
+}
+.v-theme--dark .vue-flow__controls {
+  background-color: #0f172a !important;
+  border: 1px solid #1e293b !important;
+}
+.v-theme--dark .vue-flow__controls-button {
+  background-color: #0f172a !important;
+  color: #cbd5e1 !important;
+  border-bottom: 1px solid #1e293b !important;
+  fill: #cbd5e1 !important;
+}
+.v-theme--dark .vue-flow__controls-button:hover {
+  background-color: #1e293b !important;
 }
 .faded-node {
   opacity: 0.25;

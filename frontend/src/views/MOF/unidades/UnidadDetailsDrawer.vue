@@ -24,7 +24,7 @@ function close() {
     @update:model-value="val => emit('update:modelValue', val)"
     location="right"
     temporary
-    width="400"
+    :width="$vuetify.display.xs ? '100%' : 400"
     elevation="10"
   >
     <v-toolbar :color="detailData?.color || 'primary'" dark density="compact">

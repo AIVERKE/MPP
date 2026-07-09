@@ -123,7 +123,11 @@ export const getPesoReal = (unidad, clases = []) => {
   if (unidad.peso !== null && unidad.peso !== undefined) return unidad.peso;
   if (unidad.orden !== null && unidad.orden !== undefined) return unidad.orden;
 
-  const tId = unidad.clase || unidad.tipoUnidad || unidad.tipo_unidad;
+  let tId = unidad.clase || unidad.tipoUnidad || unidad.tipo_unidad;
+  if (tId && typeof tId === "object") {
+    tId = tId.id ?? tId.value ?? tId.descripcion;
+  }
+
   if (tId && clases && clases.length > 0) {
     const clase = clases.find(
       (c) =>

@@ -4,50 +4,108 @@
  mail: jperezbenavides@gmail.com
  -->
 <script setup>
-import { ref } from "vue";
-import { useAuthStore } from "../../stores/auth";
+import { ref, computed, onUnmounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useAuthStore } from "@/stores/auth";
 import { useTheme } from "vuetify";
 
-const authStore = useAuthStore();
+const route = useRoute();
+const router = useRouter();
 const theme = useTheme();
 const drawer = ref(true);
-const sidebarWidth = ref(260);
-const isResizing = ref(false);
+const authStore = useAuthStore();
 
 const toggleTheme = () => {
   theme.global.name.value = theme.global.current.value.dark ? "light" : "dark";
 };
 
-const handleLogout = () => {
-  authStore.logout();
-};
+// --- Lógica de Redimensionamiento ---
+const drawerWidth = ref(260);
+const isResizing = ref(false);
 
 const startResizing = () => {
   isResizing.value = true;
-  document.addEventListener("mousemove", handleMouseMove);
+  document.addEventListener("mousemove", resize);
   document.addEventListener("mouseup", stopResizing);
+  document.body.style.cursor = "col-resize";
+  document.body.style.userSelect = "none";
 };
 
-const handleMouseMove = (e) => {
+const resize = (e) => {
   if (isResizing.value) {
     const newWidth = e.clientX;
-    if (newWidth > 200 && newWidth < 500) {
-      sidebarWidth.value = newWidth;
+    if (newWidth > 200 && newWidth < 600) {
+      drawerWidth.value = newWidth;
     }
   }
 };
 
 const stopResizing = () => {
   isResizing.value = false;
-  document.removeEventListener("mousemove", handleMouseMove);
+  document.removeEventListener("mousemove", resize);
   document.removeEventListener("mouseup", stopResizing);
+  document.body.style.cursor = "default";
+  document.body.style.userSelect = "auto";
+};
+
+// --- Soporte Táctil (Móviles / Tablets) ---
+const startResizingTouch = () => {
+  isResizing.value = true;
+  document.addEventListener("touchmove", resizeTouch);
+  document.addEventListener("touchend", stopResizingTouch);
+  document.body.style.userSelect = "none";
+};
+
+const resizeTouch = (e) => {
+  if (isResizing.value && e.touches.length > 0) {
+    const newWidth = e.touches[0].clientX;
+    if (newWidth > 200 && newWidth < 600) {
+      drawerWidth.value = newWidth;
+    }
+  }
+};
+
+const stopResizingTouch = () => {
+  isResizing.value = false;
+  document.removeEventListener("touchmove", resizeTouch);
+  document.removeEventListener("touchend", stopResizingTouch);
+  document.body.style.userSelect = "auto";
+};
+
+const actualDrawerWidth = computed(() => {
+  if (typeof window !== "undefined") {
+    return Math.min(drawerWidth.value, window.innerWidth);
+  }
+  return drawerWidth.value;
+});
+
+onUnmounted(() => {
+  stopResizing();
+  stopResizingTouch();
+});
+// ------------------------------------
+
+const isLoginPage = computed(() => route.path === "/login");
+const userName = computed(() => authStore.user?.nombre || "Usuario");
+const userInitials = computed(() => {
+  const name = authStore.user?.nombre || "U";
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+});
+
+const handleLogout = async () => {
+  authStore.logout();
+  await router.push("/login");
 };
 </script>
 <template>
   <v-app>
     <!-- Barra superior -->
-    <!-- <v-app-bar color="primary" elevation="1"> -->
-    <v-app-bar height="70">
+    <v-app-bar v-if="!isLoginPage" height="70">
       <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
       <v-app-bar-title>
         <v-icon color="primary" size="32" class="mr-2"
@@ -57,42 +115,69 @@ const stopResizing = () => {
       </v-app-bar-title>
       <v-spacer></v-spacer>
 
-      <!-- Nuevo iconos a la derecha -->
+      <!-- Icono de Tema (Dark/Light) -->
       <v-btn icon variant="text" class="mr-2" @click="toggleTheme">
         <v-icon>{{
           theme.global.current.value.dark
             ? "mdi-weather-sunny"
             : "mdi-weather-night"
         }}</v-icon>
+        <v-tooltip activator="parent" location="bottom">
+          Cambiar a modo
+          {{ theme.global.current.value.dark ? "claro" : "oscuro" }}
+        </v-tooltip>
       </v-btn>
 
-      <v-badge color="error" content="45" class="mr-2">
-        <v-btn icon variant="text">
-          <v-icon>mdi-bell</v-icon>
-        </v-btn>
-      </v-badge>
+      <!-- Notificaciones (Sin contador hardcodeado) -->
+      <v-btn icon variant="text" class="mr-2">
+        <v-icon>mdi-bell-outline</v-icon>
+        <v-tooltip activator="parent" location="bottom"
+          >Notificaciones</v-tooltip
+        >
+      </v-btn>
 
-      <!-- Menú de usuario -->
+      <!-- Menú de usuario con iniciales -->
       <v-menu>
         <template v-slot:activator="{ props }">
-          <v-btn icon v-bind="props">
-            <v-icon>mdi-account-circle</v-icon>
+          <v-btn icon v-bind="props" class="ml-2">
+            <v-avatar color="primary" size="32">
+              <span class="text-white text-caption">{{ userInitials }}</span>
+            </v-avatar>
+            <v-tooltip activator="parent" location="bottom"
+              >Perfil de {{ userName }}</v-tooltip
+            >
           </v-btn>
-          <!-- <v-avatar v-bind="props" color="primary" size="40" class="ml-2">
-                        <span class="text-white font-weight-bold">MU</span>
-                    </v-avatar> -->
         </template>
-        <v-list>
-          <v-list-item title="Mi Perfil"></v-list-item>
-          <v-list-item title="Configuración"></v-list-item>
+        <v-list density="compact" min-width="150">
+          <v-list-item
+            prepend-icon="mdi-account"
+            title="Mi Perfil"
+            value="profile"
+          ></v-list-item>
+          <v-list-item
+            prepend-icon="mdi-cog"
+            title="Configuración"
+            value="settings"
+          ></v-list-item>
           <v-divider></v-divider>
-          <v-list-item title="Cerrar Sesión" class="text-error" @click="handleLogout"></v-list-item>
+          <v-list-item
+            prepend-icon="mdi-logout"
+            title="Cerrar Sesión"
+            class="text-error"
+            @click="handleLogout"
+          ></v-list-item>
         </v-list>
       </v-menu>
     </v-app-bar>
 
     <!-- Sidebar de navegación -->
-    <v-navigation-drawer v-model="drawer" app :width="sidebarWidth">
+    <v-navigation-drawer
+      v-if="!isLoginPage"
+      v-model="drawer"
+      app
+      :width="actualDrawerWidth"
+      class="resizable-drawer"
+    >
       <div class="pa-2">
         <div class="sidebar-section-title">Menú</div>
         <v-list density="compact" nav>
@@ -106,10 +191,9 @@ const stopResizing = () => {
             title="Usuarios"
             to="/usuarios"
           ></v-list-item>
-          
           <v-list-group
             class="no-indent"
-            prepend-icon="mdi-sitemap"
+            prepend-icon="mdi-package-variant"
             value="MOF"
           >
             <template #activator="{ props }">
@@ -117,17 +201,19 @@ const stopResizing = () => {
             </template>
             <v-list-item
               prepend-icon="mdi-sitemap"
-              title="Organigrama"
+              title="ESTRUCTURA ORGANIZACIONAL"
               to="/mof/organigrama-unidades"
             ></v-list-item>
             <v-list-item
               prepend-icon="mdi-list-box"
-              title="Listar Unidades"
+              title="LISTAR UNIDADES"
               to="/mof/listar-unidades"
-            ></v-list-item>
+            >
+            </v-list-item>
+
             <v-list-item
               prepend-icon="mdi-tree"
-              title="Árbol Unidades"
+              title="ARBOL DE UNIDADES"
               to="/mof/arbol-unidades"
             ></v-list-item>
           </v-list-group>
@@ -140,88 +226,97 @@ const stopResizing = () => {
             <template #activator="{ props }">
               <v-list-item v-bind="props" title="MPP"></v-list-item>
             </template>
-
             <v-list-item
               prepend-icon="mdi-sitemap"
-              title="Arquitectura de Procesos"
+              title="GENERADOR DE PROCESOS Y PROCEDIMIENTOS"
               to="/mpp/gestion-mpp"
             ></v-list-item>
-
             <v-list-item
-              prepend-icon="mdi-vector-polyline"
-              title="Diseñador de Flujos"
-              to="/mpp/diagrama-flujos"
-              class="text-primary font-weight-bold"
+              prepend-icon="mdi-history"
+              title="HISTORIAL Y RELACIONES"
+              to="/mpp/historial-mpp"
             ></v-list-item>
-
           </v-list-group>
-
           <v-list-group prepend-icon="mdi-chart-bar" value="Reportes">
             <template #activator="{ props }">
               <v-list-item v-bind="props" title="Reportes"></v-list-item>
             </template>
+
             <v-list-item
               prepend-icon="mdi-view-dashboard-outline"
-              title="Dashboard Ejecutivo"
+              title="DASHBOARD EJECUTIVO"
               to="/reportes/ejecutivo"
-            ></v-list-item>
+            >
+            </v-list-item>
+
             <v-list-item
               prepend-icon="mdi-domain"
-              title="Dashboard Facultativo"
+              title="DASHBOARD FACULTATIVO"
               to="/reportes/facultativo"
-            ></v-list-item>
+            >
+            </v-list-item>
           </v-list-group>
-          
           <v-list-item
             prepend-icon="mdi-cog"
             title="Configuración"
             to="/configuracion"
           ></v-list-item>
         </v-list>
-        <!-- Sección APPS -->
         <div class="sidebar-section-title">Sección</div>
       </div>
-
-      <!-- Resize Handle -->
-      <div
-        class="resize-handle"
-        @mousedown.stop="startResizing"
-      ></div>
-
-      <!-- Usuario en el footer -->
 
       <template v-slot:append>
         <v-divider></v-divider>
         <div class="pa-4" style="border-top: 1px solid var(--color-border)">
-          <v-list-item class="px-2">
+          <v-list-item
+            class="px-2"
+            @click="handleLogout"
+            style="cursor: pointer"
+          >
             <template v-slot:prepend>
               <v-avatar color="primary" size="40">
-                <span class="text-white">{{ authStore.user?.name?.substring(0,2).toUpperCase() || 'US' }}</span>
+                <span class="text-white">{{ userInitials }}</span>
               </v-avatar>
             </template>
-            <v-list-item-title class="font-weight-medium"
-              >{{ authStore.user?.name || 'Usuario' }}</v-list-item-title
-            >
-            <v-list-item-subtitle class="text-caption"
-              >Coordinador TIC</v-list-item-subtitle
-            >
+            <v-list-item-title class="font-weight-medium">{{
+              userName
+            }}</v-list-item-title>
+            <v-list-item-subtitle class="text-caption">{{
+              authStore.user?.rol || "Usuario"
+            }}</v-list-item-subtitle>
             <template v-slot:append>
-              <v-icon @click="handleLogout" style="cursor: pointer;">mdi-power</v-icon>
+              <v-icon color="error">mdi-power</v-icon>
             </template>
           </v-list-item>
         </div>
       </template>
+
+      <!-- Manejador para redimensionar -->
+      <div
+        class="resize-handle"
+        @mousedown="startResizing"
+        @touchstart="startResizingTouch"
+      ></div>
     </v-navigation-drawer>
 
     <!-- Contenido principal -->
     <v-main>
-      <v-container fluid class="pa-6">
+      <v-container
+        fluid
+        :class="isLoginPage ? 'pa-0' : 'pa-6'"
+        class="fill-height"
+      >
         <router-view />
       </v-container>
     </v-main>
   </v-app>
 </template>
 <style scoped>
+.resizable-drawer {
+  position: relative;
+  transition: none !important;
+}
+
 .resize-handle {
   position: absolute;
   top: 0;
@@ -229,11 +324,14 @@ const stopResizing = () => {
   width: 4px;
   height: 100%;
   cursor: col-resize;
-  z-index: 10;
-  transition: background-color 0.2s;
+  z-index: 100;
+  background: transparent;
+  transition: background 0.2s;
 }
-.resize-handle:hover {
-  background-color: rgba(var(--v-theme-primary), 0.3);
+
+.resize-handle:hover,
+.resize-handle:active {
+  background: rgba(var(--v-theme-primary), 0.3);
+  width: 6px;
 }
 </style>
-

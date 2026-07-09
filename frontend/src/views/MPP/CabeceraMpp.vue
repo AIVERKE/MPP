@@ -2,8 +2,8 @@
 import { ref, onMounted, onUnmounted, watch, computed } from "vue";
 import { useMppCoreStore } from "@/stores/mpp_core";
 import { rules } from "@/utils/rules";
-import DisenadorMatriz from "./DisenadorMatriz.vue";
-import FormularioComplementario from "./FormularioComplementario.vue";
+import MatrizMpp from "./MatrizMpp.vue";
+import PieMpp from "./PieMpp.vue";
 
 const mppStore = useMppCoreStore();
 
@@ -236,7 +236,7 @@ watch(selectedProceso, async (v) => {
 
 // --- AUXILIARES UI ---
 const getItemTitle = (item) => item?.denominacion || item?.nombre_unidad || item?.nombre || item?.descripcion || "Sin nombre";
-const getProcedimientoProps = (item) => ({ subtitle: item.estado === "Inactivo" ? "Inactivo" : null, class: item.estado === "Inactivo" ? "text-grey bg-grey-lighten-4" : "" });
+const getProcedimientoProps = (item) => ({ subtitle: item.estado === "Inactivo" ? "Inactivo" : null, class: item.estado === "Inactivo" ? "text-slate-500 bg-slate-50" : "" });
 const isProcedimientoInactivo = computed(() => mppStore.procedimientos.find((p) => p.id_procedimiento === selectedProcedimiento.value)?.estado === "Inactivo");
 
 // --- DIÁLOGOS CRUD (ENTIDADES) ---
@@ -393,12 +393,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <v-container fluid class="pa-0 fill-height bg-grey-lighten-4 overflow-hidden">
+  <v-container fluid class="pa-0 fill-height bg-slate-50 overflow-hidden">
     <!-- PANTALLA 1: GESTIÓN POR PASOS (STEPPER) -->
     <v-row v-if="currentScreen === 'setup'" justify="center" align="center" class="fill-height ma-0">
       <v-col cols="12" sm="11" md="10" lg="8">
         <v-card elevation="12" class="rounded-xl border-top-primary overflow-hidden">
-          <v-toolbar color="white" flat class="px-4">
+          <v-toolbar color="surface" flat class="px-4">
             <div class="text-h5 font-weight-bold grey-darken-3 d-flex align-center" style="white-space: nowrap;">
               <v-icon color="primary" class="mr-2">mdi-sitemap</v-icon>
               ARQUITECTURA DE PROCESOS Y PROCEDIMIENTOS
@@ -417,7 +417,7 @@ onUnmounted(() => {
                   <v-col cols="12" md="6">
                     <div class="text-caption font-weight-bold text-uppercase mb-2 text-primary">1. Seleccione el Proceso</div>
                     <div class="d-flex align-center">
-                      <v-select v-model="selectedProceso" :items="mppStore.procesos" :item-title="getItemTitle" item-value="id_proceso" label="Proceso" variant="solo-filled" density="compact" prepend-inner-icon="mdi-hexagon-multiple-outline" class="flex-grow-1" :rules="[rules.required]"></v-select>
+                      <v-select v-model="selectedProceso" :items="mppStore.procesos" :item-title="getItemTitle" item-value="id_proceso" label="Proceso" variant="solo-filled" prepend-inner-icon="mdi-hexagon-multiple-outline" class="flex-grow-1" :rules="[rules.required]"></v-select>
                       <div class="ml-2 d-flex">
                         <v-btn icon color="primary" variant="tonal" size="small" @click="openDialog('proceso')" class="mr-1"><v-icon size="16">mdi-plus</v-icon></v-btn>
                         <v-btn icon color="info" variant="tonal" size="small" :disabled="!selectedProceso" @click="openDialog('proceso', 'edit')"><v-icon size="16">mdi-pencil</v-icon></v-btn>
@@ -427,7 +427,7 @@ onUnmounted(() => {
                   <v-col cols="12" md="6">
                     <div class="text-caption font-weight-bold text-uppercase mb-2 text-primary">2. Seleccione el Procedimiento</div>
                     <div class="d-flex align-center">
-                      <v-select v-model="selectedProcedimiento" :items="mppStore.procedimientos" :item-title="getItemTitle" item-value="id_procedimiento" :item-props="getProcedimientoProps" label="Procedimiento" variant="solo-filled" density="compact" :disabled="!selectedProceso" prepend-inner-icon="mdi-file-edit-outline" class="flex-grow-1" :rules="[rules.required]"></v-select>
+                      <v-select v-model="selectedProcedimiento" :items="mppStore.procedimientos" :item-title="getItemTitle" item-value="id_procedimiento" :item-props="getProcedimientoProps" label="Procedimiento" variant="solo-filled" :disabled="!selectedProceso" prepend-inner-icon="mdi-file-edit-outline" class="flex-grow-1" :rules="[rules.required]"></v-select>
                       <div class="ml-2 d-flex">
                         <v-btn icon color="primary" variant="tonal" size="small" @click="openDialog('procedimiento')" class="mr-1"><v-icon size="16">mdi-plus</v-icon></v-btn>
                         <v-btn icon color="info" variant="tonal" size="small" :disabled="!selectedProcedimiento" @click="openDialog('procedimiento', 'edit')"><v-icon size="16">mdi-pencil</v-icon></v-btn>
@@ -450,7 +450,6 @@ onUnmounted(() => {
                         item-value="id_unidad" 
                         label="Unidades" 
                         variant="solo-filled" 
-                        density="compact" 
                         prepend-inner-icon="mdi-domain" 
                         multiple 
                         chips 
@@ -468,7 +467,6 @@ onUnmounted(() => {
                         item-value="id_cargo" 
                         label="Responsable" 
                         variant="solo-filled" 
-                        density="compact" 
                         prepend-inner-icon="mdi-account-tie-outline" 
                         :disabled="!selectedProceso"
                         :rules="[rules.required]"
@@ -490,10 +488,10 @@ onUnmounted(() => {
               <v-card flat class="pa-4">
                 <v-row dense>
                   <v-col cols="12" md="4">
-                    <v-text-field v-model="procedureHeader.periodicidad" label="Periodicidad" variant="solo-filled" density="compact" prepend-inner-icon="mdi-calendar-sync" placeholder="Ej: Anual" :rules="[rules.required]"></v-text-field>
+                    <v-text-field v-model="procedureHeader.periodicidad" label="Periodicidad" variant="solo-filled" prepend-inner-icon="mdi-calendar-sync" placeholder="Ej: Anual" :rules="[rules.required]"></v-text-field>
                   </v-col>
                   <v-col cols="12" md="8">
-                    <v-select v-model="selectedNormativa" :items="mppStore.normativas" item-title="nombre" item-value="id_normativa" label="Marco Normativo" variant="solo-filled" density="compact" prepend-inner-icon="mdi-gavel" class="flex-grow-1" :rules="[rules.required]">
+                    <v-select v-model="selectedNormativa" :items="mppStore.normativas" item-title="nombre" item-value="id_normativa" label="Marco Normativo" variant="solo-filled" prepend-inner-icon="mdi-gavel" class="flex-grow-1" :rules="[rules.required]">
                       <template v-slot:append-inner>
                         <v-btn icon="mdi-plus" size="x-small" color="primary" variant="text" @click.stop="openResourceDialog('normativa')"></v-btn>
                         <v-btn icon="mdi-pencil" size="x-small" color="info" variant="text" :disabled="!selectedNormativa" @click.stop="openResourceDialog('normativa', 'edit', mppStore.normativas.find(n => n.id_normativa === selectedNormativa))"></v-btn>
@@ -501,19 +499,49 @@ onUnmounted(() => {
                     </v-select>
                   </v-col>
                   <v-col cols="12" md="6">
-                    <v-textarea v-model="procedureHeader.objetivos" label="Objetivo del Procedimiento" variant="solo-filled" density="compact" rows="2" prepend-inner-icon="mdi-target-variant" auto-grow :rules="[rules.required]"></v-textarea>
+                    <v-textarea v-model="procedureHeader.objetivos" label="Objetivo del Procedimiento" variant="solo-filled" rows="2" prepend-inner-icon="mdi-target-variant" auto-grow :rules="[rules.required]"></v-textarea>
                   </v-col>
                   <v-col cols="12" md="6">
-                    <v-textarea v-model="procedureHeader.alcance" label="Alcance" variant="solo-filled" density="compact" rows="2" prepend-inner-icon="mdi-arrow-expand-all" auto-grow :rules="[rules.required]"></v-textarea>
+                    <v-textarea v-model="procedureHeader.alcance" label="Alcance" variant="solo-filled" rows="2" prepend-inner-icon="mdi-arrow-expand-all" auto-grow :rules="[rules.required]"></v-textarea>
                   </v-col>
                 </v-row>
 
                 <v-divider class="my-4"></v-divider>
                 
-                <v-btn color="primary" block size="x-large" class="rounded-lg font-weight-bold text-uppercase" :disabled="!selectedProcedimiento || isProcedimientoInactivo || !selectedCargo" @click="confirmEstructura" height="60" prepend-icon="mdi-vector-combine">
-                  COMENZAR DISEÑO DE MATRIZ
-                </v-btn>
+                 <v-btn color="primary" block size="x-large" class="rounded-lg font-weight-bold text-uppercase text-caption" :disabled="!selectedProcedimiento || isProcedimientoInactivo || !selectedCargo" @click="confirmEstructura" height="60" prepend-icon="mdi-vector-combine">
+                   Comenzar diseño de matriz
+                 </v-btn>
               </v-card>
+            </template>
+
+            <!-- Acciones personalizadas unificadas con PieMpp -->
+            <template v-slot:actions="{ prev, next }">
+              <v-divider></v-divider>
+              <div class="d-flex justify-space-between pa-4 bg-white">
+                <v-btn
+                  v-if="step > 1"
+                  color="primary"
+                  variant="outlined"
+                  prepend-icon="mdi-arrow-left"
+                  class="rounded-lg font-weight-bold text-uppercase text-caption"
+                  @click="prev"
+                >
+                  Anterior
+                </v-btn>
+                <div v-else></div>
+
+                <v-btn
+                  v-if="step < 3"
+                  color="primary"
+                  variant="flat"
+                  append-icon="mdi-arrow-right"
+                  class="rounded-lg font-weight-bold text-uppercase text-caption px-6"
+                  :disabled="step === 1 ? !isStep1Valid : step === 2 ? !isStep2Valid : false"
+                  @click="next"
+                >
+                  Siguiente
+                </v-btn>
+              </div>
             </template>
           </v-stepper>
         </v-card>
@@ -521,7 +549,7 @@ onUnmounted(() => {
     </v-row>
 
     <!-- PANTALLA 2: DISEÑADOR MATRIZ -->
-    <DisenadorMatriz 
+    <MatrizMpp 
         v-else-if="currentScreen === 'matrix'" 
         :procesoId="selectedProceso" 
         :procedimientoId="selectedProcedimiento" 
@@ -532,7 +560,7 @@ onUnmounted(() => {
     />
 
     <!-- PANTALLA 3: FORMULARIO COMPLEMENTARIO (KPIs, Instalaciones, etc.) -->
-    <FormularioComplementario
+    <PieMpp
         v-else-if="currentScreen === 'complementary'"
         :procedimientoId="selectedProcedimiento"
         :procesoId="selectedProceso"
@@ -559,8 +587,8 @@ onUnmounted(() => {
         </v-card-text>
         <v-card-actions class="px-6 pb-4">
           <v-spacer></v-spacer>
-          <v-btn variant="text" @click="showEntityDialog = false" class="rounded-lg text-uppercase">CANCELAR</v-btn>
-          <v-btn color="primary" variant="elevated" @click="handleSaveEntity" :loading="isSaving" class="rounded-lg px-6 text-uppercase">GUARDAR {{ mppStore.schemas[entityType].title }}</v-btn>
+           <v-btn color="primary" variant="outlined" class="rounded-lg font-weight-bold text-uppercase text-caption mr-2" @click="showEntityDialog = false">Cancelar</v-btn>
+           <v-btn color="primary" variant="flat" class="rounded-lg font-weight-bold text-uppercase text-caption px-6" @click="handleSaveEntity" :loading="isSaving">Guardar {{ mppStore.schemas[entityType].title }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -581,10 +609,10 @@ onUnmounted(() => {
           </v-row>
         </v-card-text>
         <v-card-actions class="px-6 pb-4">
-          <v-btn v-if="resourceMode === 'edit'" color="error" variant="text" @click="handleDeleteResource" class="rounded-lg text-uppercase">ELIMINAR</v-btn>
-          <v-spacer></v-spacer>
-          <v-btn variant="text" @click="showResourceDialog = false" class="rounded-lg text-uppercase">CANCELAR</v-btn>
-          <v-btn color="primary" variant="elevated" @click="handleSaveResource" :loading="isSaving" class="rounded-lg px-6 text-uppercase">GUARDAR {{ mppStore.schemas[resourceType].title }}</v-btn>
+           <v-btn v-if="resourceMode === 'edit'" color="error" variant="outlined" class="rounded-lg font-weight-bold text-uppercase text-caption" @click="handleDeleteResource">Eliminar</v-btn>
+           <v-spacer></v-spacer>
+           <v-btn color="primary" variant="outlined" class="rounded-lg font-weight-bold text-uppercase text-caption mr-2" @click="showResourceDialog = false">Cancelar</v-btn>
+           <v-btn color="primary" variant="flat" class="rounded-lg font-weight-bold text-uppercase text-caption px-6" @click="handleSaveResource" :loading="isSaving">Guardar {{ mppStore.schemas[resourceType].title }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>

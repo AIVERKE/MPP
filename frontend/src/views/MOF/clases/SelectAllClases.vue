@@ -191,7 +191,7 @@ async function deleteClase(id) {
         <v-dialog v-model="dialog" max-width="500" persistent v-if="!hideCrud">
             <v-card>
                 <v-card-title class="text-h6 font-weight-bold pa-4">
-                    {{ editingClase ? 'Editar' : 'Nueva' }} Unidad Organizacional
+                    {{ editingClase ? 'Editar' : 'Nueva' }} Instancia
                 </v-card-title>
                 <v-divider />
                 <v-card-text class="pa-4 pt-6">

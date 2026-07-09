@@ -61,11 +61,19 @@ onMounted(async () => {
 </script>
 
 <template>
-  <v-container>
-    <div class="d-flex align-center mb-6">
-      <h1 class="text-h4 font-weight-bold">Configuración de Flujo</h1>
+  <v-container fluid class="pa-0">
+    <div class="mb-6 d-flex align-center justify-space-between">
+      <div>
+        <h1 class="text-h4 font-weight-black mb-1 text-slate-800">Configuración de Flujo</h1>
+        <div class="text-body-2 d-flex align-center text-slate-500">
+          <v-icon size="18" class="mr-2">mdi-cog</v-icon>
+          <span>Menú</span>
+          <v-icon size="16" class="mx-1">mdi-chevron-right</v-icon>
+          <span class="font-weight-bold text-primary">Configuración</span>
+        </div>
+      </div>
       <v-spacer></v-spacer>
-      <v-btn color="primary" prepend-icon="mdi-plus" @click="openDialog()">Nueva Acción</v-btn>
+      <v-btn color="primary" prepend-icon="mdi-plus" class="rounded-lg font-weight-bold" @click="openDialog()">Nueva Acción</v-btn>
     </div>
 
     <v-row>

@@ -173,8 +173,8 @@ async function confirmDelete() {
   <v-container fluid class="pa-0">
     <!-- Header & Breadcrumb -->
     <div class="mb-6">
-      <h1 class="text-h4 font-weight-black mb-1" style="color: #1E293B;">Listado de Unidades</h1>
-      <div class="text-body-2 d-flex align-center" style="color: #64748B;">
+      <h1 class="text-h4 font-weight-black mb-1 text-slate-800">Listado de Unidades</h1>
+      <div class="text-body-2 d-flex align-center text-slate-500">
         <v-icon size="18" class="mr-2">mdi-office-building</v-icon>
         <span>MOF</span>
         <v-icon size="16" class="mx-1">mdi-chevron-right</v-icon>
@@ -272,7 +272,7 @@ async function confirmDelete() {
                 size="x-small" 
                 label 
                 class="font-weight-bold" 
-                :style="{ backgroundColor: resolveClaseColor(item.clase), color: 'white' }"
+                :style="{ backgroundColor: resolveClaseColor(item.clase), color: '#1E293B' }"
               >
                 {{ resolveClase(item.clase) }}
               </v-chip>
@@ -280,7 +280,7 @@ async function confirmDelete() {
 
             <!-- Custom Slot: Nivel -->
             <td class="text-start">
-              <v-chip size="x-small" label variant="tonal" color="indigo-darken-2" class="font-weight-bold">
+              <v-chip size="x-small" label variant="tonal" color="indigo-darken-2" class="font-weight-bold chip-nivel">
                 {{ resolveNivel(item.nivel) }}
               </v-chip>
             </td>
