@@ -12,6 +12,7 @@ import { FlujoModule } from './modules/flujo/flujo.module';
 import { RecursosModule } from './modules/recursos/recursos.module';
 import { CalidadModule } from './modules/calidad/calidad.module';
 import { MofModule } from './modules/mof/mof.module';
+import { VersionesModule } from './modules/versiones/versiones.module';
 
 @Module({
   imports: [
@@ -21,7 +22,6 @@ import { MofModule } from './modules/mof/mof.module';
     ScheduleModule.forRoot(),
     AuthModule,
     TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
         host: configService.get<string>('DB_HOST', 'localhost'),
@@ -33,6 +33,7 @@ import { MofModule } from './modules/mof/mof.module';
         synchronize: false,
       }),
       inject: [ConfigService],
+      imports: [ConfigModule],
     }),
     SeguridadModule,
     EstructuraOrganizacionalModule,
@@ -41,6 +42,7 @@ import { MofModule } from './modules/mof/mof.module';
     RecursosModule,
     CalidadModule,
     MofModule,
+    VersionesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, UnprocessableEntityException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Unidad } from './entities/unidad.entity';
@@ -6,7 +11,10 @@ import { Cargo } from './entities/cargo.entity';
 import { Instalacion } from './entities/instalacion.entity';
 import { CreateCargoDto, UpdateCargoDto } from './dto/cargo.dto';
 import { CreateUnidadDto, UpdateUnidadDto } from './dto/unidad.dto';
-import { CreateInstalacionDto, UpdateInstalacionDto } from './dto/instalacion.dto';
+import {
+  CreateInstalacionDto,
+  UpdateInstalacionDto,
+} from './dto/instalacion.dto';
 
 @Injectable()
 export class EstructuraOrganizacionalService {
@@ -32,8 +40,8 @@ export class EstructuraOrganizacionalService {
       if (error?.code === '23502' && error?.column === 'id_cargo') {
         throw new UnprocessableEntityException(
           'No es posible crear un cargo manualmente. ' +
-          'Los cargos son gestionados por el sistema MOF y sus IDs son asignados externamente. ' +
-          'Para agregar cargos, utilizá el endpoint POST /mof/cargos/sync.',
+            'Los cargos son gestionados por el sistema MOF y sus IDs son asignados externamente. ' +
+            'Para agregar cargos, utilizá el endpoint POST /mof/cargos/sync.',
         );
       }
       throw error;
@@ -136,9 +144,7 @@ export class EstructuraOrganizacionalService {
       where: { id_unidad },
     });
     if (!unidad) {
-      throw new BadRequestException(
-        `Unidad con ID ${id_unidad} no encontrada`,
-      );
+      throw new BadRequestException(`Unidad con ID ${id_unidad} no encontrada`);
     }
 
     const instalacion = this.instalacionRepository.create(createInstalacionDto);
