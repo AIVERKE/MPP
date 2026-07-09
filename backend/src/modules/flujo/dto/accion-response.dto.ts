@@ -9,7 +9,8 @@ export class AccionResponseDto {
   id_accion: number;
 
   @ApiProperty({
-    description: 'Nombre de la acción (puede cambiar sin afectar la figura del diagrama)',
+    description:
+      'Nombre de la acción (puede cambiar sin afectar la figura del diagrama)',
     example: 'Verificar',
   })
   nombre_accion: string;

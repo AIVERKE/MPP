@@ -122,7 +122,9 @@ export class MofService implements OnModuleInit {
 
       this.lastSync = new Date();
       this.syncStatus = 'Éxito';
-      this.logger.log('Sincronización MOF de unidades completada exitosamente.');
+      this.logger.log(
+        'Sincronización MOF de unidades completada exitosamente.',
+      );
 
       return {
         total: unidadesToSave.length,
@@ -199,7 +201,10 @@ export class MofService implements OnModuleInit {
         );
       }
 
-      const cargosMap = new Map<number, { id_cargo: number; nombre: string; descripcion: string }>();
+      const cargosMap = new Map<
+        number,
+        { id_cargo: number; nombre: string; descripcion: string }
+      >();
       const unitCargosMap = new Map<number, number[]>();
 
       this.logger.log(`Procesando ${unidades.length} unidades en lotes...`);
@@ -258,7 +263,9 @@ export class MofService implements OnModuleInit {
         const cargosToSave = Array.from(cargosMap.values());
 
         // Upsert: preserva los IDs existentes y sus relaciones con procesos
-        this.logger.log(`Realizando upsert de ${cargosToSave.length} cargos únicos...`);
+        this.logger.log(
+          `Realizando upsert de ${cargosToSave.length} cargos únicos...`,
+        );
         await queryRunner.manager.upsert(Cargo, cargosToSave, ['id_cargo']);
 
         // Soft delete: desactivar los cargos que ya no existen en el MOF
