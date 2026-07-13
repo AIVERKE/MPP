@@ -22,6 +22,11 @@ import {
   UpdateOperacionCargoDto,
 } from './dto/operacion-cargo.dto';
 import { CreateTareaDto, UpdateTareaDto } from './dto/tarea.dto';
+import { AuditoriaService } from '../versiones/auditoria.service';
+
+function cloneEntity<T>(entity: T): T {
+  return JSON.parse(JSON.stringify(entity));
+}
 
 @Injectable()
 export class FlujoService {
@@ -42,13 +47,27 @@ export class FlujoService {
     private readonly procedimientoRepository: Repository<Procedimiento>,
     @InjectRepository(Cargo)
     private readonly cargoRepository: Repository<Cargo>,
+    private readonly auditoriaService: AuditoriaService,
   ) {}
 
   // --- Figuras ---
 
-  async createFigura(createDto: CreateFiguraDto): Promise<Figura> {
+  async createFigura(
+    createDto: CreateFiguraDto,
+    idUsuario?: number,
+  ): Promise<Figura> {
     const registro = this.figuraRepository.create(createDto);
-    return await this.figuraRepository.save(registro);
+    const saved = await this.figuraRepository.save(registro);
+    const postSnapshot = await this.findOneFigura(saved.id_figura);
+    await this.auditoriaService.registrarCambio(
+      'Figura',
+      saved.id_figura,
+      'CREATE',
+      {},
+      postSnapshot,
+      idUsuario,
+    );
+    return postSnapshot;
   }
 
   async findAllFiguras(): Promise<Figura[]> {
@@ -65,20 +84,47 @@ export class FlujoService {
     return registro;
   }
 
-  async updateFigura(id: number, updateDto: UpdateFiguraDto): Promise<Figura> {
+  async updateFigura(
+    id: number,
+    updateDto: UpdateFiguraDto,
+    idUsuario?: number,
+  ): Promise<Figura> {
     const registro = await this.findOneFigura(id);
+    const preSnapshot = cloneEntity(registro);
     Object.assign(registro, updateDto);
-    return await this.figuraRepository.save(registro);
+    await this.figuraRepository.save(registro);
+    const postSnapshot = await this.findOneFigura(id);
+    await this.auditoriaService.registrarCambio(
+      'Figura',
+      id,
+      'UPDATE',
+      preSnapshot,
+      postSnapshot,
+      idUsuario,
+    );
+    return postSnapshot;
   }
 
-  async removeFigura(id: number): Promise<void> {
+  async removeFigura(id: number, idUsuario?: number): Promise<void> {
     const registro = await this.findOneFigura(id);
+    const preSnapshot = cloneEntity(registro);
     await this.figuraRepository.softRemove(registro);
+    await this.auditoriaService.registrarCambio(
+      'Figura',
+      id,
+      'DELETE',
+      preSnapshot,
+      null,
+      idUsuario,
+    );
   }
 
   // --- Acciones ---
 
-  async createAccion(createDto: CreateAccionDto): Promise<Accion> {
+  async createAccion(
+    createDto: CreateAccionDto,
+    idUsuario?: number,
+  ): Promise<Accion> {
     const { id_figura } = createDto;
 
     if (id_figura) {
@@ -94,7 +140,16 @@ export class FlujoService {
 
     const registro = this.accionRepository.create(createDto);
     const saved = await this.accionRepository.save(registro);
-    return await this.findOneAccion(saved.id_accion);
+    const postSnapshot = await this.findOneAccion(saved.id_accion);
+    await this.auditoriaService.registrarCambio(
+      'Accion',
+      saved.id_accion,
+      'CREATE',
+      {},
+      postSnapshot,
+      idUsuario,
+    );
+    return postSnapshot;
   }
 
   async findAllAcciones(): Promise<Accion[]> {
@@ -112,8 +167,13 @@ export class FlujoService {
     return registro;
   }
 
-  async updateAccion(id: number, updateDto: UpdateAccionDto): Promise<Accion> {
+  async updateAccion(
+    id: number,
+    updateDto: UpdateAccionDto,
+    idUsuario?: number,
+  ): Promise<Accion> {
     const registro = await this.findOneAccion(id);
+    const preSnapshot = cloneEntity(registro);
     const { id_figura } = updateDto;
 
     if (id_figura) {
@@ -129,17 +189,38 @@ export class FlujoService {
 
     Object.assign(registro, updateDto);
     await this.accionRepository.save(registro);
-    return await this.findOneAccion(id);
+    const postSnapshot = await this.findOneAccion(id);
+    await this.auditoriaService.registrarCambio(
+      'Accion',
+      id,
+      'UPDATE',
+      preSnapshot,
+      postSnapshot,
+      idUsuario,
+    );
+    return postSnapshot;
   }
 
-  async removeAccion(id: number): Promise<void> {
+  async removeAccion(id: number, idUsuario?: number): Promise<void> {
     const registro = await this.findOneAccion(id);
+    const preSnapshot = cloneEntity(registro);
     await this.accionRepository.softRemove(registro);
+    await this.auditoriaService.registrarCambio(
+      'Accion',
+      id,
+      'DELETE',
+      preSnapshot,
+      null,
+      idUsuario,
+    );
   }
 
   // --- Actividades ---
 
-  async createActividad(createDto: CreateActividadDto): Promise<Actividad> {
+  async createActividad(
+    createDto: CreateActividadDto,
+    idUsuario?: number,
+  ): Promise<Actividad> {
     const { id_operaciones } = createDto;
 
     if (id_operaciones) {
@@ -154,7 +235,17 @@ export class FlujoService {
     }
 
     const registro = this.actividadRepository.create(createDto);
-    return await this.actividadRepository.save(registro);
+    const saved = await this.actividadRepository.save(registro);
+    const postSnapshot = await this.findOneActividad(saved.id_actividad);
+    await this.auditoriaService.registrarCambio(
+      'Actividad',
+      saved.id_actividad,
+      'CREATE',
+      {},
+      postSnapshot,
+      idUsuario,
+    );
+    return postSnapshot;
   }
 
   async findAllActividades(): Promise<Actividad[]> {
@@ -177,8 +268,10 @@ export class FlujoService {
   async updateActividad(
     id: number,
     updateDto: UpdateActividadDto,
+    idUsuario?: number,
   ): Promise<Actividad> {
     const registro = await this.findOneActividad(id);
+    const preSnapshot = cloneEntity(registro);
     const { id_operaciones } = updateDto;
 
     if (id_operaciones) {
@@ -193,17 +286,39 @@ export class FlujoService {
     }
 
     Object.assign(registro, updateDto);
-    return await this.actividadRepository.save(registro);
+    await this.actividadRepository.save(registro);
+    const postSnapshot = await this.findOneActividad(id);
+    await this.auditoriaService.registrarCambio(
+      'Actividad',
+      id,
+      'UPDATE',
+      preSnapshot,
+      postSnapshot,
+      idUsuario,
+    );
+    return postSnapshot;
   }
 
-  async removeActividad(id: number): Promise<void> {
+  async removeActividad(id: number, idUsuario?: number): Promise<void> {
     const registro = await this.findOneActividad(id);
+    const preSnapshot = cloneEntity(registro);
     await this.actividadRepository.softRemove(registro);
+    await this.auditoriaService.registrarCambio(
+      'Actividad',
+      id,
+      'DELETE',
+      preSnapshot,
+      null,
+      idUsuario,
+    );
   }
 
   // --- Operaciones ---
 
-  async createOperacion(createDto: CreateOperacionDto): Promise<Operacion> {
+  async createOperacion(
+    createDto: CreateOperacionDto,
+    idUsuario?: number,
+  ): Promise<Operacion> {
     const { id_procedimiento } = createDto;
 
     if (id_procedimiento) {
@@ -218,7 +333,17 @@ export class FlujoService {
     }
 
     const registro = this.operacionRepository.create(createDto);
-    return await this.operacionRepository.save(registro);
+    const saved = await this.operacionRepository.save(registro);
+    const postSnapshot = await this.findOneOperacion(saved.id_operaciones);
+    await this.auditoriaService.registrarCambio(
+      'Operacion',
+      saved.id_operaciones,
+      'CREATE',
+      {},
+      postSnapshot,
+      idUsuario,
+    );
+    return postSnapshot;
   }
 
   async findAllOperaciones(): Promise<Operacion[]> {
@@ -241,8 +366,10 @@ export class FlujoService {
   async updateOperacion(
     id: number,
     updateDto: UpdateOperacionDto,
+    idUsuario?: number,
   ): Promise<Operacion> {
     const registro = await this.findOneOperacion(id);
+    const preSnapshot = cloneEntity(registro);
     const { id_procedimiento } = updateDto;
 
     if (id_procedimiento) {
@@ -257,18 +384,38 @@ export class FlujoService {
     }
 
     Object.assign(registro, updateDto);
-    return await this.operacionRepository.save(registro);
+    await this.operacionRepository.save(registro);
+    const postSnapshot = await this.findOneOperacion(id);
+    await this.auditoriaService.registrarCambio(
+      'Operacion',
+      id,
+      'UPDATE',
+      preSnapshot,
+      postSnapshot,
+      idUsuario,
+    );
+    return postSnapshot;
   }
 
-  async removeOperacion(id: number): Promise<void> {
+  async removeOperacion(id: number, idUsuario?: number): Promise<void> {
     const registro = await this.findOneOperacion(id);
+    const preSnapshot = cloneEntity(registro);
     await this.operacionRepository.softRemove(registro);
+    await this.auditoriaService.registrarCambio(
+      'Operacion',
+      id,
+      'DELETE',
+      preSnapshot,
+      null,
+      idUsuario,
+    );
   }
 
   // --- OperacionCargo ---
 
   async createOperacionCargo(
     createDto: CreateOperacionCargoDto,
+    idUsuario?: number,
   ): Promise<OperacionCargo> {
     const { id_operacion, id_cargo } = createDto;
 
@@ -291,7 +438,17 @@ export class FlujoService {
     }
 
     const registro = this.operacionCargoRepository.create(createDto);
-    return await this.operacionCargoRepository.save(registro);
+    const saved = await this.operacionCargoRepository.save(registro);
+    const postSnapshot = await this.findOneOperacionCargo(saved.id);
+    await this.auditoriaService.registrarCambio(
+      'OperacionCargo',
+      saved.id,
+      'CREATE',
+      {},
+      postSnapshot,
+      idUsuario,
+    );
+    return postSnapshot;
   }
 
   async findAllOperacionCargos(): Promise<OperacionCargo[]> {
@@ -316,8 +473,10 @@ export class FlujoService {
   async updateOperacionCargo(
     id: number,
     updateDto: UpdateOperacionCargoDto,
+    idUsuario?: number,
   ): Promise<OperacionCargo> {
     const registro = await this.findOneOperacionCargo(id);
+    const preSnapshot = cloneEntity(registro);
     const { id_operacion, id_cargo } = updateDto;
 
     if (id_operacion) {
@@ -339,17 +498,39 @@ export class FlujoService {
     }
 
     Object.assign(registro, updateDto);
-    return await this.operacionCargoRepository.save(registro);
+    await this.operacionCargoRepository.save(registro);
+    const postSnapshot = await this.findOneOperacionCargo(id);
+    await this.auditoriaService.registrarCambio(
+      'OperacionCargo',
+      id,
+      'UPDATE',
+      preSnapshot,
+      postSnapshot,
+      idUsuario,
+    );
+    return postSnapshot;
   }
 
-  async removeOperacionCargo(id: number): Promise<void> {
+  async removeOperacionCargo(id: number, idUsuario?: number): Promise<void> {
     const registro = await this.findOneOperacionCargo(id);
+    const preSnapshot = cloneEntity(registro);
     await this.operacionCargoRepository.softRemove(registro);
+    await this.auditoriaService.registrarCambio(
+      'OperacionCargo',
+      id,
+      'DELETE',
+      preSnapshot,
+      null,
+      idUsuario,
+    );
   }
 
   // --- Tareas ---
 
-  async createTarea(createDto: CreateTareaDto): Promise<Tarea> {
+  async createTarea(
+    createDto: CreateTareaDto,
+    idUsuario?: number,
+  ): Promise<Tarea> {
     const { id_actividad, id_accion } = createDto;
 
     if (id_actividad) {
@@ -376,7 +557,16 @@ export class FlujoService {
 
     const registro = this.tareaRepository.create(createDto);
     const saved = await this.tareaRepository.save(registro);
-    return await this.findOneTarea(saved.id_tarea);
+    const postSnapshot = await this.findOneTarea(saved.id_tarea);
+    await this.auditoriaService.registrarCambio(
+      'Tarea',
+      saved.id_tarea,
+      'CREATE',
+      {},
+      postSnapshot,
+      idUsuario,
+    );
+    return postSnapshot;
   }
 
   async findAllTareas(): Promise<Tarea[]> {
@@ -396,8 +586,13 @@ export class FlujoService {
     return registro;
   }
 
-  async updateTarea(id: number, updateDto: UpdateTareaDto): Promise<Tarea> {
+  async updateTarea(
+    id: number,
+    updateDto: UpdateTareaDto,
+    idUsuario?: number,
+  ): Promise<Tarea> {
     const registro = await this.findOneTarea(id);
+    const preSnapshot = cloneEntity(registro);
     const { id_actividad, id_accion } = updateDto;
 
     if (id_actividad) {
@@ -424,11 +619,29 @@ export class FlujoService {
 
     Object.assign(registro, updateDto);
     await this.tareaRepository.save(registro);
-    return await this.findOneTarea(id);
+    const postSnapshot = await this.findOneTarea(id);
+    await this.auditoriaService.registrarCambio(
+      'Tarea',
+      id,
+      'UPDATE',
+      preSnapshot,
+      postSnapshot,
+      idUsuario,
+    );
+    return postSnapshot;
   }
 
-  async removeTarea(id: number): Promise<void> {
+  async removeTarea(id: number, idUsuario?: number): Promise<void> {
     const registro = await this.findOneTarea(id);
+    const preSnapshot = cloneEntity(registro);
     await this.tareaRepository.softRemove(registro);
+    await this.auditoriaService.registrarCambio(
+      'Tarea',
+      id,
+      'DELETE',
+      preSnapshot,
+      null,
+      idUsuario,
+    );
   }
 }
