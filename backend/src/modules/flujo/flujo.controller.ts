@@ -7,6 +7,8 @@ import {
   Param,
   Delete,
   ParseIntPipe,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import { FlujoService } from './flujo.service';
 import {
@@ -20,7 +22,9 @@ import {
   ApiNotFoundResponse,
   ApiBadRequestResponse,
   ApiNoContentResponse,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateAccionDto, UpdateAccionDto } from './dto/accion.dto';
 import { AccionResponseDto } from './dto/accion-response.dto';
 import { CreateFiguraDto, UpdateFiguraDto } from './dto/figura.dto';
@@ -40,12 +44,17 @@ export class FlujoController {
 
   // --- Operaciones ---
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Post('operaciones')
   @ApiOperation({ summary: 'Crear una nueva operación' })
   @ApiResponse({ status: 201, description: 'Operación creada exitosamente.' })
   @ApiResponse({ status: 400, description: 'Datos inválidos.' })
-  createOperacion(@Body() createDto: CreateOperacionDto) {
-    return this.service.createOperacion(createDto);
+  createOperacion(@Body() createDto: CreateOperacionDto, @Req() req: any) {
+    return this.service.createOperacion(
+      createDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   @Get('operaciones')
@@ -67,6 +76,8 @@ export class FlujoController {
     return this.service.findOneOperacion(id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Patch('operaciones/:id')
   @ApiOperation({ summary: 'Actualizar una operación por ID' })
   @ApiParam({ name: 'id', description: 'ID de la operación' })
@@ -78,10 +89,17 @@ export class FlujoController {
   updateOperacion(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateOperacionDto,
+    @Req() req: any,
   ) {
-    return this.service.updateOperacion(id, updateDto);
+    return this.service.updateOperacion(
+      id,
+      updateDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Delete('operaciones/:id')
   @ApiOperation({ summary: 'Eliminar una operación (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID de la operación' })
@@ -90,18 +108,26 @@ export class FlujoController {
     description: 'Operación eliminada exitosamente.',
   })
   @ApiResponse({ status: 404, description: 'Operación no encontrada.' })
-  removeOperacion(@Param('id', ParseIntPipe) id: number) {
-    return this.service.removeOperacion(id);
+  removeOperacion(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.service.removeOperacion(
+      id,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   // --- Actividades ---
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Post('actividades')
   @ApiOperation({ summary: 'Crear una nueva actividad' })
   @ApiResponse({ status: 201, description: 'Actividad creada exitosamente.' })
   @ApiResponse({ status: 400, description: 'Datos inválidos.' })
-  createActividad(@Body() createDto: CreateActividadDto) {
-    return this.service.createActividad(createDto);
+  createActividad(@Body() createDto: CreateActividadDto, @Req() req: any) {
+    return this.service.createActividad(
+      createDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   @Get('actividades')
@@ -123,6 +149,8 @@ export class FlujoController {
     return this.service.findOneActividad(id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Patch('actividades/:id')
   @ApiOperation({ summary: 'Actualizar una actividad por ID' })
   @ApiParam({ name: 'id', description: 'ID de la actividad' })
@@ -134,10 +162,17 @@ export class FlujoController {
   updateActividad(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateActividadDto,
+    @Req() req: any,
   ) {
-    return this.service.updateActividad(id, updateDto);
+    return this.service.updateActividad(
+      id,
+      updateDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Delete('actividades/:id')
   @ApiOperation({ summary: 'Eliminar una actividad (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID de la actividad' })
@@ -146,12 +181,17 @@ export class FlujoController {
     description: 'Actividad eliminada exitosamente.',
   })
   @ApiResponse({ status: 404, description: 'Actividad no encontrada.' })
-  removeActividad(@Param('id', ParseIntPipe) id: number) {
-    return this.service.removeActividad(id);
+  removeActividad(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.service.removeActividad(
+      id,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   // --- Figuras ---
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Post('figuras')
   @ApiOperation({
     summary: 'Crear una nueva figura',
@@ -164,8 +204,11 @@ export class FlujoController {
     type: FiguraResponseDto,
   })
   @ApiBadRequestResponse({ description: 'Datos inválidos o codigo duplicado.' })
-  createFigura(@Body() createDto: CreateFiguraDto) {
-    return this.service.createFigura(createDto);
+  createFigura(@Body() createDto: CreateFiguraDto, @Req() req: any) {
+    return this.service.createFigura(
+      createDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   @Get('figuras')
@@ -192,6 +235,8 @@ export class FlujoController {
     return this.service.findOneFigura(id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Patch('figuras/:id')
   @ApiOperation({ summary: 'Actualizar una figura por ID' })
   @ApiParam({ name: 'id', description: 'ID de la figura' })
@@ -205,21 +250,33 @@ export class FlujoController {
   updateFigura(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateFiguraDto,
+    @Req() req: any,
   ) {
-    return this.service.updateFigura(id, updateDto);
+    return this.service.updateFigura(
+      id,
+      updateDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Delete('figuras/:id')
   @ApiOperation({ summary: 'Eliminar una figura (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID de la figura' })
   @ApiNoContentResponse({ description: 'Figura eliminada exitosamente.' })
   @ApiNotFoundResponse({ description: 'Figura no encontrada.' })
-  removeFigura(@Param('id', ParseIntPipe) id: number) {
-    return this.service.removeFigura(id);
+  removeFigura(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.service.removeFigura(
+      id,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   // --- Acciones ---
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Post('acciones')
   @ApiOperation({
     summary: 'Crear una nueva acción',
@@ -234,8 +291,11 @@ export class FlujoController {
   @ApiBadRequestResponse({
     description: 'Datos inválidos o figura referenciada no existe.',
   })
-  createAccion(@Body() createDto: CreateAccionDto) {
-    return this.service.createAccion(createDto);
+  createAccion(@Body() createDto: CreateAccionDto, @Req() req: any) {
+    return this.service.createAccion(
+      createDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   @Get('acciones')
@@ -262,6 +322,8 @@ export class FlujoController {
     return this.service.findOneAccion(id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Patch('acciones/:id')
   @ApiOperation({ summary: 'Actualizar una acción por ID' })
   @ApiParam({ name: 'id', description: 'ID de la acción' })
@@ -277,27 +339,45 @@ export class FlujoController {
   updateAccion(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateAccionDto,
+    @Req() req: any,
   ) {
-    return this.service.updateAccion(id, updateDto);
+    return this.service.updateAccion(
+      id,
+      updateDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Delete('acciones/:id')
   @ApiOperation({ summary: 'Eliminar una acción (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID de la acción' })
   @ApiNoContentResponse({ description: 'Acción eliminada exitosamente.' })
   @ApiNotFoundResponse({ description: 'Acción no encontrada.' })
-  removeAccion(@Param('id', ParseIntPipe) id: number) {
-    return this.service.removeAccion(id);
+  removeAccion(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.service.removeAccion(
+      id,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   // --- Operación-Cargo ---
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Post('operacion-cargos')
   @ApiOperation({ summary: 'Crear una nueva relación Operación-Cargo' })
   @ApiResponse({ status: 201, description: 'Relación creada exitosamente.' })
   @ApiResponse({ status: 400, description: 'Datos inválidos.' })
-  createOperacionCargo(@Body() createDto: CreateOperacionCargoDto) {
-    return this.service.createOperacionCargo(createDto);
+  createOperacionCargo(
+    @Body() createDto: CreateOperacionCargoDto,
+    @Req() req: any,
+  ) {
+    return this.service.createOperacionCargo(
+      createDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   @Get('operacion-cargos')
@@ -319,6 +399,8 @@ export class FlujoController {
     return this.service.findOneOperacionCargo(id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Patch('operacion-cargos/:id')
   @ApiOperation({ summary: 'Actualizar una relación Operación-Cargo por ID' })
   @ApiParam({ name: 'id', description: 'ID de la relación' })
@@ -330,10 +412,17 @@ export class FlujoController {
   updateOperacionCargo(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateOperacionCargoDto,
+    @Req() req: any,
   ) {
-    return this.service.updateOperacionCargo(id, updateDto);
+    return this.service.updateOperacionCargo(
+      id,
+      updateDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Delete('operacion-cargos/:id')
   @ApiOperation({
     summary: 'Eliminar una relación Operación-Cargo (Borrado lógico)',
@@ -341,18 +430,26 @@ export class FlujoController {
   @ApiParam({ name: 'id', description: 'ID de la relación' })
   @ApiResponse({ status: 200, description: 'Relación eliminada exitosamente.' })
   @ApiResponse({ status: 404, description: 'Relación no encontrada.' })
-  removeOperacionCargo(@Param('id', ParseIntPipe) id: number) {
-    return this.service.removeOperacionCargo(id);
+  removeOperacionCargo(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.service.removeOperacionCargo(
+      id,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   // --- Tareas ---
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Post('tareas')
   @ApiOperation({ summary: 'Crear una nueva tarea' })
   @ApiResponse({ status: 201, description: 'Tarea creada exitosamente.' })
   @ApiResponse({ status: 400, description: 'Datos inválidos.' })
-  createTarea(@Body() createDto: CreateTareaDto) {
-    return this.service.createTarea(createDto);
+  createTarea(@Body() createDto: CreateTareaDto, @Req() req: any) {
+    return this.service.createTarea(
+      createDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   @Get('tareas')
@@ -374,6 +471,8 @@ export class FlujoController {
     return this.service.findOneTarea(id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Patch('tareas/:id')
   @ApiOperation({ summary: 'Actualizar una tarea por ID' })
   @ApiParam({ name: 'id', description: 'ID de la tarea' })
@@ -382,16 +481,26 @@ export class FlujoController {
   updateTarea(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateTareaDto,
+    @Req() req: any,
   ) {
-    return this.service.updateTarea(id, updateDto);
+    return this.service.updateTarea(
+      id,
+      updateDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Delete('tareas/:id')
   @ApiOperation({ summary: 'Eliminar una tarea (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID de la tarea' })
   @ApiResponse({ status: 200, description: 'Tarea eliminada exitosamente.' })
   @ApiResponse({ status: 404, description: 'Tarea no encontrada.' })
-  removeTarea(@Param('id', ParseIntPipe) id: number) {
-    return this.service.removeTarea(id);
+  removeTarea(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.service.removeTarea(
+      id,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 }

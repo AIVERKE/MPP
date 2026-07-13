@@ -7,6 +7,8 @@ import { Procedimiento } from './entities/procedimiento.entity';
 import { Cargo } from '../estructura-organizacional/entities/cargo.entity';
 import { CargoProceso } from './entities/cargo-proceso.entity';
 import { Unidad } from '../estructura-organizacional/entities/unidad.entity';
+import { VersionesModule } from '../versiones/versiones.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { Unidad } from '../estructura-organizacional/entities/unidad.entity';
       Unidad,
       Cargo,
     ]),
+    VersionesModule,
+    AuthModule,
   ],
   controllers: [ProcesosController],
   providers: [ProcesosService],

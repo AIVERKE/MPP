@@ -10,6 +10,8 @@ import { Figura } from './entities/figura.entity';
 import { Tarea } from './entities/tarea.entity';
 import { Procedimiento } from '../procesos/entities/procedimiento.entity';
 import { Cargo } from '../estructura-organizacional/entities/cargo.entity';
+import { VersionesModule } from '../versiones/versiones.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -23,6 +25,8 @@ import { Cargo } from '../estructura-organizacional/entities/cargo.entity';
       Procedimiento,
       Cargo,
     ]),
+    VersionesModule,
+    AuthModule,
   ],
   controllers: [FlujoController],
   providers: [FlujoService],

@@ -26,6 +26,11 @@ import {
 } from './dto/documento-referencia.dto';
 import { Procedimiento } from '../procesos/entities/procedimiento.entity';
 import { Operacion } from '../flujo/entities/operacion.entity';
+import { AuditoriaService } from '../versiones/auditoria.service';
+
+function cloneEntity<T>(entity: T): T {
+  return JSON.parse(JSON.stringify(entity));
+}
 
 @Injectable()
 export class RecursosService {
@@ -46,11 +51,15 @@ export class RecursosService {
     private readonly procedimientoRepository: Repository<Procedimiento>,
     @InjectRepository(Operacion)
     private readonly operacionRepository: Repository<Operacion>,
+    private readonly auditoriaService: AuditoriaService,
   ) {}
 
   // --- Requisitos ---
 
-  async createRequisitos(createDto: CreateRequisitosDto): Promise<Requisitos> {
+  async createRequisitos(
+    createDto: CreateRequisitosDto,
+    idUsuario?: number,
+  ): Promise<Requisitos> {
     if (createDto.id_operacion) {
       const operacion = await this.operacionRepository.findOne({
         where: { id_operaciones: createDto.id_operacion },
@@ -64,7 +73,17 @@ export class RecursosService {
 
     const requisito = this.requisitosRepository.create(createDto);
     try {
-      return await this.requisitosRepository.save(requisito);
+      const saved = await this.requisitosRepository.save(requisito);
+      const postSnapshot = await this.findOneRequisitos(saved.id_requisitos);
+      await this.auditoriaService.registrarCambio(
+        'Requisitos',
+        saved.id_requisitos,
+        'CREATE',
+        {},
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       this.handleDatabaseError(error);
     }
@@ -87,8 +106,10 @@ export class RecursosService {
   async updateRequisitos(
     id: number,
     updateDto: UpdateRequisitosDto,
+    idUsuario?: number,
   ): Promise<Requisitos> {
     const requisito = await this.findOneRequisitos(id);
+    const preSnapshot = cloneEntity(requisito);
 
     if (updateDto.id_operacion) {
       const operacion = await this.operacionRepository.findOne({
@@ -103,20 +124,42 @@ export class RecursosService {
 
     Object.assign(requisito, updateDto);
     try {
-      return await this.requisitosRepository.save(requisito);
+      await this.requisitosRepository.save(requisito);
+      const postSnapshot = await this.findOneRequisitos(id);
+      await this.auditoriaService.registrarCambio(
+        'Requisitos',
+        id,
+        'UPDATE',
+        preSnapshot,
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       this.handleDatabaseError(error);
     }
   }
 
-  async removeRequisitos(id: number): Promise<void> {
+  async removeRequisitos(id: number, idUsuario?: number): Promise<void> {
     const requisito = await this.findOneRequisitos(id);
+    const preSnapshot = cloneEntity(requisito);
     await this.requisitosRepository.softRemove(requisito);
+    await this.auditoriaService.registrarCambio(
+      'Requisitos',
+      id,
+      'DELETE',
+      preSnapshot,
+      null,
+      idUsuario,
+    );
   }
 
   // --- Riesgo ---
 
-  async createRiesgo(createDto: CreateRiesgoDto): Promise<Riesgo> {
+  async createRiesgo(
+    createDto: CreateRiesgoDto,
+    idUsuario?: number,
+  ): Promise<Riesgo> {
     if (createDto.id_operacion) {
       const operacion = await this.operacionRepository.findOne({
         where: { id_operaciones: createDto.id_operacion },
@@ -130,7 +173,17 @@ export class RecursosService {
 
     const riesgo = this.riesgoRepository.create(createDto);
     try {
-      return await this.riesgoRepository.save(riesgo);
+      const saved = await this.riesgoRepository.save(riesgo);
+      const postSnapshot = await this.findOneRiesgo(saved.id_riesgo);
+      await this.auditoriaService.registrarCambio(
+        'Riesgo',
+        saved.id_riesgo,
+        'CREATE',
+        {},
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       this.handleDatabaseError(error);
     }
@@ -150,8 +203,13 @@ export class RecursosService {
     return riesgo;
   }
 
-  async updateRiesgo(id: number, updateDto: UpdateRiesgoDto): Promise<Riesgo> {
+  async updateRiesgo(
+    id: number,
+    updateDto: UpdateRiesgoDto,
+    idUsuario?: number,
+  ): Promise<Riesgo> {
     const riesgo = await this.findOneRiesgo(id);
+    const preSnapshot = cloneEntity(riesgo);
 
     if (updateDto.id_operacion) {
       const operacion = await this.operacionRepository.findOne({
@@ -166,20 +224,42 @@ export class RecursosService {
 
     Object.assign(riesgo, updateDto);
     try {
-      return await this.riesgoRepository.save(riesgo);
+      await this.riesgoRepository.save(riesgo);
+      const postSnapshot = await this.findOneRiesgo(id);
+      await this.auditoriaService.registrarCambio(
+        'Riesgo',
+        id,
+        'UPDATE',
+        preSnapshot,
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       this.handleDatabaseError(error);
     }
   }
 
-  async removeRiesgo(id: number): Promise<void> {
+  async removeRiesgo(id: number, idUsuario?: number): Promise<void> {
     const riesgo = await this.findOneRiesgo(id);
+    const preSnapshot = cloneEntity(riesgo);
     await this.riesgoRepository.softRemove(riesgo);
+    await this.auditoriaService.registrarCambio(
+      'Riesgo',
+      id,
+      'DELETE',
+      preSnapshot,
+      null,
+      idUsuario,
+    );
   }
 
   // --- Control ---
 
-  async createControl(createDto: CreateControlDto): Promise<Control> {
+  async createControl(
+    createDto: CreateControlDto,
+    idUsuario?: number,
+  ): Promise<Control> {
     if (createDto.id_operacion) {
       const operacion = await this.operacionRepository.findOne({
         where: { id_operaciones: createDto.id_operacion },
@@ -193,7 +273,17 @@ export class RecursosService {
 
     const control = this.controlRepository.create(createDto);
     try {
-      return await this.controlRepository.save(control);
+      const saved = await this.controlRepository.save(control);
+      const postSnapshot = await this.findOneControl(saved.id_control);
+      await this.auditoriaService.registrarCambio(
+        'Control',
+        saved.id_control,
+        'CREATE',
+        {},
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       this.handleDatabaseError(error);
     }
@@ -216,8 +306,10 @@ export class RecursosService {
   async updateControl(
     id: number,
     updateDto: UpdateControlDto,
+    idUsuario?: number,
   ): Promise<Control> {
     const control = await this.findOneControl(id);
+    const preSnapshot = cloneEntity(control);
 
     if (updateDto.id_operacion) {
       const operacion = await this.operacionRepository.findOne({
@@ -232,21 +324,41 @@ export class RecursosService {
 
     Object.assign(control, updateDto);
     try {
-      return await this.controlRepository.save(control);
+      await this.controlRepository.save(control);
+      const postSnapshot = await this.findOneControl(id);
+      await this.auditoriaService.registrarCambio(
+        'Control',
+        id,
+        'UPDATE',
+        preSnapshot,
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       this.handleDatabaseError(error);
     }
   }
 
-  async removeControl(id: number): Promise<void> {
+  async removeControl(id: number, idUsuario?: number): Promise<void> {
     const control = await this.findOneControl(id);
+    const preSnapshot = cloneEntity(control);
     await this.controlRepository.softRemove(control);
+    await this.auditoriaService.registrarCambio(
+      'Control',
+      id,
+      'DELETE',
+      preSnapshot,
+      null,
+      idUsuario,
+    );
   }
 
   // --- SistemaInformacion ---
 
   async createSistemaInformacion(
     createDto: CreateSistemaInformacionDto,
+    idUsuario?: number,
   ): Promise<SistemaInformacion> {
     const { id_procedimientos, ...data } = createDto;
     const sistema = this.sistemaInformacionRepository.create(data);
@@ -262,7 +374,19 @@ export class RecursosService {
     }
 
     try {
-      return await this.sistemaInformacionRepository.save(sistema);
+      const saved = await this.sistemaInformacionRepository.save(sistema);
+      const postSnapshot = await this.findOneSistemaInformacion(
+        saved.id_sistema_informacion,
+      );
+      await this.auditoriaService.registrarCambio(
+        'SistemaInformacion',
+        saved.id_sistema_informacion,
+        'CREATE',
+        {},
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       this.handleDatabaseError(error);
     }
@@ -289,8 +413,10 @@ export class RecursosService {
   async updateSistemaInformacion(
     id: number,
     updateDto: UpdateSistemaInformacionDto,
+    idUsuario?: number,
   ): Promise<SistemaInformacion> {
     const sistema = await this.findOneSistemaInformacion(id);
+    const preSnapshot = cloneEntity(sistema);
     const { id_procedimientos, ...data } = updateDto;
 
     Object.assign(sistema, data);
@@ -310,20 +436,45 @@ export class RecursosService {
     }
 
     try {
-      return await this.sistemaInformacionRepository.save(sistema);
+      await this.sistemaInformacionRepository.save(sistema);
+      const postSnapshot = await this.findOneSistemaInformacion(id);
+      await this.auditoriaService.registrarCambio(
+        'SistemaInformacion',
+        id,
+        'UPDATE',
+        preSnapshot,
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       this.handleDatabaseError(error);
     }
   }
 
-  async removeSistemaInformacion(id: number): Promise<void> {
+  async removeSistemaInformacion(
+    id: number,
+    idUsuario?: number,
+  ): Promise<void> {
     const sistema = await this.findOneSistemaInformacion(id);
+    const preSnapshot = cloneEntity(sistema);
     await this.sistemaInformacionRepository.softRemove(sistema);
+    await this.auditoriaService.registrarCambio(
+      'SistemaInformacion',
+      id,
+      'DELETE',
+      preSnapshot,
+      null,
+      idUsuario,
+    );
   }
 
   // --- Equipo ---
 
-  async createEquipo(createDto: CreateEquipoDto): Promise<Equipo> {
+  async createEquipo(
+    createDto: CreateEquipoDto,
+    idUsuario?: number,
+  ): Promise<Equipo> {
     const { id_procedimientos, ...data } = createDto;
     const equipo = this.equipoRepository.create(data);
 
@@ -338,7 +489,17 @@ export class RecursosService {
     }
 
     try {
-      return await this.equipoRepository.save(equipo);
+      const saved = await this.equipoRepository.save(equipo);
+      const postSnapshot = await this.findOneEquipo(saved.id_equipos);
+      await this.auditoriaService.registrarCambio(
+        'Equipo',
+        saved.id_equipos,
+        'CREATE',
+        {},
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       this.handleDatabaseError(error);
     }
@@ -358,8 +519,13 @@ export class RecursosService {
     return equipo;
   }
 
-  async updateEquipo(id: number, updateDto: UpdateEquipoDto): Promise<Equipo> {
+  async updateEquipo(
+    id: number,
+    updateDto: UpdateEquipoDto,
+    idUsuario?: number,
+  ): Promise<Equipo> {
     const equipo = await this.findOneEquipo(id);
+    const preSnapshot = cloneEntity(equipo);
     const { id_procedimientos, ...data } = updateDto;
 
     Object.assign(equipo, data);
@@ -379,21 +545,41 @@ export class RecursosService {
     }
 
     try {
-      return await this.equipoRepository.save(equipo);
+      await this.equipoRepository.save(equipo);
+      const postSnapshot = await this.findOneEquipo(id);
+      await this.auditoriaService.registrarCambio(
+        'Equipo',
+        id,
+        'UPDATE',
+        preSnapshot,
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       this.handleDatabaseError(error);
     }
   }
 
-  async removeEquipo(id: number): Promise<void> {
+  async removeEquipo(id: number, idUsuario?: number): Promise<void> {
     const equipo = await this.findOneEquipo(id);
+    const preSnapshot = cloneEntity(equipo);
     await this.equipoRepository.softRemove(equipo);
+    await this.auditoriaService.registrarCambio(
+      'Equipo',
+      id,
+      'DELETE',
+      preSnapshot,
+      null,
+      idUsuario,
+    );
   }
 
   // --- DocumentoReferencia ---
 
   async createDocumentoReferencia(
     createDto: CreateDocumentoReferenciaDto,
+    idUsuario?: number,
   ): Promise<DocumentoReferencia> {
     const { id_operaciones, ...data } = createDto;
     const documento = this.documentoReferenciaRepository.create(data);
@@ -409,7 +595,19 @@ export class RecursosService {
     }
 
     try {
-      return await this.documentoReferenciaRepository.save(documento);
+      const saved = await this.documentoReferenciaRepository.save(documento);
+      const postSnapshot = await this.findOneDocumentoReferencia(
+        saved.id_documento_referencia,
+      );
+      await this.auditoriaService.registrarCambio(
+        'DocumentoReferencia',
+        saved.id_documento_referencia,
+        'CREATE',
+        {},
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       this.handleDatabaseError(error);
     }
@@ -436,8 +634,10 @@ export class RecursosService {
   async updateDocumentoReferencia(
     id: number,
     updateDto: UpdateDocumentoReferenciaDto,
+    idUsuario?: number,
   ): Promise<DocumentoReferencia> {
     const documento = await this.findOneDocumentoReferencia(id);
+    const preSnapshot = cloneEntity(documento);
     const { id_operaciones, ...data } = updateDto;
 
     Object.assign(documento, data);
@@ -457,15 +657,37 @@ export class RecursosService {
     }
 
     try {
-      return await this.documentoReferenciaRepository.save(documento);
+      await this.documentoReferenciaRepository.save(documento);
+      const postSnapshot = await this.findOneDocumentoReferencia(id);
+      await this.auditoriaService.registrarCambio(
+        'DocumentoReferencia',
+        id,
+        'UPDATE',
+        preSnapshot,
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       this.handleDatabaseError(error);
     }
   }
 
-  async removeDocumentoReferencia(id: number): Promise<void> {
+  async removeDocumentoReferencia(
+    id: number,
+    idUsuario?: number,
+  ): Promise<void> {
     const documento = await this.findOneDocumentoReferencia(id);
+    const preSnapshot = cloneEntity(documento);
     await this.documentoReferenciaRepository.softRemove(documento);
+    await this.auditoriaService.registrarCambio(
+      'DocumentoReferencia',
+      id,
+      'DELETE',
+      preSnapshot,
+      null,
+      idUsuario,
+    );
   }
 
   private handleDatabaseError(error: unknown): never {

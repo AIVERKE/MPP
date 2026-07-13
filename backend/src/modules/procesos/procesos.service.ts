@@ -20,6 +20,27 @@ import {
 } from './dto/cargo-proceso.dto';
 import { Unidad } from '../estructura-organizacional/entities/unidad.entity';
 import { Cargo } from '../estructura-organizacional/entities/cargo.entity';
+import { AuditoriaService } from '../versiones/auditoria.service';
+
+function cloneEntity<T>(entity: T): T {
+  return JSON.parse(JSON.stringify(entity));
+}
+
+function incrementarVersion(version: string | null | undefined): string {
+  if (!version || version.trim() === '') {
+    return '1.0';
+  }
+  const parts = version.split('.');
+  if (parts.length === 0) return '1.0';
+  if (parts.length === 1) {
+    const major = parseInt(parts[0], 10);
+    return isNaN(major) ? '1.0' : `${major}.1`;
+  }
+  const major = parseInt(parts[0], 10);
+  const minor = parseInt(parts[1], 10);
+  if (isNaN(major) || isNaN(minor)) return '1.0';
+  return `${major}.${minor + 1}`;
+}
 
 @Injectable()
 export class ProcesosService {
@@ -34,11 +55,15 @@ export class ProcesosService {
     private readonly unidadRepository: Repository<Unidad>,
     @InjectRepository(Cargo)
     private readonly cargoRepository: Repository<Cargo>,
+    private readonly auditoriaService: AuditoriaService,
   ) {}
 
   // --- Procesos ---
 
-  async createProceso(createDto: CreateProcesoDto): Promise<Proceso> {
+  async createProceso(
+    createDto: CreateProcesoDto,
+    idUsuario?: number,
+  ): Promise<Proceso> {
     const { id_unidades, ...procesoData } = createDto;
 
     // Verificar unicidad de código
@@ -68,7 +93,17 @@ export class ProcesosService {
     }
 
     try {
-      return await this.procesoRepository.save(proceso);
+      const saved = await this.procesoRepository.save(proceso);
+      const postSnapshot = await this.findOneProceso(saved.id_proceso);
+      await this.auditoriaService.registrarCambio(
+        'Proceso',
+        saved.id_proceso,
+        'CREATE',
+        {},
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (error.code === '23505') {
@@ -99,8 +134,10 @@ export class ProcesosService {
   async updateProceso(
     id: number,
     updateDto: UpdateProcesoDto,
+    idUsuario?: number,
   ): Promise<Proceso> {
     const proceso = await this.findOneProceso(id);
+    const preSnapshot = cloneEntity(proceso);
     const { id_unidades, ...procesoData } = updateDto;
 
     // Verificar unicidad de código si está cambiando
@@ -131,7 +168,17 @@ export class ProcesosService {
     }
 
     try {
-      return await this.procesoRepository.save(proceso);
+      await this.procesoRepository.save(proceso);
+      const postSnapshot = await this.findOneProceso(id);
+      await this.auditoriaService.registrarCambio(
+        'Proceso',
+        id,
+        'UPDATE',
+        preSnapshot,
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (error.code === '23505') {
@@ -143,15 +190,25 @@ export class ProcesosService {
     }
   }
 
-  async removeProceso(id: number): Promise<void> {
+  async removeProceso(id: number, idUsuario?: number): Promise<void> {
     const proceso = await this.findOneProceso(id);
+    const preSnapshot = cloneEntity(proceso);
     await this.procesoRepository.softRemove(proceso);
+    await this.auditoriaService.registrarCambio(
+      'Proceso',
+      id,
+      'DELETE',
+      preSnapshot,
+      null,
+      idUsuario,
+    );
   }
 
   // --- Procedimientos ---
 
   async createProcedimiento(
     createDto: CreateProcedimientoDto,
+    idUsuario?: number,
   ): Promise<Procedimiento> {
     const { id_instalaciones, ...procedimientoData } = createDto;
 
@@ -183,7 +240,19 @@ export class ProcesosService {
     }
 
     try {
-      return await this.procedimientoRepository.save(procedimiento);
+      const saved = await this.procedimientoRepository.save(procedimiento);
+      const postSnapshot = await this.findOneProcedimiento(
+        saved.id_procedimiento,
+      );
+      await this.auditoriaService.registrarCambio(
+        'Procedimiento',
+        saved.id_procedimiento,
+        'CREATE',
+        {},
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (error.code === '23505') {
@@ -214,8 +283,10 @@ export class ProcesosService {
   async updateProcedimiento(
     id: number,
     updateDto: UpdateProcedimientoDto,
+    idUsuario?: number,
   ): Promise<Procedimiento> {
     const procedimiento = await this.findOneProcedimiento(id);
+    const preSnapshot = cloneEntity(procedimiento);
     const { id_instalaciones, ...procedimientoData } = updateDto;
 
     // Verificar unicidad de código si está cambiando
@@ -234,6 +305,9 @@ export class ProcesosService {
     }
 
     Object.assign(procedimiento, procedimientoData);
+
+    // Auto-incremento de versión
+    procedimiento.version = incrementarVersion(procedimiento.version);
 
     if (id_instalaciones) {
       const instalaciones =
@@ -254,7 +328,17 @@ export class ProcesosService {
     }
 
     try {
-      return await this.procedimientoRepository.save(procedimiento);
+      await this.procedimientoRepository.save(procedimiento);
+      const postSnapshot = await this.findOneProcedimiento(id);
+      await this.auditoriaService.registrarCambio(
+        'Procedimiento',
+        id,
+        'UPDATE',
+        preSnapshot,
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (error.code === '23505') {
@@ -266,15 +350,25 @@ export class ProcesosService {
     }
   }
 
-  async removeProcedimiento(id: number): Promise<void> {
+  async removeProcedimiento(id: number, idUsuario?: number): Promise<void> {
     const procedimiento = await this.findOneProcedimiento(id);
+    const preSnapshot = cloneEntity(procedimiento);
     await this.procedimientoRepository.softRemove(procedimiento);
+    await this.auditoriaService.registrarCambio(
+      'Procedimiento',
+      id,
+      'DELETE',
+      preSnapshot,
+      null,
+      idUsuario,
+    );
   }
 
   // --- CargoProcesos ---
 
   async createCargoProceso(
     createDto: CreateCargoProcesoDto,
+    idUsuario?: number,
   ): Promise<CargoProceso> {
     const { id_cargo, id_proceso } = createDto;
 
@@ -295,7 +389,17 @@ export class ProcesosService {
     }
 
     const cargoProceso = this.cargoProcesoRepository.create(createDto);
-    return await this.cargoProcesoRepository.save(cargoProceso);
+    const saved = await this.cargoProcesoRepository.save(cargoProceso);
+    const postSnapshot = await this.findOneCargoProceso(saved.id);
+    await this.auditoriaService.registrarCambio(
+      'CargoProceso',
+      saved.id,
+      'CREATE',
+      {},
+      postSnapshot,
+      idUsuario,
+    );
+    return postSnapshot;
   }
 
   async findAllCargoProcesos(): Promise<CargoProceso[]> {
@@ -319,8 +423,10 @@ export class ProcesosService {
   async updateCargoProceso(
     id: number,
     updateDto: UpdateCargoProcesoDto,
+    idUsuario?: number,
   ): Promise<CargoProceso> {
     const cargoProceso = await this.findOneCargoProceso(id);
+    const preSnapshot = cloneEntity(cargoProceso);
 
     const { id_cargo, id_proceso } = updateDto;
 
@@ -343,11 +449,30 @@ export class ProcesosService {
     }
 
     Object.assign(cargoProceso, updateDto);
-    return await this.cargoProcesoRepository.save(cargoProceso);
+    await this.cargoProcesoRepository.save(cargoProceso);
+    const postSnapshot = await this.findOneCargoProceso(id);
+    await this.auditoriaService.registrarCambio(
+      'CargoProceso',
+      id,
+      'UPDATE',
+      preSnapshot,
+      postSnapshot,
+      idUsuario,
+    );
+    return postSnapshot;
   }
 
-  async removeCargoProceso(id: number): Promise<void> {
+  async removeCargoProceso(id: number, idUsuario?: number): Promise<void> {
     const cargoProceso = await this.findOneCargoProceso(id);
+    const preSnapshot = cloneEntity(cargoProceso);
     await this.cargoProcesoRepository.softRemove(cargoProceso);
+    await this.auditoriaService.registrarCambio(
+      'CargoProceso',
+      id,
+      'DELETE',
+      preSnapshot,
+      null,
+      idUsuario,
+    );
   }
 }

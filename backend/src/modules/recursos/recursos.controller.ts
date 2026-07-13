@@ -7,9 +7,18 @@ import {
   Param,
   Delete,
   ParseIntPipe,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import { RecursosService } from './recursos.service';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateRequisitosDto, UpdateRequisitosDto } from './dto/requisitos.dto';
 import { CreateRiesgoDto, UpdateRiesgoDto } from './dto/riesgo.dto';
 import { CreateControlDto, UpdateControlDto } from './dto/control.dto';
@@ -30,12 +39,17 @@ export class RecursosController {
 
   // --- Requisitos ---
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Post('requisitos')
   @ApiOperation({ summary: 'Crear un nuevo requisito' })
   @ApiResponse({ status: 201, description: 'Requisito creado exitosamente.' })
   @ApiResponse({ status: 400, description: 'Datos inválidos.' })
-  createRequisitos(@Body() createDto: CreateRequisitosDto) {
-    return this.service.createRequisitos(createDto);
+  createRequisitos(@Body() createDto: CreateRequisitosDto, @Req() req: any) {
+    return this.service.createRequisitos(
+      createDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   @Get('requisitos')
@@ -57,6 +71,8 @@ export class RecursosController {
     return this.service.findOneRequisitos(id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Patch('requisitos/:id')
   @ApiOperation({ summary: 'Actualizar un requisito por ID' })
   @ApiParam({ name: 'id', description: 'ID del requisito' })
@@ -68,10 +84,17 @@ export class RecursosController {
   updateRequisitos(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateRequisitosDto,
+    @Req() req: any,
   ) {
-    return this.service.updateRequisitos(id, updateDto);
+    return this.service.updateRequisitos(
+      id,
+      updateDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Delete('requisitos/:id')
   @ApiOperation({ summary: 'Eliminar un requisito (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID del requisito' })
@@ -80,18 +103,26 @@ export class RecursosController {
     description: 'Requisito eliminado exitosamente.',
   })
   @ApiResponse({ status: 404, description: 'Requisito no encontrado.' })
-  removeRequisitos(@Param('id', ParseIntPipe) id: number) {
-    return this.service.removeRequisitos(id);
+  removeRequisitos(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.service.removeRequisitos(
+      id,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   // --- Riesgos ---
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Post('riesgos')
   @ApiOperation({ summary: 'Crear un nuevo riesgo' })
   @ApiResponse({ status: 201, description: 'Riesgo creado exitosamente.' })
   @ApiResponse({ status: 400, description: 'Datos inválidos.' })
-  createRiesgo(@Body() createDto: CreateRiesgoDto) {
-    return this.service.createRiesgo(createDto);
+  createRiesgo(@Body() createDto: CreateRiesgoDto, @Req() req: any) {
+    return this.service.createRiesgo(
+      createDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   @Get('riesgos')
@@ -113,6 +144,8 @@ export class RecursosController {
     return this.service.findOneRiesgo(id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Patch('riesgos/:id')
   @ApiOperation({ summary: 'Actualizar un riesgo por ID' })
   @ApiParam({ name: 'id', description: 'ID del riesgo' })
@@ -121,27 +154,42 @@ export class RecursosController {
   updateRiesgo(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateRiesgoDto,
+    @Req() req: any,
   ) {
-    return this.service.updateRiesgo(id, updateDto);
+    return this.service.updateRiesgo(
+      id,
+      updateDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Delete('riesgos/:id')
   @ApiOperation({ summary: 'Eliminar un riesgo (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID del riesgo' })
   @ApiResponse({ status: 200, description: 'Riesgo eliminado exitosamente.' })
   @ApiResponse({ status: 404, description: 'Riesgo no encontrado.' })
-  removeRiesgo(@Param('id', ParseIntPipe) id: number) {
-    return this.service.removeRiesgo(id);
+  removeRiesgo(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.service.removeRiesgo(
+      id,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   // --- Controles ---
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Post('controles')
   @ApiOperation({ summary: 'Crear un nuevo control' })
   @ApiResponse({ status: 201, description: 'Control creado exitosamente.' })
   @ApiResponse({ status: 400, description: 'Datos inválidos.' })
-  createControl(@Body() createDto: CreateControlDto) {
-    return this.service.createControl(createDto);
+  createControl(@Body() createDto: CreateControlDto, @Req() req: any) {
+    return this.service.createControl(
+      createDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   @Get('controles')
@@ -163,6 +211,8 @@ export class RecursosController {
     return this.service.findOneControl(id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Patch('controles/:id')
   @ApiOperation({ summary: 'Actualizar un control por ID' })
   @ApiParam({ name: 'id', description: 'ID del control' })
@@ -174,21 +224,33 @@ export class RecursosController {
   updateControl(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateControlDto,
+    @Req() req: any,
   ) {
-    return this.service.updateControl(id, updateDto);
+    return this.service.updateControl(
+      id,
+      updateDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Delete('controles/:id')
   @ApiOperation({ summary: 'Eliminar un control (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID del control' })
   @ApiResponse({ status: 200, description: 'Control eliminado exitosamente.' })
   @ApiResponse({ status: 404, description: 'Control no encontrado.' })
-  removeControl(@Param('id', ParseIntPipe) id: number) {
-    return this.service.removeControl(id);
+  removeControl(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.service.removeControl(
+      id,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   // --- Sistemas de Información ---
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Post('sistemas-informacion')
   @ApiOperation({ summary: 'Crear un nuevo sistema de información' })
   @ApiResponse({
@@ -196,8 +258,14 @@ export class RecursosController {
     description: 'Sistema de información creado exitosamente.',
   })
   @ApiResponse({ status: 400, description: 'Datos inválidos.' })
-  createSistemaInformacion(@Body() createDto: CreateSistemaInformacionDto) {
-    return this.service.createSistemaInformacion(createDto);
+  createSistemaInformacion(
+    @Body() createDto: CreateSistemaInformacionDto,
+    @Req() req: any,
+  ) {
+    return this.service.createSistemaInformacion(
+      createDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   @Get('sistemas-informacion')
@@ -225,6 +293,8 @@ export class RecursosController {
     return this.service.findOneSistemaInformacion(id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Patch('sistemas-informacion/:id')
   @ApiOperation({ summary: 'Actualizar un sistema de información por ID' })
   @ApiParam({ name: 'id', description: 'ID del sistema de información' })
@@ -239,10 +309,17 @@ export class RecursosController {
   updateSistemaInformacion(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateSistemaInformacionDto,
+    @Req() req: any,
   ) {
-    return this.service.updateSistemaInformacion(id, updateDto);
+    return this.service.updateSistemaInformacion(
+      id,
+      updateDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Delete('sistemas-informacion/:id')
   @ApiOperation({
     summary: 'Eliminar un sistema de información (Borrado lógico)',
@@ -256,18 +333,29 @@ export class RecursosController {
     status: 404,
     description: 'Sistema de información no encontrado.',
   })
-  removeSistemaInformacion(@Param('id', ParseIntPipe) id: number) {
-    return this.service.removeSistemaInformacion(id);
+  removeSistemaInformacion(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: any,
+  ) {
+    return this.service.removeSistemaInformacion(
+      id,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   // --- Equipos ---
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Post('equipos')
   @ApiOperation({ summary: 'Crear un nuevo equipo' })
   @ApiResponse({ status: 201, description: 'Equipo creado exitosamente.' })
   @ApiResponse({ status: 400, description: 'Datos inválidos.' })
-  createEquipo(@Body() createDto: CreateEquipoDto) {
-    return this.service.createEquipo(createDto);
+  createEquipo(@Body() createDto: CreateEquipoDto, @Req() req: any) {
+    return this.service.createEquipo(
+      createDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   @Get('equipos')
@@ -289,6 +377,8 @@ export class RecursosController {
     return this.service.findOneEquipo(id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Patch('equipos/:id')
   @ApiOperation({ summary: 'Actualizar un equipo por ID' })
   @ApiParam({ name: 'id', description: 'ID del equipo' })
@@ -297,21 +387,33 @@ export class RecursosController {
   updateEquipo(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateEquipoDto,
+    @Req() req: any,
   ) {
-    return this.service.updateEquipo(id, updateDto);
+    return this.service.updateEquipo(
+      id,
+      updateDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Delete('equipos/:id')
   @ApiOperation({ summary: 'Eliminar un equipo (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID del equipo' })
   @ApiResponse({ status: 200, description: 'Equipo eliminado exitosamente.' })
   @ApiResponse({ status: 404, description: 'Equipo no encontrado.' })
-  removeEquipo(@Param('id', ParseIntPipe) id: number) {
-    return this.service.removeEquipo(id);
+  removeEquipo(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.service.removeEquipo(
+      id,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   // --- Documentos de Referencia ---
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Post('documentos-referencia')
   @ApiOperation({ summary: 'Crear un nuevo documento de referencia' })
   @ApiResponse({
@@ -319,8 +421,14 @@ export class RecursosController {
     description: 'Documento de referencia creado exitosamente.',
   })
   @ApiResponse({ status: 400, description: 'Datos inválidos.' })
-  createDocumentoReferencia(@Body() createDto: CreateDocumentoReferenciaDto) {
-    return this.service.createDocumentoReferencia(createDto);
+  createDocumentoReferencia(
+    @Body() createDto: CreateDocumentoReferenciaDto,
+    @Req() req: any,
+  ) {
+    return this.service.createDocumentoReferencia(
+      createDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   @Get('documentos-referencia')
@@ -348,6 +456,8 @@ export class RecursosController {
     return this.service.findOneDocumentoReferencia(id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Patch('documentos-referencia/:id')
   @ApiOperation({ summary: 'Actualizar un documento de referencia por ID' })
   @ApiParam({ name: 'id', description: 'ID del documento de referencia' })
@@ -362,10 +472,17 @@ export class RecursosController {
   updateDocumentoReferencia(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateDocumentoReferenciaDto,
+    @Req() req: any,
   ) {
-    return this.service.updateDocumentoReferencia(id, updateDto);
+    return this.service.updateDocumentoReferencia(
+      id,
+      updateDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Delete('documentos-referencia/:id')
   @ApiOperation({
     summary: 'Eliminar un documento de referencia (Borrado lógico)',
@@ -379,7 +496,13 @@ export class RecursosController {
     status: 404,
     description: 'Documento de referencia no encontrado.',
   })
-  removeDocumentoReferencia(@Param('id', ParseIntPipe) id: number) {
-    return this.service.removeDocumentoReferencia(id);
+  removeDocumentoReferencia(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: any,
+  ) {
+    return this.service.removeDocumentoReferencia(
+      id,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 }
