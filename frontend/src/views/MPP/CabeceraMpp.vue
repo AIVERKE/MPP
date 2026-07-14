@@ -517,7 +517,7 @@ onUnmounted(() => {
             <!-- Acciones personalizadas unificadas con PieMpp -->
             <template v-slot:actions="{ prev, next }">
               <v-divider></v-divider>
-              <div class="d-flex justify-space-between pa-4 bg-white">
+              <div class="d-flex justify-space-between pa-4 bg-surface">
                 <v-btn
                   v-if="step > 1"
                   color="primary"
