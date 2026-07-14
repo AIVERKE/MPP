@@ -14,11 +14,15 @@ export const useAllClasesMofStore = defineStore(
         const API_URL = "https://correspondencia.fcpn.edu.bo/umsa-core/api/v1/mof/clases";
 
         const getHeaders = () => {
+          const isLocalToken = localStorage.getItem('is_local_token') === 'true';
           const token = localStorage.getItem('token') || '';
-          return {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+          const headers = {
+            'Content-Type': 'application/json'
           };
+          if (token && !isLocalToken) {
+            headers['Authorization'] = `Bearer ${token}`;
+          }
+          return headers;
         };
 
         const getFetchClases = async () => {

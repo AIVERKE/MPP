@@ -16,7 +16,7 @@ export const useAllUnidadesMofStore = defineStore(
             const headers = {
                 'Content-Type': 'application/json',
             };
-            if (authStore.token) {
+            if (authStore.token && !authStore.isLocalToken) {
                 headers['Authorization'] = `Bearer ${authStore.token}`;
             }
             return headers;
