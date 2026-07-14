@@ -11,7 +11,7 @@
           class="rounded-xl border-top-primary overflow-hidden mb-6"
         >
           <div
-            class="px-6 py-5 border-bottom d-flex flex-column flex-md-row align-start align-md-center justify-space-between ga-4 bg-white"
+            class="px-6 py-5 border-bottom d-flex flex-column flex-md-row align-start align-md-center justify-space-between ga-4 bg-surface"
           >
             <div>
               <div class="d-flex align-center">
@@ -148,7 +148,7 @@
 
             <v-expansion-panel-text class="bg-slate-50 border-top pa-2">
               <!-- Información de soporte del proceso -->
-              <div class="mb-4 pa-4 bg-white rounded-lg border">
+              <div class="mb-4 pa-4 bg-surface rounded-lg border">
                 <div
                   class="text-subtitle-2 font-weight-black text-primary mb-1"
                 >
@@ -319,10 +319,10 @@
       :width="smAndDown ? '100%' : '820'"
       class="elevation-16 rounded-l-xl overflow-hidden border-left-primary"
     >
-      <div v-if="selectedProcedure" class="d-flex flex-column bg-white">
+      <div v-if="selectedProcedure" class="bg-surface">
         <!-- CABECERA DEL DRAWER -->
         <div
-          class="px-6 py-4 border-bottom flex-shrink-0 bg-white d-flex align-center justify-space-between ga-2"
+          class="px-6 py-4 border-bottom flex-shrink-0 bg-surface d-flex align-center justify-space-between ga-2"
         >
           <div class="flex-grow-1 min-width-0">
             <div class="d-flex align-center flex-wrap ga-2">
@@ -396,11 +396,11 @@
         </v-tabs>
 
         <!-- CONTENIDO DE LAS PESTAÑAS (SCROLLABLE) -->
-        <div class="flex-grow-1 overflow-y-auto pt-2 px-6 pb-6 bg-slate-50">
+        <div class="pt-2 px-6 pb-6 bg-slate-50">
           <!-- PESTAÑA 1: ESTRUCTURA Y RECURSOS -->
           <div v-show="drawerTab === 'general'" class="px-1 pb-1 pt-0">
             <!-- Información Técnica -->
-            <v-card class="rounded-xl border pa-4 mb-4 bg-white" elevation="2">
+            <v-card class="rounded-xl border pa-4 mb-4" elevation="2">
               <h3
                 class="text-subtitle-2 font-weight-black text-primary mb-3 uppercase"
               >
@@ -449,7 +449,7 @@
             </v-card>
 
             <!-- Dependencias Asignadas -->
-            <v-card class="rounded-xl border pa-4 mb-4 bg-white" elevation="2">
+            <v-card class="rounded-xl border pa-4 mb-4" elevation="2">
               <h3
                 class="text-subtitle-2 font-weight-black text-primary mb-2 uppercase"
               >
@@ -484,7 +484,7 @@
             </v-card>
 
             <!-- Herramientas Digitales y Materiales -->
-            <v-card class="rounded-xl border pa-4 bg-white" elevation="2">
+            <v-card class="rounded-xl border pa-4" elevation="2">
               <h3
                 class="text-subtitle-2 font-weight-black text-primary mb-2 uppercase"
               >
@@ -544,7 +544,7 @@
           <!-- PESTAÑA 2: CALIDAD Y NORMATIVA -->
           <div v-show="drawerTab === 'calidad'" class="px-1 pb-1 pt-0">
             <!-- Leyes y Normas -->
-            <v-card class="rounded-xl border pa-4 mb-4 bg-white" elevation="2">
+            <v-card class="rounded-xl border pa-4 mb-4" elevation="2">
               <h3
                 class="text-subtitle-2 font-weight-black text-indigo-darken-4 mb-2 uppercase"
               >
@@ -603,7 +603,7 @@
             </v-card>
 
             <!-- Indicadores de Calidad -->
-            <v-card class="rounded-xl border pa-4 bg-white" elevation="2">
+            <v-card class="rounded-xl border pa-4" elevation="2">
               <h3
                 class="text-subtitle-2 font-weight-black text-green-darken-4 mb-2 uppercase"
               >
@@ -641,7 +641,7 @@
                     </div>
                     <v-row
                       no-gutters
-                      class="text-caption bg-white border pa-2 rounded"
+                    class="text-caption bg-surface border pa-2 rounded"
                     >
                       <v-col cols="6" class="border-right">
                         <span
@@ -682,11 +682,11 @@
           <!-- PESTAÑA 3: MATRIZ DE FLUJO -->
           <div v-show="drawerTab === 'flujo'" class="px-1 pb-1 pt-0">
             <v-card
-              class="rounded-xl border bg-white overflow-hidden mb-4"
+              class="rounded-xl border overflow-hidden mb-4"
               elevation="2"
             >
               <div
-                class="pa-4 border-bottom bg-white d-flex align-center justify-space-between flex-wrap ga-2"
+                class="pa-4 border-bottom d-flex align-center justify-space-between flex-wrap ga-2"
               >
                 <div>
                   <h3
@@ -744,7 +744,7 @@
                 >
                   <thead>
                     <tr
-                      class="bg-white border-bottom text-uppercase text-caption font-weight-bold"
+                      class="bg-surface border-bottom text-uppercase text-caption font-weight-bold"
                     >
                       <th width="50" class="text-center font-weight-bold">
                         Paso

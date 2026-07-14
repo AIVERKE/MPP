@@ -50,6 +50,9 @@
 .v-theme--dark .border-b-thin {
   border-bottom: 1px solid #1e293b !important; /* Slate 800 - Borde oscuro */
 }
+.v-theme--dark .bg-white {
+  background-color: #0f172a !important; /* Slate 900 - Fondo oscuro para tarjetas y secciones blancas */
+}
 
 /* Adaptación de bg-indigo-lighten-5 para Modo Oscuro (usado en cabeceras de tablas) */
 .bg-indigo-lighten-5 {
