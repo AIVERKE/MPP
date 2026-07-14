@@ -9,8 +9,8 @@ export const useAuthStore = defineStore("auth", () => {
   const user = ref(JSON.parse(localStorage.getItem("user") || "null"));
   const isAuthenticated = computed(() => !!token.value);
 
-  // Si ya tenemos token local, lo configuramos en axios por defecto
-  if (token.value && isLocalToken.value) {
+  // Si ya tenemos token, lo configuramos en axios por defecto
+  if (token.value) {
     axios.defaults.headers.common["Authorization"] = `Bearer ${token.value}`;
   }
 
@@ -85,8 +85,8 @@ export const useAuthStore = defineStore("auth", () => {
       };
       localStorage.setItem("user", JSON.stringify(user.value));
 
-      // Remover token de axios defaults para evitar conflictos con UMSA Core
-      delete axios.defaults.headers.common["Authorization"];
+      // Configurar token en axios por defecto para autorizar peticiones al backend local
+      axios.defaults.headers.common["Authorization"] = `Bearer ${data.access_token}`;
 
       return true;
     } catch (error) {
