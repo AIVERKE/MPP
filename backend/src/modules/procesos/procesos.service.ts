@@ -21,26 +21,12 @@ import {
 import { Unidad } from '../estructura-organizacional/entities/unidad.entity';
 import { Cargo } from '../estructura-organizacional/entities/cargo.entity';
 import { AuditoriaService } from '../versiones/auditoria.service';
+import { VersionesService } from '../versiones/versiones.service';
 
 function cloneEntity<T>(entity: T): T {
   return JSON.parse(JSON.stringify(entity));
 }
 
-function incrementarVersion(version: string | null | undefined): string {
-  if (!version || version.trim() === '') {
-    return '1.0';
-  }
-  const parts = version.split('.');
-  if (parts.length === 0) return '1.0';
-  if (parts.length === 1) {
-    const major = parseInt(parts[0], 10);
-    return isNaN(major) ? '1.0' : `${major}.1`;
-  }
-  const major = parseInt(parts[0], 10);
-  const minor = parseInt(parts[1], 10);
-  if (isNaN(major) || isNaN(minor)) return '1.0';
-  return `${major}.${minor + 1}`;
-}
 
 @Injectable()
 export class ProcesosService {
@@ -56,6 +42,7 @@ export class ProcesosService {
     @InjectRepository(Cargo)
     private readonly cargoRepository: Repository<Cargo>,
     private readonly auditoriaService: AuditoriaService,
+    private readonly versionesService: VersionesService,
   ) {}
 
   // --- Procesos ---
@@ -306,8 +293,17 @@ export class ProcesosService {
 
     Object.assign(procedimiento, procedimientoData);
 
-    // Auto-incremento de versión
-    procedimiento.version = incrementarVersion(procedimiento.version);
+    const versionAnterior = preSnapshot.version;
+    let versionNueva = versionAnterior;
+
+    // Solo se incrementa la versión si el nuevo estado es 'Aprobado' y el anterior no lo era
+    if (
+      procedimientoData.estado_version === 'Aprobado' &&
+      preSnapshot.estado_version !== 'Aprobado'
+    ) {
+      versionNueva = this.versionesService.calcularNuevaVersion(versionAnterior);
+      procedimiento.version = versionNueva;
+    }
 
     if (id_instalaciones) {
       const instalaciones =
@@ -330,6 +326,16 @@ export class ProcesosService {
     try {
       await this.procedimientoRepository.save(procedimiento);
       const postSnapshot = await this.findOneProcedimiento(id);
+
+      if (versionNueva !== versionAnterior) {
+        await this.versionesService.registrarVersionamiento(
+          id,
+          versionAnterior || '',
+          versionNueva,
+          idUsuario,
+        );
+      }
+
       await this.auditoriaService.registrarCambio(
         'Procedimiento',
         id,

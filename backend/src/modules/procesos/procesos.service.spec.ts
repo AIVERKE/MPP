@@ -7,6 +7,7 @@ import { CargoProceso } from './entities/cargo-proceso.entity';
 import { Unidad } from '../estructura-organizacional/entities/unidad.entity';
 import { Cargo } from '../estructura-organizacional/entities/cargo.entity';
 import { AuditoriaService } from '../versiones/auditoria.service';
+import { VersionesService } from '../versiones/versiones.service';
 
 const mockRepository = () => ({
   find: jest.fn(),
@@ -18,6 +19,11 @@ const mockRepository = () => ({
 
 const mockAuditoriaService = () => ({
   registrarCambio: jest.fn(),
+});
+
+const mockVersionesService = () => ({
+  calcularNuevaVersion: jest.fn().mockReturnValue('1.0'),
+  registrarVersionamiento: jest.fn(),
 });
 
 describe('ProcesosService', () => {
@@ -39,6 +45,7 @@ describe('ProcesosService', () => {
         { provide: getRepositoryToken(Unidad), useValue: mockRepository() },
         { provide: getRepositoryToken(Cargo), useValue: mockRepository() },
         { provide: AuditoriaService, useValue: mockAuditoriaService() },
+        { provide: VersionesService, useValue: mockVersionesService() },
       ],
     }).compile();
 
