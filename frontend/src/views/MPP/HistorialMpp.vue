@@ -182,11 +182,11 @@
                 </div>
               </div>
 
-              <!-- TABLA DE PROCEDIMIENTOS AGRUPADOS POR NOMBRE/CÓDIGO BASE (VERSIONADO) -->
+              <!-- TABLA DE PROCEDIMIENTOS -->
               <div
                 class="text-subtitle-1 font-weight-black text-slate-700 px-2 mb-3"
               >
-                Historial de Procedimientos:
+                Procedimientos del Proceso:
               </div>
 
               <div class="overflow-x-auto w-100 rounded-lg border mb-3">
@@ -199,14 +199,14 @@
                       <th class="font-weight-bold text-left">
                         Nombre del Procedimiento
                       </th>
-                      <th class="font-weight-bold text-center" width="180">
-                        Versiones Disponibles
+                      <th class="font-weight-bold text-center" width="120">
+                        Versión
                       </th>
-                      <th class="font-weight-bold text-center" width="140">
-                        Última Versión
+                      <th class="font-weight-bold text-center" width="160">
+                        Estado Versión
                       </th>
                       <th class="font-weight-bold text-center" width="130">
-                        Estado Actual
+                        Estado
                       </th>
                       <th class="font-weight-bold text-center" width="140">
                         Detalles
@@ -216,7 +216,7 @@
                   <tbody>
                     <tr
                       v-if="
-                        getProcedimientosGrouped(proceso.id_proceso).length ===
+                        getProcedimientosForProceso(proceso.id_proceso).length ===
                         0
                       "
                     >
@@ -229,30 +229,17 @@
                       </td>
                     </tr>
                     <tr
-                      v-for="grupo in getProcedimientosGrouped(
+                      v-for="proc in getProcedimientosForProceso(
                         proceso.id_proceso,
                       )"
-                      :key="grupo.nombreBase"
+                      :key="proc.id_procedimiento"
                       class="hover-row"
                     >
                       <td class="text-caption font-weight-black text-primary">
-                        {{ grupo.codigoBase || "S/C" }}
+                        {{ proc.codigo || "S/C" }}
                       </td>
                       <td class="text-body-2 font-weight-medium text-slate-800">
-                        {{ grupo.nombreBase }}
-                      </td>
-                      <td class="text-center">
-                        <!-- Dropdown rápido para elegir y comparar versiones en el drawer -->
-                        <v-select
-                          v-model="grupo.selectedVersionId"
-                          :items="grupo.versiones"
-                          item-title="versionLabel"
-                          item-value="id_procedimiento"
-                          variant="outlined"
-                          density="compact"
-                          hide-details
-                          class="version-select rounded-lg"
-                        ></v-select>
+                        {{ proc.nombre }}
                       </td>
                       <td class="text-center">
                         <v-chip
@@ -261,32 +248,27 @@
                           variant="flat"
                           class="font-weight-bold"
                         >
-                          v{{
-                            getProcedureVersionString(
-                              grupo.selectedVersionId,
-                              grupo.versiones,
-                            )
-                          }}
+                          v{{ proc.version || "—" }}
                         </v-chip>
                       </td>
                       <td class="text-center">
                         <v-chip
                           size="x-small"
-                          :color="
-                            getProcedureStatusColor(
-                              grupo.selectedVersionId,
-                              grupo.versiones,
-                            )
-                          "
+                          :color="getEstadoVersionColor(proc.estado_version)"
                           variant="tonal"
                           class="font-weight-bold text-uppercase"
                         >
-                          {{
-                            getProcedureStatus(
-                              grupo.selectedVersionId,
-                              grupo.versiones,
-                            )
-                          }}
+                          {{ proc.estado_version || "Borrador" }}
+                        </v-chip>
+                      </td>
+                      <td class="text-center">
+                        <v-chip
+                          size="x-small"
+                          :color="proc.estado === 'Activo' ? 'success' : 'grey'"
+                          variant="tonal"
+                          class="font-weight-bold text-uppercase"
+                        >
+                          {{ proc.estado || "Activo" }}
                         </v-chip>
                       </td>
                       <td class="text-center">
@@ -296,7 +278,7 @@
                           variant="flat"
                           prepend-icon="mdi-eye"
                           class="rounded-lg text-caption font-weight-bold"
-                          @click="openDetailsDrawer(grupo.selectedVersionId)"
+                          @click="openDetailsDrawer(proc.id_procedimiento)"
                         >
                           Explorar
                         </v-btn>
@@ -343,7 +325,15 @@
                 variant="tonal"
                 class="font-weight-black"
               >
-                Versión {{ selectedProcedure.version || "1.0" }}
+                Versión {{ selectedProcedure.version || "—" }}
+              </v-chip>
+              <v-chip
+                size="x-small"
+                color="secondary"
+                variant="tonal"
+                class="font-weight-black uppercase"
+              >
+                {{ selectedProcedure.estado_version || "Borrador" }}
               </v-chip>
               <v-chip
                 size="x-small"
@@ -446,6 +436,53 @@
                   >
                 </v-col>
               </v-row>
+            </v-card>
+
+            <!-- Historial de versiones -->
+            <v-card class="rounded-xl border pa-4 mb-4" elevation="2">
+              <h3
+                class="text-subtitle-2 font-weight-black text-primary mb-3 uppercase"
+              >
+                Historial de Versiones
+              </h3>
+              <div v-if="versionHistoryLoading" class="text-center py-4">
+                <v-progress-circular
+                  indeterminate
+                  color="primary"
+                  size="32"
+                ></v-progress-circular>
+              </div>
+              <div
+                v-else-if="versionHistory.length === 0"
+                class="text-caption text-grey py-2"
+              >
+                No hay registros de versionamiento para este procedimiento.
+              </div>
+              <v-table v-else density="compact" class="bg-transparent">
+                <thead>
+                  <tr class="text-caption text-uppercase">
+                    <th>Versión anterior</th>
+                    <th>Versión nueva</th>
+                    <th>Fecha</th>
+                    <th>Usuario</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="entry in versionHistory"
+                    :key="entry.id_auditoria"
+                  >
+                    <td>
+                      v{{ entry.datosAnteriores?.version || "—" }}
+                    </td>
+                    <td class="font-weight-bold">
+                      v{{ entry.datosNuevos?.version || "—" }}
+                    </td>
+                    <td>{{ formatAuditDate(entry.fechaCambio) }}</td>
+                    <td>{{ entry.idUsuario || "—" }}</td>
+                  </tr>
+                </tbody>
+              </v-table>
             </v-card>
 
             <!-- Dependencias Asignadas -->
@@ -977,6 +1014,10 @@ import axios from "axios";
 const mppStore = useMppCoreStore();
 const { smAndDown } = useDisplay();
 
+const BASE_URL_MPP = mppStore.BASE_URL_MPP;
+const BASE_URL_FLUX = mppStore.BASE_URL_FLUX;
+const BASE_URL_REC = mppStore.BASE_URL_REC;
+
 // --- ESTADOS DE UI ---
 const searchQuery = ref("");
 const statusFilter = ref("Todos");
@@ -993,6 +1034,8 @@ const drawerTab = ref("general");
 const flowViewMode = ref("table");
 const selectedProcedureId = ref(null);
 const drawerFlowLoading = ref(false);
+const versionHistory = ref([]);
+const versionHistoryLoading = ref(false);
 
 const procedureFlows = ref({});
 const connectionPaths = ref([]);
@@ -1002,9 +1045,7 @@ const scrollWrapper = ref(null);
 // --- CARGA DE DATOS ---
 const fetchAllProcedimientos = async () => {
   try {
-    const response = await axios.get(
-      "http://localhost:3000/procesos/procedimientos",
-    );
+    const response = await axios.get(`${BASE_URL_MPP}/procedimientos`);
     allProcedimientos.value = response.data.data || response.data || [];
   } catch (err) {
     console.error("Error al cargar todos los procedimientos:", err);
@@ -1013,13 +1054,32 @@ const fetchAllProcedimientos = async () => {
 
 const fetchAllCargoProcesos = async () => {
   try {
-    const response = await axios.get(
-      "http://localhost:3000/procesos/cargo-procesos",
-    );
+    const response = await axios.get(`${BASE_URL_MPP}/cargo-procesos`);
     allCargoProcesos.value = response.data.data || response.data || [];
   } catch (err) {
     console.error("Error al cargar cargo-procesos:", err);
   }
+};
+
+const fetchVersionHistory = async (procId) => {
+  versionHistoryLoading.value = true;
+  try {
+    const response = await axios.get(
+      `${BASE_URL_MPP}/procedimientos/${procId}/versiones`,
+    );
+    const payload = response.data?.data ?? response.data;
+    versionHistory.value = payload?.data || [];
+  } catch (err) {
+    console.error("Error al cargar historial de versiones:", err);
+    versionHistory.value = [];
+  } finally {
+    versionHistoryLoading.value = false;
+  }
+};
+
+const formatAuditDate = (dateValue) => {
+  if (!dateValue) return "—";
+  return new Date(dateValue).toLocaleString();
 };
 
 const loadProcedureFlow = async (procId) => {
@@ -1028,27 +1088,13 @@ const loadProcedureFlow = async (procId) => {
   try {
     const [opRes, actRes, tarRes, cargoRes, riesgosRes, controlesRes, reqRes] =
       await Promise.all([
-        axios
-          .get("http://localhost:3000/flujo/operaciones")
-          .catch(() => ({ data: [] })),
-        axios
-          .get("http://localhost:3000/flujo/actividades")
-          .catch(() => ({ data: [] })),
-        axios
-          .get("http://localhost:3000/flujo/tareas")
-          .catch(() => ({ data: [] })),
-        axios
-          .get("http://localhost:3000/flujo/operacion-cargos")
-          .catch(() => ({ data: [] })),
-        axios
-          .get("http://localhost:3000/recursos/riesgos")
-          .catch(() => ({ data: [] })),
-        axios
-          .get("http://localhost:3000/recursos/controles")
-          .catch(() => ({ data: [] })),
-        axios
-          .get("http://localhost:3000/recursos/requisitos")
-          .catch(() => ({ data: [] })),
+        axios.get(`${BASE_URL_FLUX}/operaciones`).catch(() => ({ data: [] })),
+        axios.get(`${BASE_URL_FLUX}/actividades`).catch(() => ({ data: [] })),
+        axios.get(`${BASE_URL_FLUX}/tareas`).catch(() => ({ data: [] })),
+        axios.get(`${BASE_URL_FLUX}/operacion-cargos`).catch(() => ({ data: [] })),
+        axios.get(`${BASE_URL_REC}/riesgos`).catch(() => ({ data: [] })),
+        axios.get(`${BASE_URL_REC}/controles`).catch(() => ({ data: [] })),
+        axios.get(`${BASE_URL_REC}/requisitos`).catch(() => ({ data: [] })),
       ]);
 
     const getData = (res) => {
@@ -1290,11 +1336,12 @@ const textMatchAny = (text, list) => {
 };
 
 // --- GESTIÓN DE ABRIR Y SELECCIÓN EN EL DRAWER ---
-const openDetailsDrawer = (procId) => {
+const openDetailsDrawer = async (procId) => {
   selectedProcedureId.value = procId;
   drawerTab.value = "general";
   flowViewMode.value = "table";
   drawerOpen.value = true;
+  await fetchVersionHistory(procId);
 };
 
 // --- PROPIEDADES COMPUTADAS DERECHAS A DETALLE SELECCIONADO ---
@@ -1423,8 +1470,8 @@ const swimlaneGroups = computed(() => {
   return Array.from(map.values());
 });
 
-// --- LÓGICA DE AGRUPACIÓN POR PROCEDIMIENTO Y COMPOSICIÓN DE VERSIONES ---
-const getProcedimientosGrouped = (procesoId) => {
+// --- LISTA PLANA DE PROCEDIMIENTOS POR PROCESO ---
+const getProcedimientosForProceso = (procesoId) => {
   const pId = Number(procesoId);
 
   let filtered = allProcedimientos.value.filter((p) => {
@@ -1447,46 +1494,18 @@ const getProcedimientosGrouped = (procesoId) => {
     );
   }
 
-  const groupsMap = {};
+  return filtered.sort((a, b) =>
+    (a.nombre || "").localeCompare(b.nombre || "", undefined, {
+      sensitivity: "base",
+    }),
+  );
+};
 
-  filtered.forEach((p) => {
-    let nombreBase = (p.nombre || "").trim();
-    nombreBase = nombreBase
-      .replace(/[\s\-_(]*v(er)?(sión)?\.?\s*\d+(\.\d+)*\)?$/gi, "")
-      .trim();
-
-    let codigoBase = (p.codigo || "").trim();
-    codigoBase = codigoBase.replace(/[\s\-_]*v\d+(\.\d+)*$/gi, "").trim();
-
-    if (!groupsMap[nombreBase]) {
-      groupsMap[nombreBase] = {
-        nombreBase,
-        codigoBase: codigoBase || p.codigo,
-        selectedVersionId: null,
-        versiones: [],
-      };
-    }
-
-    groupsMap[nombreBase].versiones.push({
-      id_procedimiento: p.id_procedimiento,
-      version: p.version || "1.0",
-      estado: p.estado || "Activo",
-      versionLabel: `v${p.version || "1.0"} (${p.estado || "Activo"})`,
-    });
-  });
-
-  const result = Object.values(groupsMap).map((grupo) => {
-    grupo.versiones.sort((a, b) => {
-      return String(b.version).localeCompare(String(a.version), undefined, {
-        numeric: true,
-        sensitivity: "base",
-      });
-    });
-    grupo.selectedVersionId = grupo.versiones[0]?.id_procedimiento || null;
-    return grupo;
-  });
-
-  return result;
+const getEstadoVersionColor = (estadoVersion) => {
+  if (estadoVersion === "Aprobado") return "success";
+  if (estadoVersion === "En revisión") return "warning";
+  if (estadoVersion === "Renovado") return "info";
+  return "grey";
 };
 
 const getProcedimientosCount = (procesoId) => {
@@ -1495,23 +1514,6 @@ const getProcedimientosCount = (procesoId) => {
     const parentId = p.proceso?.id_proceso || p.id_proceso || p.proceso;
     return Number(parentId) === pId;
   }).length;
-};
-
-const getProcedureVersionString = (selectedId, versiones) => {
-  const vObj = versiones.find((v) => v.id_procedimiento === selectedId);
-  return vObj ? vObj.version : "1.0";
-};
-
-const getProcedureStatus = (selectedId, versiones) => {
-  const vObj = versiones.find((v) => v.id_procedimiento === selectedId);
-  return vObj ? vObj.estado : "Activo";
-};
-
-const getProcedureStatusColor = (selectedId, versiones) => {
-  const status = getProcedureStatus(selectedId, versiones);
-  if (status === "Activo") return "success";
-  if (status === "En Revisión") return "warning";
-  return "grey";
 };
 
 const getProcessResponsible = (procesoId) => {

@@ -579,6 +579,7 @@ onUnmounted(() => {
           <v-row dense>
             <v-col v-for="field in mppStore.schemas[entityType].fields.filter(f => f.type !== 'hidden')" :key="field.key" cols="12">
               <v-text-field v-if="['text', 'date'].includes(field.type)" v-model="entityData[field.key]" :label="field.label" :type="field.type" variant="outlined" density="compact"></v-text-field>
+              <v-text-field v-else-if="field.type === 'readonly'" :model-value="entityData[field.key] || '—'" :label="field.label" variant="outlined" density="compact" readonly></v-text-field>
               <v-textarea v-else-if="field.type === 'textarea'" v-model="entityData[field.key]" :label="field.label" variant="outlined" density="compact" rows="2"></v-textarea>
               <v-select v-else-if="field.type === 'select-multiple'" v-model="entityData[field.key]" :items="mppStore[field.optionsSource]" :item-title="field.itemTitle" :item-value="field.itemValue" :label="field.label" multiple chips closable-chips variant="outlined" density="compact"></v-select>
               <v-select v-else-if="field.type === 'select'" v-model="entityData[field.key]" :items="field.options" :label="field.label" variant="outlined" density="compact"></v-select>

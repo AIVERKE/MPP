@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { AuditoriaCambios } from './entities/auditoria-cambios.entity';
 
 @Injectable()
@@ -18,6 +18,7 @@ export class AuditoriaService {
     datosNuevos: any,
     idUsuario?: number,
     motivoCambio?: string,
+    manager?: EntityManager,
   ): Promise<AuditoriaCambios> {
     const registro = new AuditoriaCambios();
     registro.tablaAfectada = tablaAfectada;
@@ -32,7 +33,11 @@ export class AuditoriaService {
       registro.motivoCambio = motivoCambio;
     }
 
-    return await this.auditoriaRepository.save(registro);
+    const repository = manager
+      ? manager.getRepository(AuditoriaCambios)
+      : this.auditoriaRepository;
+
+    return await repository.save(registro);
   }
 
   async findAll(query: {
@@ -43,6 +48,7 @@ export class AuditoriaService {
     fechaDesde?: string;
     fechaHasta?: string;
     idUsuario?: number;
+    idRegistroOriginal?: number;
   }) {
     const page = query.page && query.page > 0 ? Number(query.page) : 1;
     const limit = query.limit && query.limit > 0 ? Number(query.limit) : 20;
@@ -61,6 +67,15 @@ export class AuditoriaService {
       queryBuilder.andWhere('auditoria.accion = :accion', {
         accion: query.accion,
       });
+    }
+
+    if (query.idRegistroOriginal) {
+      queryBuilder.andWhere(
+        'auditoria.idRegistroOriginal = :idRegistroOriginal',
+        {
+          idRegistroOriginal: Number(query.idRegistroOriginal),
+        },
+      );
     }
 
     if (query.idUsuario) {

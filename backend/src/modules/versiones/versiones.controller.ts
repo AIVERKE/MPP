@@ -42,7 +42,7 @@ export class VersionesController {
   @ApiQuery({
     name: 'accion',
     required: false,
-    enum: ['CREATE', 'UPDATE', 'DELETE'],
+    enum: ['CREATE', 'UPDATE', 'DELETE', 'VERSION'],
   })
   @ApiQuery({
     name: 'fecha_desde',
@@ -57,6 +57,12 @@ export class VersionesController {
     example: '2024-12-31',
   })
   @ApiQuery({ name: 'id_usuario', required: false, type: Number })
+  @ApiQuery({
+    name: 'id_registro_original',
+    required: false,
+    type: Number,
+    example: 10,
+  })
   @ApiResponse({
     status: 200,
     description: 'Lista paginada de registros.',
@@ -75,6 +81,8 @@ export class VersionesController {
     @Query('fecha_hasta') fechaHasta?: string,
     @Query('id_usuario', new ParseIntPipe({ optional: true }))
     idUsuario?: number,
+    @Query('id_registro_original', new ParseIntPipe({ optional: true }))
+    idRegistroOriginal?: number,
   ) {
     return this.auditoriaService.findAll({
       page,
@@ -84,6 +92,7 @@ export class VersionesController {
       fechaDesde,
       fechaHasta,
       idUsuario,
+      idRegistroOriginal,
     });
   }
 
