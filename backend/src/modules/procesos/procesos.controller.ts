@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   UseGuards,
   Req,
+  Query,
 } from '@nestjs/common';
 import { ProcesosService } from './procesos.service';
 import {
@@ -133,6 +134,22 @@ export class ProcesosController {
   })
   findAllProcedimientos() {
     return this.service.findAllProcedimientos();
+  }
+
+  @Get('procedimientos/:id/versiones')
+  @ApiOperation({ summary: 'Obtener historial de versiones de un procedimiento' })
+  @ApiParam({ name: 'id', description: 'ID del procedimiento' })
+  @ApiResponse({
+    status: 200,
+    description: 'Historial de versiones del procedimiento.',
+  })
+  @ApiResponse({ status: 404, description: 'Procedimiento no encontrado.' })
+  findHistorialVersionesProcedimiento(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('page', new ParseIntPipe({ optional: true })) page?: number,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ) {
+    return this.service.findHistorialVersionesProcedimiento(id, { page, limit });
   }
 
   @Get('procedimientos/:id')

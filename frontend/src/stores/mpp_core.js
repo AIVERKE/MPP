@@ -45,7 +45,8 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
                 { key: "objetivos", label: "Objetivos", type: "textarea" },
                 { key: "alcance", label: "Alcance", type: "textarea" },
                 { key: "periodicidad", label: "Periodicidad", type: "text" },
-                { key: "version", label: "Versión", type: "text", default: "1.0" },
+                { key: "estado_version", label: "Estado de Versión", type: "select", options: ["Borrador", "En revisión", "Aprobado", "Renovado"], default: "Borrador" },
+                { key: "version", label: "Versión (automática)", type: "readonly" },
                 { key: "estado", label: "Estado", type: "select", options: ["Activo", "Inactivo", "En Revisión"], default: "Activo" },
                 { key: "id_instalaciones", label: "Instalaciones", type: "select-multiple", optionsSource: "instalaciones", itemTitle: "nombre", itemValue: "id_instalacion" }
             ],
@@ -487,15 +488,23 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
 
     const saveEntity = async (type, data) => {
         const schema = schemas.value[type];
+        const payload = { ...data };
+        schema.fields
+            .filter((field) => field.type === "readonly")
+            .forEach((field) => delete payload[field.key]);
         let baseUrl = schema.endpoints.save === "normativas" ? BASE_URL_CAL : BASE_URL_MPP;
-        const res = await axios.post(`${baseUrl}/${schema.endpoints.save}`, data);
+        const res = await axios.post(`${baseUrl}/${schema.endpoints.save}`, payload);
         return res.data.data || res.data;
     };
 
     const updateEntity = async (type, id, data) => {
         const schema = schemas.value[type];
+        const payload = { ...data };
+        schema.fields
+            .filter((field) => field.type === "readonly")
+            .forEach((field) => delete payload[field.key]);
         let baseUrl = schema.endpoints.update === "normativas" ? BASE_URL_CAL : BASE_URL_MPP;
-        const res = await axios.patch(`${baseUrl}/${schema.endpoints.update}/${id}`, data);
+        const res = await axios.patch(`${baseUrl}/${schema.endpoints.update}/${id}`, payload);
         return res.data.data || res.data;
     };
 
@@ -524,6 +533,7 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
         saveAccion, updateAccion, deleteAccion,
         saveFlujoCompleto,
         saveMatrixRow, fetchMatrixData, deleteMatrixRow,
-        saveEntity, updateEntity, deleteEntity
+        saveEntity, updateEntity, deleteEntity,
+        BASE_URL_MPP, BASE_URL_FLUX, BASE_URL_ORG, BASE_URL_REC, BASE_URL_CAL, BASE_URL_MOF
     };
 });

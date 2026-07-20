@@ -9,18 +9,16 @@ const mockAuditoriaService = () => ({
 
 describe('VersionesController', () => {
   let controller: VersionesController;
-  let service: any;
+  let service: ReturnType<typeof mockAuditoriaService>;
 
   beforeEach(async () => {
+    service = mockAuditoriaService();
     const module: TestingModule = await Test.createTestingModule({
       controllers: [VersionesController],
-      providers: [
-        { provide: AuditoriaService, useValue: mockAuditoriaService() },
-      ],
+      providers: [{ provide: AuditoriaService, useValue: service }],
     }).compile();
 
     controller = module.get<VersionesController>(VersionesController);
-    service = module.get<AuditoriaService>(AuditoriaService);
   });
 
   it('should be defined', () => {
@@ -38,7 +36,15 @@ describe('VersionesController', () => {
       fechaDesde: undefined,
       fechaHasta: undefined,
       idUsuario: undefined,
+      idRegistroOriginal: undefined,
     });
+  });
+
+  it('should pass id_registro_original to findAll', async () => {
+    await controller.findAll(1, 10, 'Procedimiento', 'VERSION', undefined, undefined, undefined, 15);
+    expect(service.findAll).toHaveBeenCalledWith(
+      expect.objectContaining({ idRegistroOriginal: 15 }),
+    );
   });
 
   it('should call findOne on service with id', async () => {

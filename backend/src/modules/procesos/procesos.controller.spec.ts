@@ -11,6 +11,7 @@ const mockProcesosService = () => ({
   createProcedimiento: jest.fn(),
   findAllProcedimientos: jest.fn(),
   findOneProcedimiento: jest.fn(),
+  findHistorialVersionesProcedimiento: jest.fn(),
   updateProcedimiento: jest.fn(),
   removeProcedimiento: jest.fn(),
   createCargoProceso: jest.fn(),
@@ -22,13 +23,13 @@ const mockProcesosService = () => ({
 
 describe('ProcesosController', () => {
   let controller: ProcesosController;
+  let service: ReturnType<typeof mockProcesosService>;
 
   beforeEach(async () => {
+    service = mockProcesosService();
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ProcesosController],
-      providers: [
-        { provide: ProcesosService, useValue: mockProcesosService() },
-      ],
+      providers: [{ provide: ProcesosService, useValue: service }],
     }).compile();
 
     controller = module.get<ProcesosController>(ProcesosController);
@@ -36,5 +37,13 @@ describe('ProcesosController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  it('should call findHistorialVersionesProcedimiento', async () => {
+    await controller.findHistorialVersionesProcedimiento(3, 1, 20);
+    expect(service.findHistorialVersionesProcedimiento).toHaveBeenCalledWith(3, {
+      page: 1,
+      limit: 20,
+    });
   });
 });

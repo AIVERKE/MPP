@@ -5,7 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { DataSource, EntityManager, Repository, In } from 'typeorm';
 import { Proceso } from './entities/proceso.entity';
 import { Procedimiento } from './entities/procedimiento.entity';
 import { CargoProceso } from './entities/cargo-proceso.entity';
@@ -43,6 +43,7 @@ export class ProcesosService {
     private readonly cargoRepository: Repository<Cargo>,
     private readonly auditoriaService: AuditoriaService,
     private readonly versionesService: VersionesService,
+    private readonly dataSource: DataSource,
   ) {}
 
   // --- Procesos ---
@@ -211,8 +212,15 @@ export class ProcesosService {
       }
     }
 
-    const procedimiento =
-      this.procedimientoRepository.create(procedimientoData);
+    const { versionNueva, debeRegistrar } =
+      this.versionesService.resolverVersionamientoEnCreacion(
+        procedimientoData.estado_version,
+      );
+
+    const procedimiento = this.procedimientoRepository.create({
+      ...procedimientoData,
+      version: versionNueva ?? undefined,
+    });
 
     if (id_instalaciones && id_instalaciones.length > 0) {
       const instalaciones = await this.unidadRepository.findBy({
@@ -227,19 +235,36 @@ export class ProcesosService {
     }
 
     try {
-      const saved = await this.procedimientoRepository.save(procedimiento);
-      const postSnapshot = await this.findOneProcedimiento(
-        saved.id_procedimiento,
-      );
-      await this.auditoriaService.registrarCambio(
-        'Procedimiento',
-        saved.id_procedimiento,
-        'CREATE',
-        {},
-        postSnapshot,
-        idUsuario,
-      );
-      return postSnapshot;
+      return await this.dataSource.transaction(async (manager) => {
+        const saved = await manager.save(procedimiento);
+        const postSnapshot = await this.findOneProcedimientoWithManager(
+          saved.id_procedimiento,
+          manager,
+        );
+
+        if (debeRegistrar && versionNueva) {
+          await this.versionesService.registrarVersionamiento(
+            saved.id_procedimiento,
+            '',
+            versionNueva,
+            idUsuario,
+            manager,
+          );
+        }
+
+        await this.auditoriaService.registrarCambio(
+          'Procedimiento',
+          saved.id_procedimiento,
+          'CREATE',
+          {},
+          postSnapshot,
+          idUsuario,
+          undefined,
+          manager,
+        );
+
+        return postSnapshot;
+      });
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (error.code === '23505') {
@@ -259,6 +284,33 @@ export class ProcesosService {
 
   async findOneProcedimiento(id: number): Promise<Procedimiento> {
     const procedimiento = await this.procedimientoRepository.findOne({
+      where: { id_procedimiento: id },
+      relations: ['proceso', 'instalaciones'],
+    });
+    if (!procedimiento)
+      throw new NotFoundException(`Procedimiento con ID ${id} no encontrado`);
+    return procedimiento;
+  }
+
+  async findHistorialVersionesProcedimiento(
+    id: number,
+    query?: { page?: number; limit?: number },
+  ) {
+    await this.findOneProcedimiento(id);
+    return this.auditoriaService.findAll({
+      tablaAfectada: 'Procedimiento',
+      idRegistroOriginal: id,
+      accion: 'VERSION',
+      page: query?.page,
+      limit: query?.limit,
+    });
+  }
+
+  private async findOneProcedimientoWithManager(
+    id: number,
+    manager: EntityManager,
+  ): Promise<Procedimiento> {
+    const procedimiento = await manager.findOne(Procedimiento, {
       where: { id_procedimiento: id },
       relations: ['proceso', 'instalaciones'],
     });
@@ -293,15 +345,14 @@ export class ProcesosService {
 
     Object.assign(procedimiento, procedimientoData);
 
-    const versionAnterior = preSnapshot.version;
-    let versionNueva = versionAnterior;
+    const versionAnterior = preSnapshot.version ?? null;
+    const { versionNueva, debeRegistrar } =
+      this.versionesService.aplicarVersionamientoSiCorresponde(
+        preSnapshot,
+        procedimientoData.estado_version,
+      );
 
-    // Solo se incrementa la versión si el nuevo estado es 'Aprobado' y el anterior no lo era
-    if (
-      procedimientoData.estado_version === 'Aprobado' &&
-      preSnapshot.estado_version !== 'Aprobado'
-    ) {
-      versionNueva = this.versionesService.calcularNuevaVersion(versionAnterior);
+    if (debeRegistrar && versionNueva) {
       procedimiento.version = versionNueva;
     }
 
@@ -324,27 +375,36 @@ export class ProcesosService {
     }
 
     try {
-      await this.procedimientoRepository.save(procedimiento);
-      const postSnapshot = await this.findOneProcedimiento(id);
-
-      if (versionNueva !== versionAnterior) {
-        await this.versionesService.registrarVersionamiento(
+      return await this.dataSource.transaction(async (manager) => {
+        await manager.save(procedimiento);
+        const postSnapshot = await this.findOneProcedimientoWithManager(
           id,
-          versionAnterior || '',
-          versionNueva,
-          idUsuario,
+          manager,
         );
-      }
 
-      await this.auditoriaService.registrarCambio(
-        'Procedimiento',
-        id,
-        'UPDATE',
-        preSnapshot,
-        postSnapshot,
-        idUsuario,
-      );
-      return postSnapshot;
+        if (debeRegistrar && versionNueva) {
+          await this.versionesService.registrarVersionamiento(
+            id,
+            versionAnterior || '',
+            versionNueva,
+            idUsuario,
+            manager,
+          );
+        }
+
+        await this.auditoriaService.registrarCambio(
+          'Procedimiento',
+          id,
+          'UPDATE',
+          preSnapshot,
+          postSnapshot,
+          idUsuario,
+          undefined,
+          manager,
+        );
+
+        return postSnapshot;
+      });
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (error.code === '23505') {

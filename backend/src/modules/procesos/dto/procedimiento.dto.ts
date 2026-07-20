@@ -70,17 +70,6 @@ export class CreateProcedimientoDto {
   periodicidad?: string;
 
   @ApiProperty({
-    description: 'Versión del procedimiento',
-    example: '1.0',
-    examples: {
-      ejemplo1: { value: '1.0' },
-      ejemplo2: { value: '2.1' },
-    },
-    required: false,
-  })
-  version?: string;
-
-  @ApiProperty({
     description: 'Estado del procedimiento',
     example: 'Activo',
     examples: {
@@ -111,3 +100,18 @@ export class CreateProcedimientoDto {
 export class UpdateProcedimientoDto extends PartialType(
   CreateProcedimientoDto,
 ) {}
+
+export class ProcedimientoResponseDto extends CreateProcedimientoDto {
+  @ApiProperty({
+    description: 'Versión actual del procedimiento (gestionada por el sistema)',
+    example: '1.0',
+    nullable: true,
+  })
+  version?: string;
+
+  @ApiProperty({
+    description: 'ID del procedimiento',
+    example: 1,
+  })
+  id_procedimiento: number;
+}
