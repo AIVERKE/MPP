@@ -23,7 +23,6 @@ describe('ProcesosService', () => {
   let service: ProcesosService;
   let procedimientoRepository: ReturnType<typeof mockRepository>;
   let auditoriaService: jest.Mocked<AuditoriaService>;
-  let transactionCallback: (manager: any) => Promise<unknown>;
 
   const mockEntityManager = {
     save: jest.fn(),
@@ -31,10 +30,9 @@ describe('ProcesosService', () => {
   };
 
   const mockDataSource = {
-    transaction: jest.fn((cb: (manager: typeof mockEntityManager) => Promise<unknown>) => {
-      transactionCallback = cb;
-      return cb(mockEntityManager);
-    }),
+    transaction: jest.fn((cb: (manager: typeof mockEntityManager) => Promise<unknown>) =>
+      cb(mockEntityManager),
+    ),
   };
 
   beforeEach(async () => {
@@ -74,23 +72,18 @@ describe('ProcesosService', () => {
   });
 
   describe('updateProcedimiento versioning', () => {
-    const procedimientoBase: Procedimiento = {
+    const procedimientoBase = {
       id_procedimiento: 1,
       id_proceso: 1,
       codigo: 'P-001',
       nombre: 'Test',
-      objetivos: null,
-      alcance: null,
-      periodicidad: null,
-      version: null,
       estado: 'Activo',
-      estado_version: 'Borrador',
+      estado_version: 'Borrador' as const,
       proceso: null as any,
       instalaciones: [],
       createdAt: new Date(),
       updatedAt: new Date(),
-      deletedAt: null,
-    };
+    } as unknown as Procedimiento;
 
     beforeEach(() => {
       jest.spyOn(service, 'findOneProcedimiento').mockResolvedValue({
