@@ -98,6 +98,14 @@ export class CreateProcedimientoDto {
     required: false,
   })
   id_instalaciones?: number[];
+
+  @ApiProperty({
+    description: 'Estado de la versión del procedimiento',
+    example: 'Borrador',
+    enum: ['Borrador', 'En revisión', 'Aprobado', 'Renovado'],
+    required: false,
+  })
+  estado_version?: 'Borrador' | 'En revisión' | 'Aprobado' | 'Renovado';
 }
 
 export class UpdateProcedimientoDto extends PartialType(
