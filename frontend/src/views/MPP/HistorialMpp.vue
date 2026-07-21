@@ -229,59 +229,142 @@
                       </td>
                     </tr>
                     <tr
-                      v-for="proc in getProcedimientosForProceso(
+                      v-for="grupo in getProcedimientosForProceso(
                         proceso.id_proceso,
                       )"
-                      :key="proc.id_procedimiento"
+                      :key="grupo.nombreBase"
                       class="hover-row"
                     >
                       <td class="text-caption font-weight-black text-primary">
-                        {{ proc.codigo || "S/C" }}
+                        {{ grupo.codigoBase || "S/C" }}
                       </td>
                       <td class="text-body-2 font-weight-medium text-slate-800">
-                        {{ proc.nombre }}
+                        {{ grupo.nombreBase }}
                       </td>
                       <td class="text-center">
-                        <v-chip
-                          size="x-small"
-                          color="primary"
-                          variant="flat"
-                          class="font-weight-bold"
+                        <v-select
+                          v-model="grupo.selectedVersionId"
+                          :items="grupo.versiones"
+                          item-title="versionLabel"
+                          item-value="id_procedimiento"
+                          variant="solo-filled"
+                          density="compact"
+                          hide-details
+                          flat
+                          class="version-select-custom"
                         >
-                          v{{ proc.version || "—" }}
-                        </v-chip>
+                          <template v-slot:selection="{ item }">
+                            <div
+                              class="d-flex align-center justify-center ga-1 text-indigo-darken-3 font-weight-black text-caption w-100"
+                            >
+                              <v-icon size="14" color="primary">mdi-source-branch</v-icon>
+                              <span>v{{ item.raw.version }}</span>
+                            </div>
+                          </template>
+                          <template v-slot:item="{ props, item }">
+                            <v-list-item v-bind="props" density="compact" class="py-1">
+                              <template v-slot:title>
+                                <div class="d-flex align-center justify-space-between ga-3">
+                                  <span class="font-weight-bold text-caption text-slate-800"
+                                    >v{{ item.raw.version }}</span
+                                  >
+                                  <v-chip
+                                    size="x-small"
+                                    :color="getEstadoVersionColor(item.raw.estado_version)"
+                                    variant="tonal"
+                                    class="font-weight-bold text-uppercase"
+                                  >
+                                    {{ item.raw.estado_version }}
+                                  </v-chip>
+                                </div>
+                              </template>
+                            </v-list-item>
+                          </template>
+                        </v-select>
                       </td>
                       <td class="text-center">
                         <v-chip
                           size="x-small"
-                          :color="getEstadoVersionColor(proc.estado_version)"
+                          :color="
+                            getProcedureStatusColor(
+                              grupo.selectedVersionId,
+                              grupo.versiones,
+                            )
+                          "
                           variant="tonal"
                           class="font-weight-bold text-uppercase"
                         >
-                          {{ proc.estado_version || "Borrador" }}
+                          {{
+                            getProcedureStatus(
+                              grupo.selectedVersionId,
+                              grupo.versiones,
+                            )
+                          }}
                         </v-chip>
                       </td>
                       <td class="text-center">
                         <v-chip
                           size="x-small"
-                          :color="proc.estado === 'Activo' ? 'success' : 'grey'"
+                          :color="
+                            getProcedureStatus(grupo.selectedVersionId, grupo.versiones) === 'Aprobado' ||
+                            getProcedureStatus(grupo.selectedVersionId, grupo.versiones) === 'Activo'
+                              ? 'success'
+                              : 'grey'
+                          "
                           variant="tonal"
                           class="font-weight-bold text-uppercase"
                         >
-                          {{ proc.estado || "Activo" }}
+                          {{
+                            getProcedureStatus(
+                              grupo.selectedVersionId,
+                              grupo.versiones,
+                            ) === 'Aprobado' ? 'Activo' : getProcedureStatus(grupo.selectedVersionId, grupo.versiones)
+                          }}
                         </v-chip>
                       </td>
                       <td class="text-center">
-                        <v-btn
-                          size="small"
-                          color="primary"
-                          variant="flat"
-                          prepend-icon="mdi-eye"
-                          class="rounded-lg text-caption font-weight-bold"
-                          @click="openDetailsDrawer(proc.id_procedimiento)"
-                        >
-                          Explorar
-                        </v-btn>
+                        <div class="d-flex align-center justify-center ga-2">
+                          <v-btn
+                            size="small"
+                            color="primary"
+                            variant="flat"
+                            prepend-icon="mdi-eye"
+                            class="rounded-lg text-caption font-weight-bold"
+                            @click="openDetailsDrawer(grupo.selectedVersionId)"
+                          >
+                            Explorar
+                          </v-btn>
+                          <v-btn
+                            size="small"
+                            :color="
+                              getProcedureStatus(grupo.selectedVersionId, grupo.versiones) === 'Aprobado' ||
+                              getProcedureStatus(grupo.selectedVersionId, grupo.versiones) === 'Activo'
+                                ? 'success'
+                                : 'warning'
+                            "
+                            variant="tonal"
+                            :prepend-icon="
+                              getProcedureStatus(grupo.selectedVersionId, grupo.versiones) === 'Aprobado' ||
+                              getProcedureStatus(grupo.selectedVersionId, grupo.versiones) === 'Activo'
+                                ? 'mdi-file-plus-outline'
+                                : 'mdi-pencil'
+                            "
+                            class="rounded-lg text-caption font-weight-bold"
+                            @click="
+                              handleProcedureEditOrCreateNewVersion(
+                                grupo.selectedVersionId,
+                                proceso.id_proceso,
+                              )
+                            "
+                          >
+                            {{
+                              getProcedureStatus(grupo.selectedVersionId, grupo.versiones) === 'Aprobado' ||
+                              getProcedureStatus(grupo.selectedVersionId, grupo.versiones) === 'Activo'
+                                ? 'Nueva Versión'
+                                : 'Editar'
+                            }}
+                          </v-btn>
+                        </div>
                       </td>
                     </tr>
                   </tbody>
@@ -1779,10 +1862,41 @@ onUnmounted(() => {
 .pl-2 {
   padding-left: 8px !important;
 }
-.version-select {
-  max-width: 170px;
+:deep(.version-select-custom) {
+  max-width: 125px;
   margin: 0 auto;
-  font-size: 0.8rem;
+}
+:deep(.version-select-custom .v-field) {
+  border-radius: 12px !important;
+  background-color: #eef2ff !important;
+  border: 1px solid #c7d2fe !important;
+  box-shadow: none !important;
+  padding-inline-start: 10px !important;
+  padding-inline-end: 6px !important;
+  min-height: 34px !important;
+  height: 34px !important;
+  transition: all 0.2s ease-in-out;
+}
+:deep(.version-select-custom .v-field:hover) {
+  border-color: #818cf8 !important;
+  background-color: #e0e7ff !important;
+}
+:deep(.version-select-custom .v-field__input) {
+  min-height: 34px !important;
+  height: 34px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+:deep(.version-select-custom .v-field__append-inner) {
+  padding-top: 0 !important;
+  align-items: center !important;
+}
+:deep(.version-select-custom .v-field__append-inner .v-icon) {
+  color: #4f46e5 !important;
+  font-size: 18px !important;
+  opacity: 0.9 !important;
 }
 .hover-row:hover {
   background-color: #f8fafc;
