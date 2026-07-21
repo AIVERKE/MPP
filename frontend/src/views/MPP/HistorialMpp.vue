@@ -748,14 +748,16 @@
                     value="table"
                     prepend-icon="mdi-table-large"
                     class="text-caption font-weight-bold"
-                    >Tabla</v-btn
                   >
+                    Tabla
+                  </v-btn>
                   <v-btn
                     value="diagram"
                     prepend-icon="mdi-sitemap"
                     class="text-caption font-weight-bold"
-                    >Diagrama</v-btn
                   >
+                    Diagrama
+                  </v-btn>
                 </v-btn-toggle>
               </div>
 
@@ -1552,6 +1554,9 @@ const getProcedimientosForProceso = (procesoId) => {
 
     return grupo;
   });
+
+  return result;
+};
 
 const getEstadoVersionColor = (estadoVersion) => {
   if (estadoVersion === "Aprobado") return "success";
