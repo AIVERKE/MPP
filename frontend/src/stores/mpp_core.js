@@ -145,14 +145,22 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
 
     const fetchProcedimientos = async (procesoId) => {
         loading.value = true;
-        const targetId = Number(procesoId);
+        const targetId = procesoId ? Number(procesoId) : null;
         try {
             const response = await axios.get(`${BASE_URL_MPP}/procedimientos`);
-            const all = response.data.data || response.data;
-            procedimientos.value = all.filter(p => {
-                const pId = p.proceso?.id_proceso || p.id_proceso || p.proceso;
-                return Number(pId) === targetId;
-            });
+            const rawAll = response.data.data || response.data;
+            const all = rawAll.map(p => ({
+                ...p,
+                estado_version: p.estado_version || p.estado || "Borrador"
+            }));
+            if (targetId) {
+                procedimientos.value = all.filter(p => {
+                    const pId = p.proceso?.id_proceso || p.id_proceso || p.proceso;
+                    return Number(pId) === targetId;
+                });
+            } else {
+                procedimientos.value = all;
+            }
         } catch (err) { error.value = err.message; }
         finally { loading.value = false; }
     };
@@ -219,8 +227,37 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
     const deleteProceso = (id) => axios.delete(`${BASE_URL_MPP}/procesos/${id}`);
 
     const saveProcedimiento = (data) => axios.post(`${BASE_URL_MPP}/procedimientos`, data).then(r => r.data);
-    const updateProcedimiento = (id, data) => axios.patch(`${BASE_URL_MPP}/procedimientos/${id}`, data);
+    const updateProcedimiento = async (id, data) => {
+        const payload = { ...data };
+        if (payload.estado_version && !payload.estado) {
+            payload.estado = payload.estado_version;
+        }
+        const res = await axios.patch(`${BASE_URL_MPP}/procedimientos/${id}`, payload);
+        const updated = res.data?.data || res.data;
+        if (updated) {
+            const index = procedimientos.value.findIndex(p => Number(p.id_procedimiento) === Number(id));
+            if (index !== -1) {
+                const st = updated.estado_version || updated.estado || payload.estado_version || payload.estado;
+                procedimientos.value[index] = { 
+                    ...procedimientos.value[index], 
+                    ...updated,
+                    estado: st,
+                    estado_version: st
+                };
+            }
+        }
+        return updated || res.data;
+    };
     const deleteProcedimiento = (id) => axios.delete(`${BASE_URL_MPP}/procedimientos/${id}`);
+    const fetchHistorialVersiones = async (procedimientoId) => {
+        try {
+            const response = await axios.get(`${BASE_URL_MPP}/procedimientos/${procedimientoId}/historial-versiones`);
+            return response.data?.data || response.data || [];
+        } catch (err) {
+            console.error("Error al obtener historial de versiones:", err);
+            return [];
+        }
+    };
 
     const saveCargoProceso = (data) => axios.post(`${BASE_URL_MPP}/cargo-procesos`, data);
     const updateCargoProceso = (id, data) => axios.patch(`${BASE_URL_MPP}/cargo-procesos/${id}`, data);
@@ -521,7 +558,7 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
         fetchUnidades, fetchRiesgos, fetchControles, fetchRequisitos, fetchNormativas, fetchIndicadores, fetchEquipos, fetchInstalaciones, fetchSistemasInformacion, fetchDocumentosReferencia,
         syncUnidades, syncCargos, fetchCargos, fetchProcesos, fetchProcedimientos, fetchCargoProcesos, fetchOperaciones, fetchPasos, fetchAcciones, fetchFiguras,
         saveProceso, updateProceso, deleteProceso,
-        saveProcedimiento, updateProcedimiento, deleteProcedimiento,
+        saveProcedimiento, updateProcedimiento, deleteProcedimiento, fetchHistorialVersiones,
         saveCargoProceso, updateCargoProceso, deleteCargoProceso,
         saveRiesgo, updateRiesgo, deleteRiesgo,
         saveControl, updateControl, deleteControl,

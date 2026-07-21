@@ -44,6 +44,41 @@ const procedimientoNombre = computed(() => {
     : `Procedimiento #${props.procedimientoId}`;
 });
 
+const procedimientoVersion = computed(() => {
+  const proc = mppStore.procedimientos.find(
+    (p) => Number(p.id_procedimiento) === Number(props.procedimientoId),
+  );
+  return proc?.version || "1.0";
+});
+
+const procedimientoEstadoVersion = computed(() => {
+  const proc = mppStore.procedimientos.find(
+    (p) => Number(p.id_procedimiento) === Number(props.procedimientoId),
+  );
+  return proc?.estado_version || proc?.estado || "Borrador";
+});
+
+const estadoVersionColor = computed(() => {
+  const st = procedimientoEstadoVersion.value;
+  if (st === "Aprobado" || st === "Activo") return "success";
+  if (st === "En Revisión") return "info";
+  if (st === "Borrador") return "warning";
+  return "grey";
+});
+
+const changeEstadoVersion = async (nuevoEstado) => {
+  if (!props.procedimientoId) return;
+  try {
+    snackbar.value = { show: true, text: `Actualizando estado a '${nuevoEstado}'...`, color: "info" };
+    await mppStore.updateProcedimiento(props.procedimientoId, { estado_version: nuevoEstado });
+    await mppStore.fetchProcedimientos(props.procesoId);
+    snackbar.value = { show: true, text: `Estado de versión actualizado a '${nuevoEstado}'`, color: "success" };
+  } catch (err) {
+    console.error("Error al cambiar estado de versión:", err);
+    snackbar.value = { show: true, text: "Error al actualizar el estado de versión", color: "error" };
+  }
+};
+
 const procesoNombre = computed(() => {
   const proc = mppStore.procesos.find((p) => p.id_proceso === props.procesoId);
   return proc
@@ -553,7 +588,11 @@ onMounted(async () => {
     if (!mppStore.cargos.length) await mppStore.fetchCargos();
     if (!mppStore.acciones.length) await mppStore.fetchAcciones();
     if (!mppStore.figuras.length) await mppStore.fetchFiguras();
-    if (!mppStore.procedimientos.length) await mppStore.fetchProcedimientos();
+    if (props.procesoId) {
+      await mppStore.fetchProcedimientos(props.procesoId);
+    } else if (!mppStore.procedimientos.length) {
+      await mppStore.fetchProcedimientos();
+    }
     if (!mppStore.procesos.length) await mppStore.fetchProcesos();
 
     // Cargar cargos ya asociados al proceso (columnas persistidas)
@@ -813,11 +852,31 @@ watch([matrixEditorContainer, () => rows.value], () => {
         <span class="text-subtitle-2 font-weight-bold uppercase">{{
           procesoNombre
         }}</span>
-        <span class="text-caption text-grey-darken-1 mt-n1">{{
-          procedimientoNombre
-        }}</span>
+        <div class="d-flex align-center ga-1 mt-n1">
+          <span class="text-caption text-grey-darken-1">{{
+            procedimientoNombre
+          }}</span>
+          <v-chip size="x-small" color="primary" variant="tonal" class="font-weight-bold ml-1">
+            v{{ procedimientoVersion }}
+          </v-chip>
+          <v-chip size="x-small" :color="estadoVersionColor" variant="tonal" class="font-weight-bold uppercase">
+            {{ procedimientoEstadoVersion }}
+          </v-chip>
+        </div>
       </div>
       <v-spacer></v-spacer>
+
+      <v-select
+        :model-value="procedimientoEstadoVersion"
+        :items="['Borrador', 'En Revisión', 'Aprobado', 'Obsoleto']"
+        label="Estado de Versión"
+        density="compact"
+        variant="solo-filled"
+        hide-details
+        style="max-width: 170px;"
+        class="mr-2 rounded-lg"
+        @update:model-value="changeEstadoVersion"
+      ></v-select>
 
       <v-btn
         variant="tonal"
