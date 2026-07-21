@@ -11,6 +11,11 @@ import { Normativa } from './entities/normativa.entity';
 import { Indicador } from './entities/indicador.entity';
 import { CreateNormativaDto, UpdateNormativaDto } from './dto/normativa.dto';
 import { CreateIndicadorDto, UpdateIndicadorDto } from './dto/indicador.dto';
+import { AuditoriaService } from '../versiones/auditoria.service';
+
+function cloneEntity<T>(entity: T): T {
+  return JSON.parse(JSON.stringify(entity));
+}
 
 @Injectable()
 export class CalidadService {
@@ -19,6 +24,7 @@ export class CalidadService {
     private readonly normativaRepository: Repository<Normativa>,
     @InjectRepository(Indicador)
     private readonly indicadorRepository: Repository<Indicador>,
+    private readonly auditoriaService: AuditoriaService,
   ) {}
 
   private handleDatabaseError(error: unknown): never {
@@ -40,7 +46,7 @@ export class CalidadService {
   // NORMATIVA
   // ============================
 
-  async createNormativa(createDto: CreateNormativaDto) {
+  async createNormativa(createDto: CreateNormativaDto, idUsuario?: number) {
     try {
       const { id_procedimientos, ...rest } = createDto;
       const nuevaNormativa = this.normativaRepository.create(rest);
@@ -51,7 +57,17 @@ export class CalidadService {
         })) as unknown as any;
       }
 
-      return await this.normativaRepository.save(nuevaNormativa);
+      const saved = await this.normativaRepository.save(nuevaNormativa);
+      const postSnapshot = await this.findOneNormativa(saved.id_normativa);
+      await this.auditoriaService.registrarCambio(
+        'Normativa',
+        saved.id_normativa,
+        'CREATE',
+        {},
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       this.handleDatabaseError(error);
     }
@@ -74,8 +90,13 @@ export class CalidadService {
     return normativa;
   }
 
-  async updateNormativa(id: number, updateDto: UpdateNormativaDto) {
+  async updateNormativa(
+    id: number,
+    updateDto: UpdateNormativaDto,
+    idUsuario?: number,
+  ) {
     const normativa = await this.findOneNormativa(id);
+    const preSnapshot = cloneEntity(normativa);
     const { id_procedimientos, ...rest } = updateDto;
 
     Object.assign(normativa, rest);
@@ -87,16 +108,35 @@ export class CalidadService {
     }
 
     try {
-      return await this.normativaRepository.save(normativa);
+      await this.normativaRepository.save(normativa);
+      const postSnapshot = await this.findOneNormativa(id);
+      await this.auditoriaService.registrarCambio(
+        'Normativa',
+        id,
+        'UPDATE',
+        preSnapshot,
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       this.handleDatabaseError(error);
     }
   }
 
-  async removeNormativa(id: number) {
+  async removeNormativa(id: number, idUsuario?: number) {
     const normativa = await this.findOneNormativa(id);
+    const preSnapshot = cloneEntity(normativa);
     try {
-      return await this.normativaRepository.softRemove(normativa);
+      await this.normativaRepository.softRemove(normativa);
+      await this.auditoriaService.registrarCambio(
+        'Normativa',
+        id,
+        'DELETE',
+        preSnapshot,
+        null,
+        idUsuario,
+      );
     } catch (error) {
       this.handleDatabaseError(error);
     }
@@ -106,7 +146,7 @@ export class CalidadService {
   // INDICADOR
   // ============================
 
-  async createIndicador(createDto: CreateIndicadorDto) {
+  async createIndicador(createDto: CreateIndicadorDto, idUsuario?: number) {
     try {
       const { id_procedimientos, ...rest } = createDto;
       const nuevoIndicador = this.indicadorRepository.create(rest);
@@ -117,7 +157,17 @@ export class CalidadService {
         })) as unknown as any;
       }
 
-      return await this.indicadorRepository.save(nuevoIndicador);
+      const saved = await this.indicadorRepository.save(nuevoIndicador);
+      const postSnapshot = await this.findOneIndicador(saved.id_indicador);
+      await this.auditoriaService.registrarCambio(
+        'Indicador',
+        saved.id_indicador,
+        'CREATE',
+        {},
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       this.handleDatabaseError(error);
     }
@@ -140,8 +190,13 @@ export class CalidadService {
     return indicador;
   }
 
-  async updateIndicador(id: number, updateDto: UpdateIndicadorDto) {
+  async updateIndicador(
+    id: number,
+    updateDto: UpdateIndicadorDto,
+    idUsuario?: number,
+  ) {
     const indicador = await this.findOneIndicador(id);
+    const preSnapshot = cloneEntity(indicador);
     const { id_procedimientos, ...rest } = updateDto;
 
     Object.assign(indicador, rest);
@@ -153,16 +208,35 @@ export class CalidadService {
     }
 
     try {
-      return await this.indicadorRepository.save(indicador);
+      await this.indicadorRepository.save(indicador);
+      const postSnapshot = await this.findOneIndicador(id);
+      await this.auditoriaService.registrarCambio(
+        'Indicador',
+        id,
+        'UPDATE',
+        preSnapshot,
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       this.handleDatabaseError(error);
     }
   }
 
-  async removeIndicador(id: number) {
+  async removeIndicador(id: number, idUsuario?: number) {
     const indicador = await this.findOneIndicador(id);
+    const preSnapshot = cloneEntity(indicador);
     try {
-      return await this.indicadorRepository.softRemove(indicador);
+      await this.indicadorRepository.softRemove(indicador);
+      await this.auditoriaService.registrarCambio(
+        'Indicador',
+        id,
+        'DELETE',
+        preSnapshot,
+        null,
+        idUsuario,
+      );
     } catch (error) {
       this.handleDatabaseError(error);
     }

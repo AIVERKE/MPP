@@ -7,9 +7,19 @@ import {
   Param,
   Delete,
   ParseIntPipe,
+  UseGuards,
+  Req,
+  Query,
 } from '@nestjs/common';
 import { ProcesosService } from './procesos.service';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateProcesoDto, UpdateProcesoDto } from './dto/proceso.dto';
 import {
   CreateProcedimientoDto,
@@ -27,12 +37,17 @@ export class ProcesosController {
 
   // --- Procesos ---
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Post('procesos')
   @ApiOperation({ summary: 'Crear un nuevo proceso' })
   @ApiResponse({ status: 201, description: 'Proceso creado exitosamente.' })
   @ApiResponse({ status: 400, description: 'Datos inválidos.' })
-  createProceso(@Body() createDto: CreateProcesoDto) {
-    return this.service.createProceso(createDto);
+  createProceso(@Body() createDto: CreateProcesoDto, @Req() req: any) {
+    return this.service.createProceso(
+      createDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   @Get('procesos')
@@ -54,6 +69,8 @@ export class ProcesosController {
     return this.service.findOneProceso(id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Patch('procesos/:id')
   @ApiOperation({ summary: 'Actualizar un proceso por ID' })
   @ApiParam({ name: 'id', description: 'ID del proceso' })
@@ -65,21 +82,33 @@ export class ProcesosController {
   updateProceso(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateProcesoDto,
+    @Req() req: any,
   ) {
-    return this.service.updateProceso(id, updateDto);
+    return this.service.updateProceso(
+      id,
+      updateDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Delete('procesos/:id')
   @ApiOperation({ summary: 'Eliminar un proceso (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID del proceso' })
   @ApiResponse({ status: 200, description: 'Proceso eliminado exitosamente.' })
   @ApiResponse({ status: 404, description: 'Proceso no encontrado.' })
-  removeProceso(@Param('id', ParseIntPipe) id: number) {
-    return this.service.removeProceso(id);
+  removeProceso(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.service.removeProceso(
+      id,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   // --- Procedimientos ---
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Post('procedimientos')
   @ApiOperation({ summary: 'Crear un nuevo procedimiento' })
   @ApiResponse({
@@ -87,8 +116,14 @@ export class ProcesosController {
     description: 'Procedimiento creado exitosamente.',
   })
   @ApiResponse({ status: 400, description: 'Datos inválidos.' })
-  createProcedimiento(@Body() createDto: CreateProcedimientoDto) {
-    return this.service.createProcedimiento(createDto);
+  createProcedimiento(
+    @Body() createDto: CreateProcedimientoDto,
+    @Req() req: any,
+  ) {
+    return this.service.createProcedimiento(
+      createDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   @Get('procedimientos')
@@ -101,6 +136,22 @@ export class ProcesosController {
     return this.service.findAllProcedimientos();
   }
 
+  @Get('procedimientos/:id/versiones')
+  @ApiOperation({ summary: 'Obtener historial de versiones de un procedimiento' })
+  @ApiParam({ name: 'id', description: 'ID del procedimiento' })
+  @ApiResponse({
+    status: 200,
+    description: 'Historial de versiones del procedimiento.',
+  })
+  @ApiResponse({ status: 404, description: 'Procedimiento no encontrado.' })
+  findHistorialVersionesProcedimiento(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('page', new ParseIntPipe({ optional: true })) page?: number,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ) {
+    return this.service.findHistorialVersionesProcedimiento(id, { page, limit });
+  }
+
   @Get('procedimientos/:id')
   @ApiOperation({ summary: 'Obtener un procedimiento por ID' })
   @ApiParam({ name: 'id', description: 'ID del procedimiento' })
@@ -110,6 +161,8 @@ export class ProcesosController {
     return this.service.findOneProcedimiento(id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Patch('procedimientos/:id')
   @ApiOperation({ summary: 'Actualizar un procedimiento por ID' })
   @ApiParam({ name: 'id', description: 'ID del procedimiento' })
@@ -121,10 +174,17 @@ export class ProcesosController {
   updateProcedimiento(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateProcedimientoDto,
+    @Req() req: any,
   ) {
-    return this.service.updateProcedimiento(id, updateDto);
+    return this.service.updateProcedimiento(
+      id,
+      updateDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Delete('procedimientos/:id')
   @ApiOperation({ summary: 'Eliminar un procedimiento (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID del procedimiento' })
@@ -133,17 +193,28 @@ export class ProcesosController {
     description: 'Procedimiento eliminado exitosamente.',
   })
   @ApiResponse({ status: 404, description: 'Procedimiento no encontrado.' })
-  removeProcedimiento(@Param('id', ParseIntPipe) id: number) {
-    return this.service.removeProcedimiento(id);
+  removeProcedimiento(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.service.removeProcedimiento(
+      id,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   // --- CargoProcesos (Relaciones) ---
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Post('cargo-procesos')
   @ApiOperation({ summary: 'Crear una nueva relación Cargo-Proceso' })
   @ApiResponse({ status: 201, description: 'Relación creada exitosamente.' })
-  createCargoProceso(@Body() createDto: CreateCargoProcesoDto) {
-    return this.service.createCargoProceso(createDto);
+  createCargoProceso(
+    @Body() createDto: CreateCargoProcesoDto,
+    @Req() req: any,
+  ) {
+    return this.service.createCargoProceso(
+      createDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   @Get('cargo-procesos')
@@ -159,22 +230,34 @@ export class ProcesosController {
     return this.service.findOneCargoProceso(id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Patch('cargo-procesos/:id')
   @ApiOperation({ summary: 'Actualizar una relación Cargo-Proceso por ID' })
   @ApiParam({ name: 'id', description: 'ID de la relación' })
   updateCargoProceso(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateCargoProcesoDto,
+    @Req() req: any,
   ) {
-    return this.service.updateCargoProceso(id, updateDto);
+    return this.service.updateCargoProceso(
+      id,
+      updateDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Delete('cargo-procesos/:id')
   @ApiOperation({
     summary: 'Eliminar una relación Cargo-Proceso (Borrado lógico)',
   })
   @ApiParam({ name: 'id', description: 'ID de la relación' })
-  removeCargoProceso(@Param('id', ParseIntPipe) id: number) {
-    return this.service.removeCargoProceso(id);
+  removeCargoProceso(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.service.removeCargoProceso(
+      id,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 }

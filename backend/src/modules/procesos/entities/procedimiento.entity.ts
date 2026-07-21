@@ -42,6 +42,9 @@ export class Procedimiento {
   @Column({ nullable: true })
   estado: string;
 
+  @Column({ name: 'estado_version', type: 'varchar', default: 'Borrador' })
+  estado_version: 'Borrador' | 'En revisión' | 'Aprobado' | 'Renovado';
+
   @ManyToOne(() => Proceso)
   @JoinColumn({ name: 'id_proceso' })
   proceso: Proceso;

@@ -5,7 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { DataSource, EntityManager, Repository, In } from 'typeorm';
 import { Proceso } from './entities/proceso.entity';
 import { Procedimiento } from './entities/procedimiento.entity';
 import { CargoProceso } from './entities/cargo-proceso.entity';
@@ -20,6 +20,13 @@ import {
 } from './dto/cargo-proceso.dto';
 import { Unidad } from '../estructura-organizacional/entities/unidad.entity';
 import { Cargo } from '../estructura-organizacional/entities/cargo.entity';
+import { AuditoriaService } from '../versiones/auditoria.service';
+import { VersionesService } from '../versiones/versiones.service';
+
+function cloneEntity<T>(entity: T): T {
+  return JSON.parse(JSON.stringify(entity));
+}
+
 
 @Injectable()
 export class ProcesosService {
@@ -34,11 +41,17 @@ export class ProcesosService {
     private readonly unidadRepository: Repository<Unidad>,
     @InjectRepository(Cargo)
     private readonly cargoRepository: Repository<Cargo>,
+    private readonly auditoriaService: AuditoriaService,
+    private readonly versionesService: VersionesService,
+    private readonly dataSource: DataSource,
   ) {}
 
   // --- Procesos ---
 
-  async createProceso(createDto: CreateProcesoDto): Promise<Proceso> {
+  async createProceso(
+    createDto: CreateProcesoDto,
+    idUsuario?: number,
+  ): Promise<Proceso> {
     const { id_unidades, ...procesoData } = createDto;
 
     // Verificar unicidad de código
@@ -68,7 +81,17 @@ export class ProcesosService {
     }
 
     try {
-      return await this.procesoRepository.save(proceso);
+      const saved = await this.procesoRepository.save(proceso);
+      const postSnapshot = await this.findOneProceso(saved.id_proceso);
+      await this.auditoriaService.registrarCambio(
+        'Proceso',
+        saved.id_proceso,
+        'CREATE',
+        {},
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (error.code === '23505') {
@@ -99,8 +122,10 @@ export class ProcesosService {
   async updateProceso(
     id: number,
     updateDto: UpdateProcesoDto,
+    idUsuario?: number,
   ): Promise<Proceso> {
     const proceso = await this.findOneProceso(id);
+    const preSnapshot = cloneEntity(proceso);
     const { id_unidades, ...procesoData } = updateDto;
 
     // Verificar unicidad de código si está cambiando
@@ -131,7 +156,17 @@ export class ProcesosService {
     }
 
     try {
-      return await this.procesoRepository.save(proceso);
+      await this.procesoRepository.save(proceso);
+      const postSnapshot = await this.findOneProceso(id);
+      await this.auditoriaService.registrarCambio(
+        'Proceso',
+        id,
+        'UPDATE',
+        preSnapshot,
+        postSnapshot,
+        idUsuario,
+      );
+      return postSnapshot;
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (error.code === '23505') {
@@ -143,15 +178,25 @@ export class ProcesosService {
     }
   }
 
-  async removeProceso(id: number): Promise<void> {
+  async removeProceso(id: number, idUsuario?: number): Promise<void> {
     const proceso = await this.findOneProceso(id);
+    const preSnapshot = cloneEntity(proceso);
     await this.procesoRepository.softRemove(proceso);
+    await this.auditoriaService.registrarCambio(
+      'Proceso',
+      id,
+      'DELETE',
+      preSnapshot,
+      null,
+      idUsuario,
+    );
   }
 
   // --- Procedimientos ---
 
   async createProcedimiento(
     createDto: CreateProcedimientoDto,
+    idUsuario?: number,
   ): Promise<Procedimiento> {
     const { id_instalaciones, ...procedimientoData } = createDto;
 
@@ -167,8 +212,15 @@ export class ProcesosService {
       }
     }
 
-    const procedimiento =
-      this.procedimientoRepository.create(procedimientoData);
+    const { versionNueva, debeRegistrar } =
+      this.versionesService.resolverVersionamientoEnCreacion(
+        procedimientoData.estado_version,
+      );
+
+    const procedimiento = this.procedimientoRepository.create({
+      ...procedimientoData,
+      version: versionNueva ?? undefined,
+    });
 
     if (id_instalaciones && id_instalaciones.length > 0) {
       const instalaciones = await this.unidadRepository.findBy({
@@ -183,7 +235,36 @@ export class ProcesosService {
     }
 
     try {
-      return await this.procedimientoRepository.save(procedimiento);
+      return await this.dataSource.transaction(async (manager) => {
+        const saved = await manager.save(procedimiento);
+        const postSnapshot = await this.findOneProcedimientoWithManager(
+          saved.id_procedimiento,
+          manager,
+        );
+
+        if (debeRegistrar && versionNueva) {
+          await this.versionesService.registrarVersionamiento(
+            saved.id_procedimiento,
+            '',
+            versionNueva,
+            idUsuario,
+            manager,
+          );
+        }
+
+        await this.auditoriaService.registrarCambio(
+          'Procedimiento',
+          saved.id_procedimiento,
+          'CREATE',
+          {},
+          postSnapshot,
+          idUsuario,
+          undefined,
+          manager,
+        );
+
+        return postSnapshot;
+      });
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (error.code === '23505') {
@@ -211,11 +292,40 @@ export class ProcesosService {
     return procedimiento;
   }
 
+  async findHistorialVersionesProcedimiento(
+    id: number,
+    query?: { page?: number; limit?: number },
+  ) {
+    await this.findOneProcedimiento(id);
+    return this.auditoriaService.findAll({
+      tablaAfectada: 'Procedimiento',
+      idRegistroOriginal: id,
+      accion: 'VERSION',
+      page: query?.page,
+      limit: query?.limit,
+    });
+  }
+
+  private async findOneProcedimientoWithManager(
+    id: number,
+    manager: EntityManager,
+  ): Promise<Procedimiento> {
+    const procedimiento = await manager.findOne(Procedimiento, {
+      where: { id_procedimiento: id },
+      relations: ['proceso', 'instalaciones'],
+    });
+    if (!procedimiento)
+      throw new NotFoundException(`Procedimiento con ID ${id} no encontrado`);
+    return procedimiento;
+  }
+
   async updateProcedimiento(
     id: number,
     updateDto: UpdateProcedimientoDto,
+    idUsuario?: number,
   ): Promise<Procedimiento> {
     const procedimiento = await this.findOneProcedimiento(id);
+    const preSnapshot = cloneEntity(procedimiento);
     const { id_instalaciones, ...procedimientoData } = updateDto;
 
     // Verificar unicidad de código si está cambiando
@@ -234,6 +344,17 @@ export class ProcesosService {
     }
 
     Object.assign(procedimiento, procedimientoData);
+
+    const versionAnterior = preSnapshot.version ?? null;
+    const { versionNueva, debeRegistrar } =
+      this.versionesService.aplicarVersionamientoSiCorresponde(
+        preSnapshot,
+        procedimientoData.estado_version,
+      );
+
+    if (debeRegistrar && versionNueva) {
+      procedimiento.version = versionNueva;
+    }
 
     if (id_instalaciones) {
       const instalaciones =
@@ -254,7 +375,36 @@ export class ProcesosService {
     }
 
     try {
-      return await this.procedimientoRepository.save(procedimiento);
+      return await this.dataSource.transaction(async (manager) => {
+        await manager.save(procedimiento);
+        const postSnapshot = await this.findOneProcedimientoWithManager(
+          id,
+          manager,
+        );
+
+        if (debeRegistrar && versionNueva) {
+          await this.versionesService.registrarVersionamiento(
+            id,
+            versionAnterior || '',
+            versionNueva,
+            idUsuario,
+            manager,
+          );
+        }
+
+        await this.auditoriaService.registrarCambio(
+          'Procedimiento',
+          id,
+          'UPDATE',
+          preSnapshot,
+          postSnapshot,
+          idUsuario,
+          undefined,
+          manager,
+        );
+
+        return postSnapshot;
+      });
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (error.code === '23505') {
@@ -266,15 +416,25 @@ export class ProcesosService {
     }
   }
 
-  async removeProcedimiento(id: number): Promise<void> {
+  async removeProcedimiento(id: number, idUsuario?: number): Promise<void> {
     const procedimiento = await this.findOneProcedimiento(id);
+    const preSnapshot = cloneEntity(procedimiento);
     await this.procedimientoRepository.softRemove(procedimiento);
+    await this.auditoriaService.registrarCambio(
+      'Procedimiento',
+      id,
+      'DELETE',
+      preSnapshot,
+      null,
+      idUsuario,
+    );
   }
 
   // --- CargoProcesos ---
 
   async createCargoProceso(
     createDto: CreateCargoProcesoDto,
+    idUsuario?: number,
   ): Promise<CargoProceso> {
     const { id_cargo, id_proceso } = createDto;
 
@@ -295,7 +455,17 @@ export class ProcesosService {
     }
 
     const cargoProceso = this.cargoProcesoRepository.create(createDto);
-    return await this.cargoProcesoRepository.save(cargoProceso);
+    const saved = await this.cargoProcesoRepository.save(cargoProceso);
+    const postSnapshot = await this.findOneCargoProceso(saved.id);
+    await this.auditoriaService.registrarCambio(
+      'CargoProceso',
+      saved.id,
+      'CREATE',
+      {},
+      postSnapshot,
+      idUsuario,
+    );
+    return postSnapshot;
   }
 
   async findAllCargoProcesos(): Promise<CargoProceso[]> {
@@ -319,8 +489,10 @@ export class ProcesosService {
   async updateCargoProceso(
     id: number,
     updateDto: UpdateCargoProcesoDto,
+    idUsuario?: number,
   ): Promise<CargoProceso> {
     const cargoProceso = await this.findOneCargoProceso(id);
+    const preSnapshot = cloneEntity(cargoProceso);
 
     const { id_cargo, id_proceso } = updateDto;
 
@@ -343,11 +515,30 @@ export class ProcesosService {
     }
 
     Object.assign(cargoProceso, updateDto);
-    return await this.cargoProcesoRepository.save(cargoProceso);
+    await this.cargoProcesoRepository.save(cargoProceso);
+    const postSnapshot = await this.findOneCargoProceso(id);
+    await this.auditoriaService.registrarCambio(
+      'CargoProceso',
+      id,
+      'UPDATE',
+      preSnapshot,
+      postSnapshot,
+      idUsuario,
+    );
+    return postSnapshot;
   }
 
-  async removeCargoProceso(id: number): Promise<void> {
+  async removeCargoProceso(id: number, idUsuario?: number): Promise<void> {
     const cargoProceso = await this.findOneCargoProceso(id);
+    const preSnapshot = cloneEntity(cargoProceso);
     await this.cargoProcesoRepository.softRemove(cargoProceso);
+    await this.auditoriaService.registrarCambio(
+      'CargoProceso',
+      id,
+      'DELETE',
+      preSnapshot,
+      null,
+      idUsuario,
+    );
   }
 }

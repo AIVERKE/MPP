@@ -9,18 +9,22 @@ import { Equipo } from './entities/equipo.entity';
 import { DocumentoReferencia } from './entities/documento-referencia.entity';
 import { Procedimiento } from '../procesos/entities/procedimiento.entity';
 import { Operacion } from '../flujo/entities/operacion.entity';
+import { AuditoriaService } from '../versiones/auditoria.service';
+
+const mockRepository = () => ({
+  find: jest.fn(),
+  findOne: jest.fn(),
+  create: jest.fn(),
+  save: jest.fn(),
+  softRemove: jest.fn(),
+});
+
+const mockAuditoriaService = () => ({
+  registrarCambio: jest.fn(),
+});
 
 describe('RecursosService', () => {
   let service: RecursosService;
-
-  const mockRepository = () => ({
-    find: jest.fn(),
-    findOne: jest.fn(),
-    create: jest.fn(),
-    save: jest.fn(),
-    preload: jest.fn(),
-    softRemove: jest.fn(),
-  });
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -43,6 +47,7 @@ describe('RecursosService', () => {
           useValue: mockRepository(),
         },
         { provide: getRepositoryToken(Operacion), useValue: mockRepository() },
+        { provide: AuditoriaService, useValue: mockAuditoriaService() },
       ],
     }).compile();
 

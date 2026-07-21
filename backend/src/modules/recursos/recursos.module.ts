@@ -10,6 +10,8 @@ import { Equipo } from './entities/equipo.entity';
 import { SistemaInformacion } from './entities/sistema-informacion.entity';
 import { Procedimiento } from '../procesos/entities/procedimiento.entity';
 import { Operacion } from '../flujo/entities/operacion.entity';
+import { VersionesModule } from '../versiones/versiones.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -23,6 +25,8 @@ import { Operacion } from '../flujo/entities/operacion.entity';
       Procedimiento,
       Operacion,
     ]),
+    VersionesModule,
+    AuthModule,
   ],
   controllers: [RecursosController],
   providers: [RecursosService],
