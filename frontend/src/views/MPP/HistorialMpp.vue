@@ -34,12 +34,12 @@
               <!-- Filtro de estado -->
               <v-select
                 v-model="statusFilter"
-                :items="['Todos', 'Activo', 'Inactivo', 'En Revisión']"
+                :items="['Todos', 'Borrador', 'En Revisión', 'Aprobado', 'Obsoleto', 'Activo', 'Inactivo']"
                 label="Estado"
                 variant="solo-filled"
                 density="compact"
                 hide-details
-                style="max-width: 150px; min-width: 130px"
+                style="max-width: 170px; min-width: 140px"
                 class="rounded-lg flex-grow-1 flex-md-grow-0"
               ></v-select>
 
@@ -290,16 +290,29 @@
                         </v-chip>
                       </td>
                       <td class="text-center">
-                        <v-btn
-                          size="small"
-                          color="primary"
-                          variant="flat"
-                          prepend-icon="mdi-eye"
-                          class="rounded-lg text-caption font-weight-bold"
-                          @click="openDetailsDrawer(grupo.selectedVersionId)"
-                        >
-                          Explorar
-                        </v-btn>
+                        <div class="d-flex align-center justify-center ga-2">
+                          <v-btn
+                            size="small"
+                            color="primary"
+                            variant="flat"
+                            prepend-icon="mdi-eye"
+                            class="rounded-lg text-caption font-weight-bold"
+                            @click="openDetailsDrawer(grupo.selectedVersionId)"
+                          >
+                            Explorar
+                          </v-btn>
+
+                          <v-btn
+                            size="small"
+                            :color="getProcedureStatus(grupo.selectedVersionId, grupo.versiones) === 'Aprobado' || getProcedureStatus(grupo.selectedVersionId, grupo.versiones) === 'Activo' ? 'success' : 'warning'"
+                            variant="tonal"
+                            :prepend-icon="getProcedureStatus(grupo.selectedVersionId, grupo.versiones) === 'Aprobado' || getProcedureStatus(grupo.selectedVersionId, grupo.versiones) === 'Activo' ? 'mdi-file-plus-outline' : 'mdi-pencil'"
+                            class="rounded-lg text-caption font-weight-bold"
+                            @click="handleProcedureEditOrCreateNewVersion(grupo.selectedVersionId, proceso.id_proceso)"
+                          >
+                            {{ (getProcedureStatus(grupo.selectedVersionId, grupo.versiones) === 'Aprobado' || getProcedureStatus(grupo.selectedVersionId, grupo.versiones) === 'Activo') ? 'Nueva Versión' : 'Editar' }}
+                          </v-btn>
+                        </div>
                       </td>
                     </tr>
                   </tbody>
@@ -971,9 +984,11 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
 import { useDisplay } from "vuetify";
+import { useRouter } from "vue-router";
 import { useMppCoreStore } from "@/stores/mpp_core";
 import axios from "axios";
 
+const router = useRouter();
 const mppStore = useMppCoreStore();
 const { smAndDown } = useDisplay();
 
@@ -982,6 +997,7 @@ const searchQuery = ref("");
 const statusFilter = ref("Todos");
 const expandedProcessPanel = ref([]);
 const loadingGlobal = ref(true);
+const selectedVersionsMap = ref({});
 
 // --- DATOS GLOBALES ---
 const allProcedimientos = ref([]);
@@ -1434,7 +1450,7 @@ const getProcedimientosGrouped = (procesoId) => {
 
   if (statusFilter.value !== "Todos") {
     filtered = filtered.filter(
-      (p) => (p.estado || "Activo") === statusFilter.value,
+      (p) => (p.estado_version || p.estado || "Borrador") === statusFilter.value,
     );
   }
 
@@ -1467,11 +1483,14 @@ const getProcedimientosGrouped = (procesoId) => {
       };
     }
 
+    const st = p.estado_version || p.estado || "Borrador";
+
     groupsMap[nombreBase].versiones.push({
       id_procedimiento: p.id_procedimiento,
       version: p.version || "1.0",
-      estado: p.estado || "Activo",
-      versionLabel: `v${p.version || "1.0"} (${p.estado || "Activo"})`,
+      estado: st,
+      estado_version: st,
+      versionLabel: `v${p.version || "1.0"} (${st})`,
     });
   });
 
@@ -1482,7 +1501,21 @@ const getProcedimientosGrouped = (procesoId) => {
         sensitivity: "base",
       });
     });
-    grupo.selectedVersionId = grupo.versiones[0]?.id_procedimiento || null;
+
+    const key = `${procesoId}_${grupo.nombreBase}`;
+    if (!selectedVersionsMap.value[key] || !grupo.versiones.some((v) => v.id_procedimiento === selectedVersionsMap.value[key])) {
+      selectedVersionsMap.value[key] = grupo.versiones[0]?.id_procedimiento || null;
+    }
+
+    Object.defineProperty(grupo, "selectedVersionId", {
+      get: () => selectedVersionsMap.value[key] || grupo.versiones[0]?.id_procedimiento || null,
+      set: (val) => {
+        selectedVersionsMap.value[key] = val;
+      },
+      configurable: true,
+      enumerable: true
+    });
+
     return grupo;
   });
 
@@ -1504,14 +1537,64 @@ const getProcedureVersionString = (selectedId, versiones) => {
 
 const getProcedureStatus = (selectedId, versiones) => {
   const vObj = versiones.find((v) => v.id_procedimiento === selectedId);
-  return vObj ? vObj.estado : "Activo";
+  return vObj ? (vObj.estado_version || vObj.estado || "Borrador") : "Borrador";
 };
 
 const getProcedureStatusColor = (selectedId, versiones) => {
   const status = getProcedureStatus(selectedId, versiones);
-  if (status === "Activo") return "success";
-  if (status === "En Revisión") return "warning";
+  if (status === "Aprobado" || status === "Activo") return "success";
+  if (status === "En Revisión") return "info";
+  if (status === "Borrador") return "warning";
   return "grey";
+};
+
+const handleProcedureEditOrCreateNewVersion = async (selectedId, procesoId) => {
+  const proc = allProcedimientos.value.find((p) => p.id_procedimiento === selectedId);
+  if (!proc) return;
+
+  const currentStatus = proc.estado_version || proc.estado || "Borrador";
+  let targetId = selectedId;
+
+  if (currentStatus === "Aprobado" || currentStatus === "Activo") {
+    const currentVer = proc.version || "1.0";
+    const parts = currentVer.split(".");
+    const nextVer = `${(parseInt(parts[0], 10) || 1) + 1}.0`;
+
+    const confirmNewVersion = confirm(
+      `El procedimiento '${proc.nombre}' (v${currentVer}) está APROBADO.\n\n¿Desea crear la versión v${nextVer} (en estado Borrador) como un nuevo registro para aplicar cambios?`
+    );
+    if (!confirmNewVersion) return;
+
+    try {
+      const pProcId = proc.proceso?.id_proceso || proc.id_proceso || procesoId;
+      const baseCode = (proc.codigo || "PROC").replace(/[\s\-_]*v\d+(\.\d+)*$/gi, "").trim();
+      const newProcData = {
+        codigo: `${baseCode}-v${nextVer}`,
+        nombre: proc.nombre,
+        objetivos: proc.objetivos || "",
+        alcance: proc.alcance || "",
+        periodicidad: proc.periodicidad || "",
+        version: nextVer,
+        estado: "Borrador",
+        estado_version: "Borrador",
+        id_proceso: Number(pProcId)
+      };
+
+      const created = await mppStore.saveProcedimiento(newProcData);
+      const newId = created?.id_procedimiento || created?.id;
+      if (newId) {
+        targetId = newId;
+      }
+      await fetchAllProcedimientos();
+    } catch (e) {
+      console.error("Error creando nueva versión de procedimiento:", e);
+    }
+  }
+
+  router.push({
+    name: "cabecera_mpp",
+    query: { procesoId, procedimientoId: targetId },
+  });
 };
 
 const getProcessResponsible = (procesoId) => {

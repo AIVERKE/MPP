@@ -32,11 +32,28 @@
             <v-chip size="x-small" color="secondary" variant="tonal" class="font-weight-bold text-uppercase ml-1">
               {{ procedimientoNombre }}
             </v-chip>
+            <v-chip size="x-small" color="primary" variant="tonal" class="font-weight-bold ml-2">
+              v{{ procedimientoVersion }}
+            </v-chip>
+            <v-chip size="x-small" :color="estadoVersionColor" variant="tonal" class="font-weight-bold uppercase ml-1">
+              {{ procedimientoEstadoVersion }}
+            </v-chip>
           </div>
         </div>
       </div>
       <v-spacer></v-spacer>
       <div class="d-flex align-center ga-4">
+        <v-select
+          v-model="procedimientoEstadoVersion"
+          :items="['Borrador', 'En Revisión', 'Aprobado', 'Obsoleto']"
+          label="Estado de Versión"
+          density="compact"
+          variant="solo-filled"
+          hide-details
+          style="max-width: 170px;"
+          class="rounded-lg"
+          @update:model-value="changeEstadoVersion"
+        ></v-select>
         <v-btn
           color="primary"
           variant="outlined"
@@ -51,7 +68,7 @@
           variant="flat"
           prepend-icon="mdi-content-save-all"
           class="rounded-lg font-weight-bold text-uppercase text-caption px-4"
-          @click="$emit('exit')"
+          @click="handleSaveAndExit"
         >
           Guardar y Salir
         </v-btn>
@@ -683,9 +700,6 @@ const modalType = ref(""); // 'indicador' | 'normativa' | 'sistema' | 'equipo'
 const editingId = ref(null);
 const formData = ref({});
 
-// Procedimiento local state for instalaciones
-const currentProcedimiento = ref(null);
-
 onMounted(async () => {
   try {
     // Cargar dependencias de la tienda si no están en memoria
@@ -707,9 +721,53 @@ onMounted(async () => {
   }
 });
 
+import { useRouter } from "vue-router";
+const router = useRouter();
+
 const procedimientoNombre = computed(() => {
   return currentProcedimiento.value?.nombre || "Procedimiento";
 });
+
+const procedimientoVersion = computed(() => {
+  return currentProcedimiento.value?.version || "1.0";
+});
+
+const procedimientoEstadoVersion = computed({
+  get() {
+    return currentProcedimiento.value?.estado_version || currentProcedimiento.value?.estado || "Borrador";
+  },
+  set(val) {
+    if (currentProcedimiento.value) {
+      currentProcedimiento.value.estado_version = val;
+    }
+  }
+});
+
+const estadoVersionColor = computed(() => {
+  const st = procedimientoEstadoVersion.value;
+  if (st === "Aprobado" || st === "Activo") return "success";
+  if (st === "En Revisión") return "info";
+  if (st === "Borrador") return "warning";
+  return "grey";
+});
+
+const changeEstadoVersion = async (nuevoEstado) => {
+  const pId = Number(props.procedimientoId);
+  try {
+    showNotification(`Actualizando estado a '${nuevoEstado}'...`, "info");
+    await mppStore.updateProcedimiento(pId, { estado_version: nuevoEstado });
+    await loadProcedimientoDetails();
+    showNotification(`Estado de versión actualizado a '${nuevoEstado}'`, "success");
+  } catch (err) {
+    console.error("Error al cambiar estado de versión:", err);
+    showNotification("Error al actualizar el estado de versión", "error");
+  }
+};
+
+const handleSaveAndExit = () => {
+  emit("exit");
+  router.push("/mpp/historial-mpp");
+};
 
 const procesoNombre = computed(() => {
   const proc = mppStore.procesos.find((p) => Number(p.id_proceso) === Number(props.procesoId));
@@ -718,20 +776,16 @@ const procesoNombre = computed(() => {
     : `Proceso #${props.procesoId}`;
 });
 
-const loadProcedimientoDetails = async () => {
+const currentProcedimiento = computed(() => {
   const pId = Number(props.procedimientoId);
-  // Intentar cargar de la store
-  const found = mppStore.procedimientos.find(
+  return mppStore.procedimientos.find(
     (p) => Number(p.id_procedimiento) === pId,
-  );
-  if (found) {
-    currentProcedimiento.value = found;
-  } else {
-    // Si no está cargado, recargar procedimientos del proceso
+  ) || null;
+});
+
+const loadProcedimientoDetails = async () => {
+  if (!currentProcedimiento.value) {
     await mppStore.fetchProcedimientos(props.procesoId);
-    currentProcedimiento.value = mppStore.procedimientos.find(
-      (p) => Number(p.id_procedimiento) === pId,
-    );
   }
 };
 

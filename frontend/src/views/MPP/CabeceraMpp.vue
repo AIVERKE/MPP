@@ -1,11 +1,18 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useMppCoreStore } from "@/stores/mpp_core";
 import { rules } from "@/utils/rules";
 import MatrizMpp from "./MatrizMpp.vue";
 import PieMpp from "./PieMpp.vue";
 
+const route = useRoute();
+const router = useRouter();
 const mppStore = useMppCoreStore();
+
+const handleExit = () => {
+  router.push("/mpp/historial-mpp");
+};
 
 // --- ESTADOS DE UI Y NAVEGACIÓN ---
 const step = ref(1);
@@ -50,7 +57,7 @@ const entityData = ref({
   estado: "Activo",
 });
 
-const procedureHeader = ref({ objetivos: "", alcance: "", periodicidad: "" });
+const procedureHeader = ref({ objetivos: "", alcance: "", periodicidad: "", estado_version: "Borrador" });
 
 const resourceMode = ref("create");
 const resourceType = ref("");
@@ -130,9 +137,12 @@ const saveProcessUnits = async (silent = false) => {
 const saveProcedureHeader = async (silent = false) => {
   if (!selectedProcedimiento.value) return;
   try {
-    isSaving.value = true;
     const procedureId = Number(selectedProcedimiento.value);
-    const updates = [mppStore.updateProcedimiento(procedureId, { ...procedureHeader.value })];
+    const payload = {
+      ...procedureHeader.value,
+      estado: procedureHeader.value.estado_version || "Borrador"
+    };
+    const updates = [mppStore.updateProcedimiento(procedureId, payload)];
 
     if (selectedNormativa.value) {
       const nId = typeof selectedNormativa.value === "object" ? selectedNormativa.value.id_normativa || selectedNormativa.value.id : Number(selectedNormativa.value);
@@ -198,7 +208,12 @@ watch(selectedProcedimiento, async (id) => {
   if (id) {
     const proc = mppStore.procedimientos.find((p) => p.id_procedimiento === id);
     if (proc) {
-      procedureHeader.value = { objetivos: proc.objetivos || "", alcance: proc.alcance || "", periodicidad: proc.periodicidad || "" };
+      procedureHeader.value = { 
+        objetivos: proc.objetivos || "", 
+        alcance: proc.alcance || "", 
+        periodicidad: proc.periodicidad || "",
+        estado_version: proc.estado_version || proc.estado || "Borrador"
+      };
       const linkedNormativa = mppStore.normativas.find((n) => n.procedimientos?.some((p) => p.id_procedimiento === id));
       selectedNormativa.value = linkedNormativa ? linkedNormativa.id_normativa : null;
     }
@@ -236,8 +251,50 @@ watch(selectedProceso, async (v) => {
 
 // --- AUXILIARES UI ---
 const getItemTitle = (item) => item?.denominacion || item?.nombre_unidad || item?.nombre || item?.descripcion || "Sin nombre";
-const getProcedimientoProps = (item) => ({ subtitle: item.estado === "Inactivo" ? "Inactivo" : null, class: item.estado === "Inactivo" ? "text-slate-500 bg-slate-50" : "" });
-const isProcedimientoInactivo = computed(() => mppStore.procedimientos.find((p) => p.id_procedimiento === selectedProcedimiento.value)?.estado === "Inactivo");
+
+const selectedProcedimientoObj = computed(() => {
+  if (!selectedProcedimiento.value) return null;
+  return mppStore.procedimientos.find((p) => p.id_procedimiento === selectedProcedimiento.value) || null;
+});
+
+watch(
+  selectedProcedimientoObj,
+  (proc) => {
+    if (proc && !isSaving.value) {
+      procedureHeader.value = {
+        ...procedureHeader.value,
+        estado_version: proc.estado_version || proc.estado || "Borrador",
+      };
+    }
+  },
+  { deep: true, immediate: true }
+);
+
+const selectedProcedimientoStatus = computed(() => {
+  if (!selectedProcedimientoObj.value) return "Borrador";
+  return selectedProcedimientoObj.value.estado_version || selectedProcedimientoObj.value.estado || "Borrador";
+});
+
+const selectedProcedimientoStatusColor = computed(() => {
+  const st = selectedProcedimientoStatus.value;
+  if (st === "Aprobado" || st === "Activo") return "success";
+  if (st === "En Revisión") return "info";
+  if (st === "Borrador") return "warning";
+  return "grey";
+});
+
+const getProcedimientoProps = (item) => {
+  const st = item.estado_version || item.estado || "Borrador";
+  return {
+    subtitle: `v${item.version || "1.0"} • Estado: ${st}`,
+    class: st === "Obsoleto" || item.estado === "Inactivo" ? "text-slate-500 bg-slate-50" : ""
+  };
+};
+
+const isProcedimientoInactivo = computed(() => {
+  const st = selectedProcedimientoStatus.value;
+  return st === "Obsoleto" || mppStore.procedimientos.find((p) => p.id_procedimiento === selectedProcedimiento.value)?.estado === "Inactivo";
+});
 
 // --- DIÁLOGOS CRUD (ENTIDADES) ---
 const openDialog = async (type, mode = "create") => {
@@ -384,6 +441,17 @@ onMounted(async () => {
   try {
     await mppStore.fetchProcesos();
     await Promise.all([mppStore.fetchUnidades(), mppStore.fetchCargos(), mppStore.fetchNormativas(), mppStore.fetchAcciones()]);
+    
+    if (route.query.procesoId) {
+      selectedProceso.value = Number(route.query.procesoId);
+      await Promise.all([
+        mppStore.fetchProcedimientos(selectedProceso.value),
+        mppStore.fetchCargoProcesos(selectedProceso.value)
+      ]);
+      if (route.query.procedimientoId) {
+        selectedProcedimiento.value = Number(route.query.procedimientoId);
+      }
+    }
   } catch (e) { console.error("Error inicial:", e); }
 });
 
@@ -425,7 +493,17 @@ onUnmounted(() => {
                     </div>
                   </v-col>
                   <v-col cols="12" md="6">
-                    <div class="text-caption font-weight-bold text-uppercase mb-2 text-primary">2. Seleccione el Procedimiento</div>
+                    <div class="text-caption font-weight-bold text-uppercase mb-2 text-primary d-flex align-center justify-space-between">
+                      <span>2. Seleccione el Procedimiento</span>
+                      <div v-if="selectedProcedimientoObj" class="d-flex align-center ga-1">
+                        <v-chip size="x-small" color="primary" variant="tonal" class="font-weight-bold">
+                          v{{ selectedProcedimientoObj.version || "1.0" }}
+                        </v-chip>
+                        <v-chip size="x-small" :color="selectedProcedimientoStatusColor" variant="tonal" class="font-weight-bold text-uppercase">
+                          {{ selectedProcedimientoStatus }}
+                        </v-chip>
+                      </div>
+                    </div>
                     <div class="d-flex align-center">
                       <v-select v-model="selectedProcedimiento" :items="mppStore.procedimientos" :item-title="getItemTitle" item-value="id_procedimiento" :item-props="getProcedimientoProps" label="Procedimiento" variant="solo-filled" :disabled="!selectedProceso" prepend-inner-icon="mdi-file-edit-outline" class="flex-grow-1" :rules="[rules.required]"></v-select>
                       <div class="ml-2 d-flex">
@@ -490,7 +568,10 @@ onUnmounted(() => {
                   <v-col cols="12" md="4">
                     <v-text-field v-model="procedureHeader.periodicidad" label="Periodicidad" variant="solo-filled" prepend-inner-icon="mdi-calendar-sync" placeholder="Ej: Anual" :rules="[rules.required]"></v-text-field>
                   </v-col>
-                  <v-col cols="12" md="8">
+                  <v-col cols="12" md="4">
+                    <v-select v-model="procedureHeader.estado_version" :items="['Borrador', 'En Revisión', 'Aprobado', 'Obsoleto']" label="Estado de Versión" variant="solo-filled" prepend-inner-icon="mdi-label-outline" :rules="[rules.required]"></v-select>
+                  </v-col>
+                  <v-col cols="12" md="4">
                     <v-select v-model="selectedNormativa" :items="mppStore.normativas" item-title="nombre" item-value="id_normativa" label="Marco Normativo" variant="solo-filled" prepend-inner-icon="mdi-gavel" class="flex-grow-1" :rules="[rules.required]">
                       <template v-slot:append-inner>
                         <v-btn icon="mdi-plus" size="x-small" color="primary" variant="text" @click.stop="openResourceDialog('normativa')"></v-btn>
@@ -565,7 +646,7 @@ onUnmounted(() => {
         :procedimientoId="selectedProcedimiento"
         :procesoId="selectedProceso"
         @back="currentScreen = 'matrix'"
-        @exit="currentScreen = 'setup'; isLocked = false;"
+        @exit="handleExit"
     />
 
     <!-- MODALES UNIFICADOS (Chameleon Engine) -->
