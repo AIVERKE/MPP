@@ -22,7 +22,7 @@ export class AuditoriaCambiosResponseDto {
   @ApiProperty({
     description: 'Acción realizada',
     example: 'UPDATE',
-    enum: ['CREATE', 'UPDATE', 'DELETE', 'VERSION'],
+    enum: ['CREATE', 'UPDATE', 'DELETE', 'VERSION', 'CAMBIO_ESTADO'],
   })
   accion: string;
 

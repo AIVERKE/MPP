@@ -326,7 +326,12 @@ export class ProcesosService {
   ): Promise<Procedimiento> {
     const procedimiento = await this.findOneProcedimiento(id);
     const preSnapshot = cloneEntity(procedimiento);
-    const { id_instalaciones, ...procedimientoData } = updateDto;
+    const {
+      id_instalaciones,
+      estado_version: nuevoEstado,
+      motivo_cambio: motivoCambio,
+      ...procedimientoData
+    } = updateDto;
 
     // Verificar unicidad de código si está cambiando
     if (
@@ -345,11 +350,15 @@ export class ProcesosService {
 
     Object.assign(procedimiento, procedimientoData);
 
+    const estadoCambio =
+      nuevoEstado !== undefined &&
+      nuevoEstado !== preSnapshot.estado_version;
+
     const versionAnterior = preSnapshot.version ?? null;
     const { versionNueva, debeRegistrar } =
       this.versionesService.aplicarVersionamientoSiCorresponde(
         preSnapshot,
-        procedimientoData.estado_version,
+        nuevoEstado,
       );
 
     if (debeRegistrar && versionNueva) {
@@ -377,6 +386,17 @@ export class ProcesosService {
     try {
       return await this.dataSource.transaction(async (manager) => {
         await manager.save(procedimiento);
+
+        if (estadoCambio && nuevoEstado) {
+          await this.versionesService.cambiarEstadoProcedimiento(
+            id,
+            nuevoEstado,
+            idUsuario,
+            motivoCambio,
+            manager,
+          );
+        }
+
         const postSnapshot = await this.findOneProcedimientoWithManager(
           id,
           manager,

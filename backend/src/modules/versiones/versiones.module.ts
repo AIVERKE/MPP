@@ -5,9 +5,13 @@ import { AuditoriaService } from './auditoria.service';
 import { VersionesController } from './versiones.controller';
 import { AuthModule } from '../auth/auth.module';
 import { VersionesService } from './versiones.service';
+import { Procedimiento } from '../procesos/entities/procedimiento.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([AuditoriaCambios]), AuthModule],
+  imports: [
+    TypeOrmModule.forFeature([AuditoriaCambios, Procedimiento]),
+    AuthModule,
+  ],
   controllers: [VersionesController],
   providers: [AuditoriaService, VersionesService],
   exports: [TypeOrmModule, AuditoriaService, VersionesService],
