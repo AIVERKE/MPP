@@ -24,9 +24,15 @@ describe('ProcesosService', () => {
   let procedimientoRepository: ReturnType<typeof mockRepository>;
   let auditoriaService: jest.Mocked<AuditoriaService>;
 
+  const mockManagerRepo = {
+    findOne: jest.fn(),
+    save: jest.fn(),
+  };
+
   const mockEntityManager = {
     save: jest.fn(),
     findOne: jest.fn(),
+    getRepository: jest.fn().mockReturnValue(mockManagerRepo),
   };
 
   const mockDataSource = {
@@ -95,6 +101,17 @@ describe('ProcesosService', () => {
         estado_version: 'Aprobado',
         version: '1.0',
       });
+      mockManagerRepo.findOne
+        .mockResolvedValueOnce({
+          ...procedimientoBase,
+          estado_version: 'Borrador',
+        })
+        .mockResolvedValueOnce({
+          ...procedimientoBase,
+          estado_version: 'Aprobado',
+          version: '1.0',
+        });
+      mockManagerRepo.save.mockImplementation(async (entity) => entity);
     });
 
     it('should increment version on Borrador to Aprobado transition', async () => {

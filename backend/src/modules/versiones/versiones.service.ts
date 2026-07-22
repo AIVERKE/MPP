@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { EntityManager } from 'typeorm';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { Procedimiento } from '../procesos/entities/procedimiento.entity';
 import { AuditoriaService } from './auditoria.service';
 
@@ -8,9 +9,17 @@ export interface VersionamientoResult {
   debeRegistrar: boolean;
 }
 
+function cloneEntity<T>(entity: T): T {
+  return JSON.parse(JSON.stringify(entity));
+}
+
 @Injectable()
 export class VersionesService {
-  constructor(private readonly auditoriaService: AuditoriaService) {}
+  constructor(
+    private readonly auditoriaService: AuditoriaService,
+    @InjectRepository(Procedimiento)
+    private readonly procedimientoRepository: Repository<Procedimiento>,
+  ) {}
 
   /**
    * Incrementa la versión cuando el estado pasa a 'Aprobado' desde cualquier otro estado
@@ -84,5 +93,60 @@ export class VersionesService {
       undefined,
       manager,
     );
+  }
+
+  /**
+   * Actualiza el estado_version de un procedimiento y registra auditoría CAMBIO_ESTADO
+   * con snapshots completos (incluyendo relaciones).
+   */
+  async cambiarEstadoProcedimiento(
+    procedimientoId: number,
+    nuevoEstado: Procedimiento['estado_version'],
+    idUsuario?: number,
+    motivo?: string,
+    manager?: EntityManager,
+  ): Promise<Procedimiento> {
+    const repository = manager
+      ? manager.getRepository(Procedimiento)
+      : this.procedimientoRepository;
+
+    const procedimiento = await repository.findOne({
+      where: { id_procedimiento: procedimientoId },
+      relations: ['proceso', 'instalaciones'],
+    });
+
+    if (!procedimiento) {
+      throw new NotFoundException(
+        `Procedimiento con ID ${procedimientoId} no encontrado`,
+      );
+    }
+
+    const preSnapshot = cloneEntity(procedimiento);
+    procedimiento.estado_version = nuevoEstado;
+    await repository.save(procedimiento);
+
+    const postSnapshot = await repository.findOne({
+      where: { id_procedimiento: procedimientoId },
+      relations: ['proceso', 'instalaciones'],
+    });
+
+    if (!postSnapshot) {
+      throw new NotFoundException(
+        `Procedimiento con ID ${procedimientoId} no encontrado`,
+      );
+    }
+
+    await this.auditoriaService.registrarCambio(
+      'Procedimiento',
+      procedimientoId,
+      'CAMBIO_ESTADO',
+      preSnapshot,
+      postSnapshot,
+      idUsuario,
+      motivo,
+      manager,
+    );
+
+    return postSnapshot;
   }
 }

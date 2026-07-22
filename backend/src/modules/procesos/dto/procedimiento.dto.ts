@@ -9,7 +9,7 @@ export class CreateProcedimientoDto {
       ejemplo2: { value: 5 },
     },
   })
-  id_proceso: number;
+  id_proceso!: number;
 
   @ApiProperty({
     description: 'Código único del procedimiento',
@@ -30,7 +30,7 @@ export class CreateProcedimientoDto {
       ejemplo2: { value: 'Backup de base de datos' },
     },
   })
-  nombre: string;
+  nombre!: string;
 
   @ApiProperty({
     description: 'Objetivos del procedimiento',
@@ -99,7 +99,14 @@ export class CreateProcedimientoDto {
 
 export class UpdateProcedimientoDto extends PartialType(
   CreateProcedimientoDto,
-) {}
+) {
+  @ApiProperty({
+    description: 'Motivo opcional del cambio de estado de versión',
+    example: 'Aprobado tras revisión de calidad',
+    required: false,
+  })
+  motivo_cambio?: string;
+}
 
 export class ProcedimientoResponseDto extends CreateProcedimientoDto {
   @ApiProperty({
@@ -113,5 +120,5 @@ export class ProcedimientoResponseDto extends CreateProcedimientoDto {
     description: 'ID del procedimiento',
     example: 1,
   })
-  id_procedimiento: number;
+  id_procedimiento!: number;
 }
