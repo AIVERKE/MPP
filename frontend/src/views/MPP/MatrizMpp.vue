@@ -30,6 +30,26 @@ const newActionName = ref("");
 const newActionFiguraId = ref(null);
 const isSavingAction = ref(false);
 
+// Panel IF/ELSE para tareas con figura Rombo
+const showCondicionPanel = ref(false);
+const condicionRow = ref(null);
+const isSavingCondicion = ref(false);
+const isLoadingCondicion = ref(false);
+const condicionForm = ref({
+  id_condicion: null,
+  tipo_condicion: "if",
+  expresion_condicion: "",
+  id_tarea_siguiente_if: null,
+  id_tarea_siguiente_else: null,
+  orden: 1,
+});
+
+const tipoCondicionOptions = [
+  { title: "IF", value: "if" },
+  { title: "ELSE", value: "else" },
+  { title: "FIN SI", value: "fin_si" },
+];
+
 // Ref para exportar diagrama
 const diagramContainer = ref(null);
 const scrollWrapper = ref(null);
@@ -403,6 +423,155 @@ const getActionVisuals = (accionId) => {
   else if (codigoFigura === "hexagono") icon = "mdi-hexagon";
 
   return { icon, color, colorHex, codigoFigura };
+};
+
+const tareaOptionsForCondicion = computed(() => {
+  return rows.value
+    .filter((r) => r.savedIds?.tarea)
+    .map((r) => ({
+      title: `${r.nro}. ${r.texto_figura || r.tarea || `Tarea #${r.savedIds.tarea}`}`,
+      value: Number(r.savedIds.tarea),
+    }));
+});
+
+const openCondicionPanel = async (row) => {
+  const visuals = getActionVisuals(row.accionId);
+  if (visuals.codigoFigura !== "rombo") return;
+
+  const tareaId = row.savedIds?.tarea ? Number(row.savedIds.tarea) : null;
+  if (!tareaId) {
+    snackbar.value = {
+      show: true,
+      text: "Guarda la fila primero para configurar la condición IF/ELSE",
+      color: "warning",
+    };
+    return;
+  }
+
+  condicionRow.value = row;
+  condicionForm.value = {
+    id_condicion: null,
+    tipo_condicion: "if",
+    expresion_condicion: "",
+    id_tarea_siguiente_if: null,
+    id_tarea_siguiente_else: null,
+    orden: 1,
+  };
+  showCondicionPanel.value = true;
+  isLoadingCondicion.value = true;
+
+  try {
+    const condiciones = await mppStore.fetchCondicionesByTarea(tareaId);
+    const list = Array.isArray(condiciones) ? condiciones : [];
+    if (list.length > 0) {
+      const sorted = [...list].sort(
+        (a, b) => (a.orden ?? 0) - (b.orden ?? 0) || a.id_condicion - b.id_condicion,
+      );
+      const first = sorted[0];
+      condicionForm.value = {
+        id_condicion: first.id_condicion,
+        tipo_condicion: first.tipo_condicion || "if",
+        expresion_condicion: first.expresion_condicion || "",
+        id_tarea_siguiente_if: first.id_tarea_siguiente_if ?? null,
+        id_tarea_siguiente_else: first.id_tarea_siguiente_else ?? null,
+        orden: first.orden ?? 1,
+      };
+    }
+  } catch (e) {
+    console.error("Error al cargar condiciones:", e);
+    snackbar.value = {
+      show: true,
+      text: "Error al cargar las condiciones de la tarea",
+      color: "error",
+    };
+  } finally {
+    isLoadingCondicion.value = false;
+  }
+};
+
+const saveCondicionPanel = async () => {
+  const row = condicionRow.value;
+  const tareaId = row?.savedIds?.tarea ? Number(row.savedIds.tarea) : null;
+  if (!tareaId) {
+    snackbar.value = {
+      show: true,
+      text: "Guarda la fila primero para configurar la condición IF/ELSE",
+      color: "warning",
+    };
+    return;
+  }
+
+  if (!condicionForm.value.expresion_condicion?.trim()) {
+    snackbar.value = {
+      show: true,
+      text: "Ingresa la expresión de la condición",
+      color: "warning",
+    };
+    return;
+  }
+
+  isSavingCondicion.value = true;
+  try {
+    const payload = {
+      id_tarea: tareaId,
+      tipo_condicion: condicionForm.value.tipo_condicion,
+      expresion_condicion: condicionForm.value.expresion_condicion.trim(),
+      id_tarea_siguiente_if: condicionForm.value.id_tarea_siguiente_if || null,
+      id_tarea_siguiente_else: condicionForm.value.id_tarea_siguiente_else || null,
+      orden: Number(condicionForm.value.orden) || 1,
+    };
+
+    if (condicionForm.value.id_condicion) {
+      await mppStore.updateCondicion(condicionForm.value.id_condicion, payload);
+    } else {
+      const res = await mppStore.saveCondicion(payload);
+      const saved = res.data?.data || res.data;
+      condicionForm.value.id_condicion = saved?.id_condicion ?? null;
+    }
+
+    snackbar.value = {
+      show: true,
+      text: "Condición IF/ELSE guardada",
+      color: "success",
+    };
+    showCondicionPanel.value = false;
+  } catch (e) {
+    console.error("Error al guardar condición:", e);
+    snackbar.value = {
+      show: true,
+      text: "Error al guardar la condición",
+      color: "error",
+    };
+  } finally {
+    isSavingCondicion.value = false;
+  }
+};
+
+const deleteCondicionPanel = async () => {
+  if (!condicionForm.value.id_condicion) {
+    showCondicionPanel.value = false;
+    return;
+  }
+
+  isSavingCondicion.value = true;
+  try {
+    await mppStore.deleteCondicion(condicionForm.value.id_condicion);
+    snackbar.value = {
+      show: true,
+      text: "Condición eliminada",
+      color: "success",
+    };
+    showCondicionPanel.value = false;
+  } catch (e) {
+    console.error("Error al eliminar condición:", e);
+    snackbar.value = {
+      show: true,
+      text: "Error al eliminar la condición",
+      color: "error",
+    };
+  } finally {
+    isSavingCondicion.value = false;
+  }
 };
 
 // Obtener nombre del cargo
@@ -1098,7 +1267,7 @@ watch([matrixEditorContainer, () => rows.value], () => {
                 class="cell-flow-node"
                 :class="getActionVisuals(row.accionId).codigoFigura"
                 :style="{ backgroundColor: getActionVisuals(row.accionId).colorHex }"
-                @click.stop
+                @click.stop="openCondicionPanel(row)"
               >
                 <div class="cell-flow-text-wrapper">
                   <textarea
@@ -1405,6 +1574,108 @@ watch([matrixEditorContainer, () => rows.value], () => {
           <v-spacer></v-spacer>
           <v-btn color="primary" variant="outlined" class="rounded-lg font-weight-bold text-uppercase text-caption mr-2" @click="showCreateAction = false">Cancelar</v-btn>
           <v-btn color="primary" variant="flat" class="rounded-lg font-weight-bold text-uppercase text-caption px-4" @click="createQuickAction" :loading="isSavingAction">Guardar Acción</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- MODAL CONDICIÓN IF/ELSE (Rombo) -->
+    <v-dialog v-model="showCondicionPanel" max-width="520">
+      <v-card class="rounded-xl overflow-hidden">
+        <v-toolbar color="orange-darken-2" dark density="compact">
+          <v-toolbar-title class="text-subtitle-1 font-weight-bold">
+            CONDICIÓN IF/ELSE
+            <span v-if="condicionRow" class="text-caption font-weight-regular ml-2">
+              — Paso {{ condicionRow.nro }}
+            </span>
+          </v-toolbar-title>
+          <v-spacer></v-spacer>
+          <v-btn icon="mdi-close" @click="showCondicionPanel = false"></v-btn>
+        </v-toolbar>
+        <v-card-text class="pa-4" :class="{ 'opacity-50': isLoadingCondicion }">
+          <v-select
+            v-model="condicionForm.tipo_condicion"
+            :items="tipoCondicionOptions"
+            item-title="title"
+            item-value="value"
+            label="Tipo de condición"
+            variant="outlined"
+            density="compact"
+            class="mb-3"
+            hide-details
+          ></v-select>
+          <v-textarea
+            v-model="condicionForm.expresion_condicion"
+            label="Expresión de la condición"
+            placeholder="Ej: ¿Documento aprobado?"
+            variant="outlined"
+            density="compact"
+            rows="2"
+            class="mb-3"
+            hide-details
+          ></v-textarea>
+          <v-select
+            v-model="condicionForm.id_tarea_siguiente_if"
+            :items="tareaOptionsForCondicion"
+            item-title="title"
+            item-value="value"
+            label="Tarea siguiente si IF (verdadero)"
+            variant="outlined"
+            density="compact"
+            class="mb-3"
+            clearable
+            hide-details
+          ></v-select>
+          <v-select
+            v-model="condicionForm.id_tarea_siguiente_else"
+            :items="tareaOptionsForCondicion"
+            item-title="title"
+            item-value="value"
+            label="Tarea siguiente si ELSE (falso)"
+            variant="outlined"
+            density="compact"
+            class="mb-3"
+            clearable
+            hide-details
+          ></v-select>
+          <v-text-field
+            v-model.number="condicionForm.orden"
+            label="Orden"
+            type="number"
+            variant="outlined"
+            density="compact"
+            hide-details
+          ></v-text-field>
+        </v-card-text>
+        <v-divider></v-divider>
+        <v-card-actions class="pa-3">
+          <v-btn
+            v-if="condicionForm.id_condicion"
+            color="error"
+            variant="text"
+            class="rounded-lg font-weight-bold text-uppercase text-caption"
+            @click="deleteCondicionPanel"
+            :loading="isSavingCondicion"
+          >
+            Eliminar
+          </v-btn>
+          <v-spacer></v-spacer>
+          <v-btn
+            color="primary"
+            variant="outlined"
+            class="rounded-lg font-weight-bold text-uppercase text-caption mr-2"
+            @click="showCondicionPanel = false"
+          >
+            Cerrar
+          </v-btn>
+          <v-btn
+            color="orange-darken-2"
+            variant="flat"
+            class="rounded-lg font-weight-bold text-uppercase text-caption px-4"
+            @click="saveCondicionPanel"
+            :loading="isSavingCondicion || isLoadingCondicion"
+          >
+            Guardar
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
