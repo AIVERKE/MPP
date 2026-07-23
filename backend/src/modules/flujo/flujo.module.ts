@@ -8,6 +8,7 @@ import { Actividad } from './entities/actividad.entity';
 import { Accion } from './entities/accion.entity';
 import { Figura } from './entities/figura.entity';
 import { Tarea } from './entities/tarea.entity';
+import { CondicionTarea } from './entities/condicion-tarea.entity';
 import { Procedimiento } from '../procesos/entities/procedimiento.entity';
 import { Cargo } from '../estructura-organizacional/entities/cargo.entity';
 import { VersionesModule } from '../versiones/versiones.module';
@@ -22,6 +23,7 @@ import { AuthModule } from '../auth/auth.module';
       Accion,
       Figura,
       Tarea,
+      CondicionTarea,
       Procedimiento,
       Cargo,
     ]),

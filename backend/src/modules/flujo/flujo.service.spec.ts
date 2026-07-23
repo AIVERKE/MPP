@@ -7,6 +7,7 @@ import { Accion } from './entities/accion.entity';
 import { Figura } from './entities/figura.entity';
 import { OperacionCargo } from './entities/operacion-cargo.entity';
 import { Tarea } from './entities/tarea.entity';
+import { CondicionTarea } from './entities/condicion-tarea.entity';
 import { Procedimiento } from '../procesos/entities/procedimiento.entity';
 import { Cargo } from '../estructura-organizacional/entities/cargo.entity';
 import { AuditoriaService } from '../versiones/auditoria.service';
@@ -39,6 +40,10 @@ describe('FlujoService', () => {
           useValue: mockRepository(),
         },
         { provide: getRepositoryToken(Tarea), useValue: mockRepository() },
+        {
+          provide: getRepositoryToken(CondicionTarea),
+          useValue: mockRepository(),
+        },
         {
           provide: getRepositoryToken(Procedimiento),
           useValue: mockRepository(),

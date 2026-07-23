@@ -11,6 +11,7 @@ import { Accion } from './entities/accion.entity';
 import { Figura } from './entities/figura.entity';
 import { OperacionCargo } from './entities/operacion-cargo.entity';
 import { Tarea } from './entities/tarea.entity';
+import { CondicionTarea } from './entities/condicion-tarea.entity';
 import { Procedimiento } from '../procesos/entities/procedimiento.entity';
 import { Cargo } from '../estructura-organizacional/entities/cargo.entity';
 import { CreateAccionDto, UpdateAccionDto } from './dto/accion.dto';
@@ -22,6 +23,10 @@ import {
   UpdateOperacionCargoDto,
 } from './dto/operacion-cargo.dto';
 import { CreateTareaDto, UpdateTareaDto } from './dto/tarea.dto';
+import {
+  CreateCondicionTareaDto,
+  UpdateCondicionTareaDto,
+} from './dto/condicion-tarea.dto';
 import { AuditoriaService } from '../versiones/auditoria.service';
 
 function cloneEntity<T>(entity: T): T {
@@ -43,6 +48,8 @@ export class FlujoService {
     private readonly operacionCargoRepository: Repository<OperacionCargo>,
     @InjectRepository(Tarea)
     private readonly tareaRepository: Repository<Tarea>,
+    @InjectRepository(CondicionTarea)
+    private readonly condicionTareaRepository: Repository<CondicionTarea>,
     @InjectRepository(Procedimiento)
     private readonly procedimientoRepository: Repository<Procedimiento>,
     @InjectRepository(Cargo)
@@ -637,6 +644,133 @@ export class FlujoService {
     await this.tareaRepository.softRemove(registro);
     await this.auditoriaService.registrarCambio(
       'Tarea',
+      id,
+      'DELETE',
+      preSnapshot,
+      null,
+      idUsuario,
+    );
+  }
+
+  // --- Condiciones de Tarea ---
+
+  private async assertTareaExiste(id: number, label: string): Promise<void> {
+    const exist = await this.tareaRepository.findOne({
+      where: { id_tarea: id },
+    });
+    if (!exist) {
+      throw new BadRequestException(`${label} con ID ${id} no encontrada`);
+    }
+  }
+
+  async createCondicion(
+    createDto: CreateCondicionTareaDto,
+    idUsuario?: number,
+  ): Promise<CondicionTarea> {
+    const {
+      id_tarea,
+      id_tarea_siguiente_if,
+      id_tarea_siguiente_else,
+    } = createDto;
+
+    await this.assertTareaExiste(id_tarea, 'Tarea');
+
+    if (id_tarea_siguiente_if != null) {
+      await this.assertTareaExiste(
+        id_tarea_siguiente_if,
+        'Tarea siguiente IF',
+      );
+    }
+    if (id_tarea_siguiente_else != null) {
+      await this.assertTareaExiste(
+        id_tarea_siguiente_else,
+        'Tarea siguiente ELSE',
+      );
+    }
+
+    const registro = this.condicionTareaRepository.create(createDto);
+    const saved = await this.condicionTareaRepository.save(registro);
+    const postSnapshot = await this.findOneCondicion(saved.id_condicion);
+    await this.auditoriaService.registrarCambio(
+      'CondicionTarea',
+      saved.id_condicion,
+      'CREATE',
+      {},
+      postSnapshot,
+      idUsuario,
+    );
+    return postSnapshot;
+  }
+
+  async findCondicionesByTarea(idTarea: number): Promise<CondicionTarea[]> {
+    await this.assertTareaExiste(idTarea, 'Tarea');
+    return await this.condicionTareaRepository.find({
+      where: { id_tarea: idTarea },
+      relations: ['tarea', 'tareaSiguienteIf', 'tareaSiguienteElse'],
+      order: { orden: 'ASC', id_condicion: 'ASC' },
+    });
+  }
+
+  async findOneCondicion(id: number): Promise<CondicionTarea> {
+    const registro = await this.condicionTareaRepository.findOne({
+      where: { id_condicion: id },
+      relations: ['tarea', 'tareaSiguienteIf', 'tareaSiguienteElse'],
+    });
+    if (!registro) {
+      throw new NotFoundException(`Condición con ID ${id} no encontrada`);
+    }
+    return registro;
+  }
+
+  async updateCondicion(
+    id: number,
+    updateDto: UpdateCondicionTareaDto,
+    idUsuario?: number,
+  ): Promise<CondicionTarea> {
+    const registro = await this.findOneCondicion(id);
+    const preSnapshot = cloneEntity(registro);
+    const {
+      id_tarea,
+      id_tarea_siguiente_if,
+      id_tarea_siguiente_else,
+    } = updateDto;
+
+    if (id_tarea != null) {
+      await this.assertTareaExiste(id_tarea, 'Tarea');
+    }
+    if (id_tarea_siguiente_if != null) {
+      await this.assertTareaExiste(
+        id_tarea_siguiente_if,
+        'Tarea siguiente IF',
+      );
+    }
+    if (id_tarea_siguiente_else != null) {
+      await this.assertTareaExiste(
+        id_tarea_siguiente_else,
+        'Tarea siguiente ELSE',
+      );
+    }
+
+    Object.assign(registro, updateDto);
+    await this.condicionTareaRepository.save(registro);
+    const postSnapshot = await this.findOneCondicion(id);
+    await this.auditoriaService.registrarCambio(
+      'CondicionTarea',
+      id,
+      'UPDATE',
+      preSnapshot,
+      postSnapshot,
+      idUsuario,
+    );
+    return postSnapshot;
+  }
+
+  async removeCondicion(id: number, idUsuario?: number): Promise<void> {
+    const registro = await this.findOneCondicion(id);
+    const preSnapshot = cloneEntity(registro);
+    await this.condicionTareaRepository.softRemove(registro);
+    await this.auditoriaService.registrarCambio(
+      'CondicionTarea',
       id,
       'DELETE',
       preSnapshot,

@@ -295,6 +295,14 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
     const updateAccion = (id, data) => axios.patch(`${BASE_URL_FLUX}/acciones/${id}`, data);
     const deleteAccion = (id) => axios.delete(`${BASE_URL_FLUX}/acciones/${id}`);
 
+    const fetchCondicionesByTarea = async (idTarea) => {
+        const response = await axios.get(`${BASE_URL_FLUX}/condiciones/tarea/${idTarea}`);
+        return response.data?.data || response.data || [];
+    };
+    const saveCondicion = (data) => axios.post(`${BASE_URL_FLUX}/condiciones`, data);
+    const updateCondicion = (id, data) => axios.patch(`${BASE_URL_FLUX}/condiciones/${id}`, data);
+    const deleteCondicion = (id) => axios.delete(`${BASE_URL_FLUX}/condiciones/${id}`);
+
     const saveFlujoCompleto = async (procedimientoId, listaPasos) => {
         localStorage.setItem(`mpp_flow_${procedimientoId}`, JSON.stringify(listaPasos));
         return true;
@@ -568,6 +576,7 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
         saveEquipo, updateEquipo, deleteEquipo,
         saveSistemaInformacion, updateSistemaInformacion, deleteSistemaInformacion,
         saveAccion, updateAccion, deleteAccion,
+        fetchCondicionesByTarea, saveCondicion, updateCondicion, deleteCondicion,
         saveFlujoCompleto,
         saveMatrixRow, fetchMatrixData, deleteMatrixRow,
         saveEntity, updateEntity, deleteEntity,

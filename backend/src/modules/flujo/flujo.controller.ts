@@ -36,6 +36,10 @@ import {
   UpdateOperacionCargoDto,
 } from './dto/operacion-cargo.dto';
 import { CreateTareaDto, UpdateTareaDto } from './dto/tarea.dto';
+import {
+  CreateCondicionTareaDto,
+  UpdateCondicionTareaDto,
+} from './dto/condicion-tarea.dto';
 
 @ApiTags('Flujo de Procedimientos')
 @Controller('flujo')
@@ -499,6 +503,86 @@ export class FlujoController {
   @ApiResponse({ status: 404, description: 'Tarea no encontrada.' })
   removeTarea(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     return this.service.removeTarea(
+      id,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
+  }
+
+  // --- Condiciones de Tarea ---
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Post('condiciones')
+  @ApiOperation({ summary: 'Crear una condición IF/ELSE para una tarea' })
+  @ApiResponse({ status: 201, description: 'Condición creada exitosamente.' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos.' })
+  createCondicion(
+    @Body() createDto: CreateCondicionTareaDto,
+    @Req() req: any,
+  ) {
+    return this.service.createCondicion(
+      createDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
+  }
+
+  @Get('condiciones/tarea/:idTarea')
+  @ApiOperation({
+    summary: 'Listar condiciones asociadas a una tarea',
+  })
+  @ApiParam({ name: 'idTarea', description: 'ID de la tarea' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de condiciones obtenida exitosamente.',
+  })
+  @ApiResponse({ status: 400, description: 'Tarea no encontrada.' })
+  findCondicionesByTarea(@Param('idTarea', ParseIntPipe) idTarea: number) {
+    return this.service.findCondicionesByTarea(idTarea);
+  }
+
+  @Get('condiciones/:id')
+  @ApiOperation({ summary: 'Obtener una condición por ID' })
+  @ApiParam({ name: 'id', description: 'ID de la condición' })
+  @ApiResponse({ status: 200, description: 'Condición encontrada.' })
+  @ApiResponse({ status: 404, description: 'Condición no encontrada.' })
+  findOneCondicion(@Param('id', ParseIntPipe) id: number) {
+    return this.service.findOneCondicion(id);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Patch('condiciones/:id')
+  @ApiOperation({ summary: 'Actualizar una condición por ID' })
+  @ApiParam({ name: 'id', description: 'ID de la condición' })
+  @ApiResponse({
+    status: 200,
+    description: 'Condición actualizada exitosamente.',
+  })
+  @ApiResponse({ status: 404, description: 'Condición no encontrada.' })
+  updateCondicion(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateDto: UpdateCondicionTareaDto,
+    @Req() req: any,
+  ) {
+    return this.service.updateCondicion(
+      id,
+      updateDto,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Delete('condiciones/:id')
+  @ApiOperation({ summary: 'Eliminar una condición (Borrado lógico)' })
+  @ApiParam({ name: 'id', description: 'ID de la condición' })
+  @ApiResponse({
+    status: 200,
+    description: 'Condición eliminada exitosamente.',
+  })
+  @ApiResponse({ status: 404, description: 'Condición no encontrada.' })
+  removeCondicion(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.service.removeCondicion(
       id,
       req.user?.userId ? Number(req.user.userId) : undefined,
     );
