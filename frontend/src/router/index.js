@@ -30,6 +30,12 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/auditoria',
+      name: 'auditoria_sistema',
+      component: () => import('../views/AuditoriaSistema.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
         path:"/mpp/gestion-mpp",
         name:"cabecera_mpp",
         component: () => import('../views/MPP/CabeceraMpp.vue'),
