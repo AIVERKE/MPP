@@ -103,9 +103,9 @@ const handleLogout = async () => {
 };
 </script>
 <template>
-  <v-app>
+  <v-app style="height: 100vh; overflow: hidden;">
     <!-- Barra superior -->
-    <v-app-bar v-if="!isLoginPage" height="70">
+    <v-app-bar v-if="!isLoginPage" height="70" style="position: fixed; top: 0; z-index: 1005;">
       <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
       <v-app-bar-title>
         <v-icon color="primary" size="32" class="mr-2"
@@ -170,7 +170,7 @@ const handleLogout = async () => {
       </v-menu>
     </v-app-bar>
 
-    <!-- Sidebar de navegación -->
+    <!-- Sidebar de navegación Fijo -->
     <v-navigation-drawer
       v-if="!isLoginPage"
       v-model="drawer"
@@ -178,7 +178,7 @@ const handleLogout = async () => {
       :width="actualDrawerWidth"
       class="resizable-drawer"
     >
-      <div class="pa-2">
+      <div class="pa-2 overflow-y-auto flex-grow-1">
         <div class="sidebar-section-title">Menú</div>
         <v-list density="compact" nav>
           <v-list-item
@@ -261,13 +261,18 @@ const handleLogout = async () => {
             title="Configuración"
             to="/configuracion"
           ></v-list-item>
+          <v-list-item
+            prepend-icon="mdi-shield-account-outline"
+            title="Auditoría del Sistema"
+            to="/auditoria"
+          ></v-list-item>
         </v-list>
         <div class="sidebar-section-title">Sección</div>
       </div>
 
       <template v-slot:append>
         <v-divider></v-divider>
-        <div class="pa-4" style="border-top: 1px solid var(--color-border)">
+        <div class="pa-4 bg-surface" style="border-top: 1px solid var(--color-border)">
           <v-list-item
             class="px-2"
             @click="handleLogout"
@@ -299,12 +304,12 @@ const handleLogout = async () => {
       ></div>
     </v-navigation-drawer>
 
-    <!-- Contenido principal -->
-    <v-main>
+    <!-- Contenido principal con Scroll Independiente -->
+    <v-main style="padding-top: 70px; height: 100vh; overflow-y: auto;">
       <v-container
         fluid
         :class="isLoginPage ? 'pa-0' : 'pa-6'"
-        class="fill-height"
+        style="min-height: calc(100vh - 70px);"
       >
         <router-view />
       </v-container>
@@ -313,7 +318,13 @@ const handleLogout = async () => {
 </template>
 <style scoped>
 .resizable-drawer {
-  position: relative;
+  position: fixed !important;
+  top: 70px !important;
+  height: calc(100vh - 70px) !important;
+  z-index: 1004;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
   transition: none !important;
 }
 
