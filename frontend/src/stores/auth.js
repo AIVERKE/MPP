@@ -15,6 +15,8 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   async function login(username, password) {
+    let localAuthFailed401 = false;
+
     // 1. Intentar primero con el Backend Local
     try {
       const localResponse = await fetch("http://localhost:3000/auth/login", {
@@ -44,6 +46,10 @@ export const useAuthStore = defineStore("auth", () => {
         axios.defaults.headers.common["Authorization"] = `Bearer ${data.access_token}`;
         return true;
       }
+
+      if (localResponse.status === 401) {
+        localAuthFailed401 = true;
+      }
     } catch (localError) {
       console.warn("Fallo login en backend local, intentando UMSA Core:", localError);
     }
@@ -66,7 +72,13 @@ export const useAuthStore = defineStore("auth", () => {
       });
 
       if (!response.ok) {
-        throw new Error("Credenciales inválidas o error de conexión");
+        if (response.status === 401 || localAuthFailed401) {
+          throw new Error("Usuario o contraseña incorrectos");
+        }
+        if (response.status >= 500) {
+          throw new Error("Error interno en el servidor de autenticación");
+        }
+        throw new Error("Credenciales inválidas o error de autenticación");
       }
 
       const data = await response.json();
@@ -91,6 +103,12 @@ export const useAuthStore = defineStore("auth", () => {
       return true;
     } catch (error) {
       console.error("Error en login UMSA Core:", error);
+      if (localAuthFailed401 && error.message.includes("fetch")) {
+        throw new Error("Usuario o contraseña incorrectos");
+      }
+      if (error.name === "TypeError" || error.message === "Failed to fetch") {
+        throw new Error("Error de conexión. Verifique su conexión de red.");
+      }
       throw error;
     }
   }
