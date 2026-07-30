@@ -45,6 +45,10 @@ const condicionForm = ref({
   id_tarea_siguiente_else: null,
   orden: 1,
 });
+const rutaActiva = ref("if"); // 'if' | 'else' — próximo clic en el mini diagrama
+const condicionesPorTarea = ref({}); // { [id_tarea]: condicion }
+const condicionDiagramRef = ref(null);
+const condicionConnectionPaths = ref([]);
 
 const tipoCondicionOptions = [
   { title: "IF", value: "if" },
@@ -281,6 +285,58 @@ const allDisplayCargos = computed(() =>
   swimlaneGroups.value.flatMap((g) => g.cargos),
 );
 
+/** Índice de la primera columna que muestra un cargo (evita duplicar figura si el mismo id_cargo está en varias unidades). */
+const primaryCargoColumnIndex = (cargoId) => {
+  const id = Number(cargoId);
+  return allDisplayCargos.value.findIndex((c) => Number(c.id_cargo) === id);
+};
+
+const shouldShowFlowNode = (row, cargo, cargoIndex) => {
+  if (Number(row.responsableCargoId) !== Number(cargo.id_cargo)) return false;
+  return primaryCargoColumnIndex(cargo.id_cargo) === cargoIndex;
+};
+
+const cargoColumnKey = (cargo, index) =>
+  `${cargo.unitId ?? "u"}-${cargo.id_cargo}-${index}`;
+
+const buildOrthogonalPath = (start, end, side = "center") => {
+  const x1 = start.cx;
+  const y1 = start.cy + start.h / 2;
+  const x2 = end.cx;
+  const y2 = end.cy - end.h / 2;
+
+  if (Math.abs(x1 - x2) < 8) {
+    return `M ${x1} ${y1} L ${x2} ${y2}`;
+  }
+
+  if (side === "left") {
+    const xLeft = Math.min(start.cx - start.w / 2, end.cx - end.w / 2) - 36;
+    return `M ${start.cx - start.w / 2} ${start.cy} L ${xLeft} ${start.cy} L ${xLeft} ${end.cy} L ${end.cx - end.w / 2} ${end.cy}`;
+  }
+  if (side === "right") {
+    const xRight = Math.max(start.cx + start.w / 2, end.cx + end.w / 2) + 36;
+    return `M ${start.cx + start.w / 2} ${start.cy} L ${xRight} ${start.cy} L ${xRight} ${end.cy} L ${end.cx + end.w / 2} ${end.cy}`;
+  }
+
+  const yMid = y1 + (y2 - y1) / 2;
+  return `M ${x1} ${y1} L ${x1} ${yMid} L ${x2} ${yMid} L ${x2} ${y2}`;
+};
+
+const getRowCondicion = (row) => {
+  const tareaId = row?.savedIds?.tarea ? Number(row.savedIds.tarea) : null;
+  if (!tareaId) return null;
+  return condicionesPorTarea.value[tareaId] || null;
+};
+
+const rowSkipsSequentialOut = (row) => {
+  if (!row) return false;
+  const visuals = getActionVisuals(row.accionId);
+  if (visuals.codigoFigura !== "rombo") return false;
+  const cond = getRowCondicion(row);
+  if (!cond) return false;
+  return !!(cond.id_tarea_siguiente_if || cond.id_tarea_siguiente_else);
+};
+
 const filteredUnits = computed(() => {
   if (!unitSearch.value) return mppStore.unidades;
   const s = unitSearch.value.toLowerCase();
@@ -436,6 +492,180 @@ const tareaOptionsForCondicion = computed(() => {
     }));
 });
 
+const condicionDiagramNodes = computed(() => {
+  const originTareaId = condicionRow.value?.savedIds?.tarea
+    ? Number(condicionRow.value.savedIds.tarea)
+    : null;
+  return rows.value
+    .filter((r) => r.savedIds?.tarea)
+    .map((r) => {
+      const tareaId = Number(r.savedIds.tarea);
+      const visuals = getActionVisuals(r.accionId);
+      return {
+        nro: r.nro,
+        tareaId,
+        label: r.texto_figura || r.tarea || `Tarea #${tareaId}`,
+        isOrigin: originTareaId === tareaId,
+        isIfTarget: Number(condicionForm.value.id_tarea_siguiente_if) === tareaId,
+        isElseTarget: Number(condicionForm.value.id_tarea_siguiente_else) === tareaId,
+        colorHex: visuals.colorHex,
+        codigoFigura: visuals.codigoFigura,
+      };
+    });
+});
+
+const getTareaLabelById = (tareaId) => {
+  if (!tareaId) return null;
+  const opt = tareaOptionsForCondicion.value.find(
+    (o) => Number(o.value) === Number(tareaId),
+  );
+  return opt?.title || `Tarea #${tareaId}`;
+};
+
+const hasCondicionConfigured = (row) => {
+  const tareaId = row?.savedIds?.tarea ? Number(row.savedIds.tarea) : null;
+  if (!tareaId) return false;
+  return !!condicionesPorTarea.value[tareaId];
+};
+
+const recalculateCondicionConnections = () => {
+  nextTick(() => {
+    setTimeout(() => {
+      const container = condicionDiagramRef.value;
+      if (!container) {
+        condicionConnectionPaths.value = [];
+        return;
+      }
+      const containerRect = container.getBoundingClientRect();
+      const originEl = container.querySelector(".condicion-node.is-origin");
+      if (!originEl) {
+        condicionConnectionPaths.value = [];
+        return;
+      }
+
+      const svg = container.querySelector(".condicion-diagram-svg");
+      if (svg) {
+        svg.setAttribute("width", String(container.scrollWidth));
+        svg.setAttribute("height", String(container.scrollHeight));
+        svg.style.width = `${container.scrollWidth}px`;
+        svg.style.height = `${container.scrollHeight}px`;
+      }
+
+      const toLocal = (rect) => ({
+        x: rect.left - containerRect.left + container.scrollLeft + rect.width / 2,
+        y: rect.top - containerRect.top + container.scrollTop + rect.height / 2,
+      });
+
+      const originRect = originEl.getBoundingClientRect();
+      const origin = toLocal(originRect);
+
+      const buildPath = (targetSelector, color, label, side) => {
+        const targetEl = container.querySelector(targetSelector);
+        if (!targetEl) return null;
+        const target = toLocal(targetEl.getBoundingClientRect());
+        const offsetX = side === "left" ? -48 : 48;
+        const midX = Math.max(origin.x, target.x) + offsetX;
+        const path = `M ${origin.x} ${origin.y} L ${midX} ${origin.y} L ${midX} ${target.y} L ${target.x} ${target.y}`;
+        return {
+          path,
+          color,
+          label,
+          labelX: midX,
+          labelY: (origin.y + target.y) / 2,
+        };
+      };
+
+      const paths = [];
+      const ifPath = buildPath(
+        ".condicion-node.is-if-target",
+        "#2e7d32",
+        "SÍ",
+        "right",
+      );
+      const elsePath = buildPath(
+        ".condicion-node.is-else-target",
+        "#c62828",
+        "NO",
+        "left",
+      );
+      if (ifPath) paths.push(ifPath);
+      if (elsePath) paths.push(elsePath);
+      condicionConnectionPaths.value = paths;
+    }, 80);
+  });
+};
+
+const assignCondicionNode = (tareaId) => {
+  const originId = condicionRow.value?.savedIds?.tarea
+    ? Number(condicionRow.value.savedIds.tarea)
+    : null;
+  const id = Number(tareaId);
+  if (!id || id === originId) return;
+
+  if (rutaActiva.value === "if") {
+    if (Number(condicionForm.value.id_tarea_siguiente_if) === id) {
+      condicionForm.value.id_tarea_siguiente_if = null;
+    } else {
+      condicionForm.value.id_tarea_siguiente_if = id;
+      if (Number(condicionForm.value.id_tarea_siguiente_else) === id) {
+        condicionForm.value.id_tarea_siguiente_else = null;
+      }
+    }
+  } else {
+    if (Number(condicionForm.value.id_tarea_siguiente_else) === id) {
+      condicionForm.value.id_tarea_siguiente_else = null;
+    } else {
+      condicionForm.value.id_tarea_siguiente_else = id;
+      if (Number(condicionForm.value.id_tarea_siguiente_if) === id) {
+        condicionForm.value.id_tarea_siguiente_if = null;
+      }
+    }
+  }
+  recalculateCondicionConnections();
+};
+
+const clearCondicionRoute = (route) => {
+  if (route === "if") condicionForm.value.id_tarea_siguiente_if = null;
+  if (route === "else") condicionForm.value.id_tarea_siguiente_else = null;
+  recalculateCondicionConnections();
+};
+
+const refreshCondicionesBadges = async () => {
+  const romboRows = rows.value.filter((r) => {
+    if (!r.savedIds?.tarea) return false;
+    return getActionVisuals(r.accionId).codigoFigura === "rombo";
+  });
+
+  if (!romboRows.length) {
+    condicionesPorTarea.value = {};
+    return;
+  }
+
+  const results = await Promise.all(
+    romboRows.map(async (r) => {
+      const tareaId = Number(r.savedIds.tarea);
+      try {
+        const condiciones = await mppStore.fetchCondicionesByTarea(tareaId);
+        const list = Array.isArray(condiciones) ? condiciones : [];
+        if (!list.length) return [tareaId, null];
+        const sorted = [...list].sort(
+          (a, b) =>
+            (a.orden ?? 0) - (b.orden ?? 0) || a.id_condicion - b.id_condicion,
+        );
+        return [tareaId, sorted[0]];
+      } catch {
+        return [tareaId, null];
+      }
+    }),
+  );
+
+  const map = {};
+  results.forEach(([tareaId, cond]) => {
+    if (cond) map[tareaId] = cond;
+  });
+  condicionesPorTarea.value = map;
+};
+
 const openCondicionPanel = async (row) => {
   const visuals = getActionVisuals(row.accionId);
   if (visuals.codigoFigura !== "rombo") return;
@@ -451,6 +681,7 @@ const openCondicionPanel = async (row) => {
   }
 
   condicionRow.value = row;
+  rutaActiva.value = "if";
   condicionForm.value = {
     id_condicion: null,
     tipo_condicion: "if",
@@ -459,6 +690,7 @@ const openCondicionPanel = async (row) => {
     id_tarea_siguiente_else: null,
     orden: 1,
   };
+  condicionConnectionPaths.value = [];
   showCondicionPanel.value = true;
   isLoadingCondicion.value = true;
 
@@ -478,6 +710,10 @@ const openCondicionPanel = async (row) => {
         id_tarea_siguiente_else: first.id_tarea_siguiente_else ?? null,
         orden: first.orden ?? 1,
       };
+      condicionesPorTarea.value = {
+        ...condicionesPorTarea.value,
+        [tareaId]: first,
+      };
     }
   } catch (e) {
     console.error("Error al cargar condiciones:", e);
@@ -488,6 +724,7 @@ const openCondicionPanel = async (row) => {
     };
   } finally {
     isLoadingCondicion.value = false;
+    recalculateCondicionConnections();
   }
 };
 
@@ -523,13 +760,20 @@ const saveCondicionPanel = async () => {
       orden: Number(condicionForm.value.orden) || 1,
     };
 
+    let savedCond = { ...payload, id_condicion: condicionForm.value.id_condicion };
     if (condicionForm.value.id_condicion) {
       await mppStore.updateCondicion(condicionForm.value.id_condicion, payload);
     } else {
       const res = await mppStore.saveCondicion(payload);
       const saved = res.data?.data || res.data;
       condicionForm.value.id_condicion = saved?.id_condicion ?? null;
+      savedCond = { ...savedCond, ...saved, id_condicion: condicionForm.value.id_condicion };
     }
+
+    condicionesPorTarea.value = {
+      ...condicionesPorTarea.value,
+      [tareaId]: savedCond,
+    };
 
     snackbar.value = {
       show: true,
@@ -550,6 +794,10 @@ const saveCondicionPanel = async () => {
 };
 
 const deleteCondicionPanel = async () => {
+  const tareaId = condicionRow.value?.savedIds?.tarea
+    ? Number(condicionRow.value.savedIds.tarea)
+    : null;
+
   if (!condicionForm.value.id_condicion) {
     showCondicionPanel.value = false;
     return;
@@ -558,6 +806,11 @@ const deleteCondicionPanel = async () => {
   isSavingCondicion.value = true;
   try {
     await mppStore.deleteCondicion(condicionForm.value.id_condicion);
+    if (tareaId) {
+      const next = { ...condicionesPorTarea.value };
+      delete next[tareaId];
+      condicionesPorTarea.value = next;
+    }
     snackbar.value = {
       show: true,
       text: "Condición eliminada",
@@ -575,6 +828,17 @@ const deleteCondicionPanel = async () => {
     isSavingCondicion.value = false;
   }
 };
+
+watch(
+  () => [
+    condicionForm.value.id_tarea_siguiente_if,
+    condicionForm.value.id_tarea_siguiente_else,
+    showCondicionPanel.value,
+  ],
+  () => {
+    if (showCondicionPanel.value) recalculateCondicionConnections();
+  },
+);
 
 // Obtener nombre del cargo
 const getCargoName = (cargoId) => {
@@ -798,6 +1062,8 @@ onMounted(async () => {
             selectedCargoIds.value.push(numId);
           }
         });
+
+        await refreshCondicionesBadges();
       }
     }
   } catch (e) {
@@ -871,75 +1137,96 @@ const calculateConnections = () => {
       if (!wrapper) return;
       const wrapperRect = wrapper.getBoundingClientRect();
       const nodes = container.querySelectorAll(".preview-node");
-      
+
       const pts = [];
       nodes.forEach((node, index) => {
         const rect = node.getBoundingClientRect();
         const cx = rect.left - wrapperRect.left + rect.width / 2;
         const cy = rect.top - wrapperRect.top + rect.height / 2;
-        
-        // Asociar cada nodo al paso de la fila correspondiente por data-row-nro
+
         const rowNro = Number(node.getAttribute("data-row-nro"));
         const row = rows.value.find((r) => Number(r.nro) === rowNro) || rows.value[index];
+        const tareaId = row?.savedIds?.tarea ? Number(row.savedIds.tarea) : null;
         pts.push({
           cx,
           cy,
           w: rect.width,
           h: rect.height,
           nro: row ? Number(row.nro) : rowNro || index + 1,
+          tareaId,
+          row,
           rowText: row ? row.texto_figura || row.tarea || "" : "",
+          skipsSequential: rowSkipsSequentialOut(row),
         });
       });
 
       // Ordenar secuencialmente por nro de fila ascendente
       pts.sort((a, b) => a.nro - b.nro);
 
+      const byTareaId = new Map(
+        pts.filter((p) => p.tareaId).map((p) => [p.tareaId, p]),
+      );
       const newPaths = [];
-      
-      // 1. Dibujar conexiones secuenciales lineales (Indigo, Ortogonales L-shaped)
+
       for (let i = 0; i < pts.length - 1; i++) {
         const start = pts[i];
+        if (start.skipsSequential) continue;
         const end = pts[i + 1];
-
-        const x1 = start.cx;
-        const y1 = start.cy + start.h / 2;
-
-        const x2 = end.cx;
-        const y2 = end.cy - end.h / 2;
-
-        let path = "";
-        if (Math.abs(x1 - x2) < 5) {
-          path = `M ${x1} ${y1} L ${x2} ${y2}`;
-        } else {
-          const yMid = y1 + (y2 - y1) / 2;
-          path = `M ${x1} ${y1} L ${x1} ${yMid} L ${x2} ${yMid} L ${x2} ${y2}`;
-        }
-        newPaths.push({ path, color: "#4f46e5", isReturn: false });
+        newPaths.push({
+          path: buildOrthogonalPath(start, end),
+          color: "#4f46e5",
+          isReturn: false,
+        });
       }
 
-      // Función helper para buscar el paso destino de retorno en el texto
+      pts.forEach((start) => {
+        const cond = getRowCondicion(start.row);
+        if (!cond) return;
+
+        const ifDest = cond.id_tarea_siguiente_if
+          ? byTareaId.get(Number(cond.id_tarea_siguiente_if))
+          : null;
+        const elseDest = cond.id_tarea_siguiente_else
+          ? byTareaId.get(Number(cond.id_tarea_siguiente_else))
+          : null;
+
+        if (ifDest) {
+          newPaths.push({
+            path: buildOrthogonalPath(start, ifDest, "right"),
+            color: "#2e7d32",
+            isReturn: false,
+            isIf: true,
+          });
+        }
+        if (elseDest) {
+          newPaths.push({
+            path: buildOrthogonalPath(start, elseDest, "left"),
+            color: "#c62828",
+            isReturn: true,
+            isElse: true,
+          });
+        }
+      });
+
       const getReturnTarget = (text) => {
         if (!text) return null;
         const match = text.match(
-          /(?:vuelve\s+a|vuelve\s+al|retorna\s+a|retorna\s+al|regresa\s+a|regresa\s+al|no\s*->|->|ir\s+a|paso)\s*(?:paso\s+)?(\d+)/i
+          /(?:vuelve\s+a|vuelve\s+al|retorna\s+a|retorna\s+al|regresa\s+a|regresa\s+al|no\s*->|->|ir\s+a|paso)\s*(?:paso\s+)?(\d+)/i,
         );
         return match ? parseInt(match[1], 10) : null;
       };
 
-      // 2. Dibujar retornos/bucles condicionales (Rojos, Ortogonales)
       pts.forEach((start) => {
+        if (rowSkipsSequentialOut(start.row)) return;
         const targetNro = getReturnTarget(start.rowText);
         if (targetNro && targetNro !== start.nro) {
           const dest = pts.find((p) => p.nro === targetNro);
           if (dest) {
-            const xStart = start.cx + start.w / 2;
-            const yStart = start.cy;
-            const xEnd = dest.cx + dest.w / 2;
-            const yEnd = dest.cy;
-
-            const xRight = Math.max(xStart, xEnd) + 40;
-            const path = `M ${xStart} ${yStart} L ${xRight} ${yStart} L ${xRight} ${yEnd} L ${xEnd} ${yEnd}`;
-            newPaths.push({ path, color: "#ef4444", isReturn: true });
+            newPaths.push({
+              path: buildOrthogonalPath(start, dest, "right"),
+              color: "#ef4444",
+              isReturn: true,
+            });
           }
         }
       });
@@ -949,15 +1236,11 @@ const calculateConnections = () => {
   });
 };
 
-watch(
-  [showPreview, scrollWrapper],
-  () => {
-    if (showPreview.value && scrollWrapper.value) {
-      calculateConnections();
-    }
-  },
-  { immediate: true }
-);
+watch([showPreview, scrollWrapper, () => condicionesPorTarea.value], () => {
+  if (showPreview.value && scrollWrapper.value) {
+    calculateConnections();
+  }
+}, { immediate: true, deep: true });
 
 const editorConnectionPaths = ref([]);
 const matrixEditorContainer = ref(null);
@@ -972,13 +1255,12 @@ const calculateEditorConnections = () => {
       if (!wrapper) return;
       const wrapperRect = wrapper.getBoundingClientRect();
       const nodes = container.querySelectorAll(".cell-flow-node");
-      
+
       const pts = [];
       nodes.forEach((node, index) => {
         const rect = node.getBoundingClientRect();
         const cx = rect.left - wrapperRect.left + rect.width / 2;
         const cy = rect.top - wrapperRect.top + rect.height / 2;
-        
         let rowNro = Number(node.getAttribute("data-row-nro"));
         if (!rowNro) {
           const parentTr = node.closest("tr");
@@ -992,66 +1274,92 @@ const calculateEditorConnections = () => {
         }
         if (!rowNro) rowNro = index + 1;
 
-        const row = rows.value.find((r) => Number(r.nro) === Number(rowNro)) || rows.value[index];
-
+        const row =
+          rows.value.find((r) => Number(r.nro) === Number(rowNro)) ||
+          rows.value[index];
+        const tareaId = row?.savedIds?.tarea ? Number(row.savedIds.tarea) : null;
         pts.push({
           cx,
           cy,
           w: rect.width,
           h: rect.height,
           nro: Number(rowNro),
+          tareaId,
+          row,
           rowText: row ? row.texto_figura || row.tarea || "" : "",
+          skipsSequential: rowSkipsSequentialOut(row),
         });
       });
 
       // Ordenar secuencialmente por nro de fila ascendente
       pts.sort((a, b) => a.nro - b.nro);
 
+      const byTareaId = new Map(
+        pts.filter((p) => p.tareaId).map((p) => [p.tareaId, p]),
+      );
       const newPaths = [];
-      
-      // Conexiones secuenciales en el editor (Ortogonales L-shaped)
+
+      // Secuenciales solo si el origen NO es un rombo con IF/ELSE configurado
       for (let i = 0; i < pts.length - 1; i++) {
         const start = pts[i];
+        if (start.skipsSequential) continue;
         const end = pts[i + 1];
-
-        const x1 = start.cx;
-        const y1 = start.cy + start.h / 2;
-
-        const x2 = end.cx;
-        const y2 = end.cy - end.h / 2;
-
-        let path = "";
-        if (Math.abs(x1 - x2) < 5) {
-          path = `M ${x1} ${y1} L ${x2} ${y2}`;
-        } else {
-          const yMid = y1 + (y2 - y1) / 2;
-          path = `M ${x1} ${y1} L ${x1} ${yMid} L ${x2} ${yMid} L ${x2} ${y2}`;
-        }
-        newPaths.push({ path, color: "#4f46e5", isReturn: false });
+        newPaths.push({
+          path: buildOrthogonalPath(start, end),
+          color: "#4f46e5",
+          isReturn: false,
+        });
       }
+
+      // Rutas IF (verde) / ELSE (rojo) desde condiciones guardadas
+      pts.forEach((start) => {
+        const cond = getRowCondicion(start.row);
+        if (!cond) return;
+
+        const ifDest = cond.id_tarea_siguiente_if
+          ? byTareaId.get(Number(cond.id_tarea_siguiente_if))
+          : null;
+        const elseDest = cond.id_tarea_siguiente_else
+          ? byTareaId.get(Number(cond.id_tarea_siguiente_else))
+          : null;
+
+        if (ifDest) {
+          newPaths.push({
+            path: buildOrthogonalPath(start, ifDest, "right"),
+            color: "#2e7d32",
+            isReturn: false,
+            isIf: true,
+          });
+        }
+        if (elseDest) {
+          newPaths.push({
+            path: buildOrthogonalPath(start, elseDest, "left"),
+            color: "#c62828",
+            isReturn: true,
+            isElse: true,
+          });
+        }
+      });
 
       const getReturnTarget = (text) => {
         if (!text) return null;
         const match = text.match(
-          /(?:vuelve\s+a|vuelve\s+al|retorna\s+a|retorna\s+al|regresa\s+a|regresa\s+al|no\s*->|->|ir\s+a|paso)\s*(?:paso\s+)?(\d+)/i
+          /(?:vuelve\s+a|vuelve\s+al|retorna\s+a|retorna\s+al|regresa\s+a|regresa\s+al|no\s*->|->|ir\s+a|paso)\s*(?:paso\s+)?(\d+)/i,
         );
         return match ? parseInt(match[1], 10) : null;
       };
 
-      // Conexiones de retorno en el editor (Ortogonales)
       pts.forEach((start) => {
+        if (start.skipsSequential) return;
         const targetNro = getReturnTarget(start.rowText);
         if (targetNro && targetNro !== start.nro) {
           const dest = pts.find((p) => p.nro === targetNro);
           if (dest) {
-            const xStart = start.cx + start.w / 2;
-            const yStart = start.cy;
-            const xEnd = dest.cx + dest.w / 2;
-            const yEnd = dest.cy;
-
-            const xRight = Math.max(xStart, xEnd) + 40;
-            const path = `M ${xStart} ${yStart} L ${xRight} ${yStart} L ${xRight} ${yEnd} L ${xEnd} ${yEnd}`;
-            newPaths.push({ path, color: "#ef4444", isReturn: true });
+            newPaths.push({
+              path: buildOrthogonalPath(start, dest, "right"),
+              color: "#ef4444",
+              isReturn: true,
+            });
           }
         }
       });
@@ -1062,13 +1370,13 @@ const calculateEditorConnections = () => {
 };
 
 watch(
-  [matrixEditorContainer, selectedCargoIds, () => rows.value],
+  [matrixEditorContainer, selectedCargoIds, () => rows.value, () => condicionesPorTarea.value],
   () => {
     if (matrixEditorContainer.value && rows.value.length > 0) {
       calculateEditorConnections();
     }
   },
-  { deep: true, immediate: true }
+  { deep: true, immediate: true },
 );
 </script>
 
@@ -1238,8 +1546,8 @@ watch(
             </th>
 
             <th
-              v-for="cargo in allDisplayCargos"
-              :key="cargo.id_cargo"
+              v-for="(cargo, cargoIdx) in allDisplayCargos"
+              :key="cargoColumnKey(cargo, cargoIdx)"
               class="cargo-header text-center"
             >
               {{ cargo.nombre }}
@@ -1355,28 +1663,60 @@ watch(
             </td>
 
             <td
-              v-for="cargo in allDisplayCargos"
-              :key="cargo.id_cargo"
+              v-for="(cargo, cargoIdx) in allDisplayCargos"
+              :key="cargoColumnKey(cargo, cargoIdx)"
               class="text-center diagram-cell"
               @click="handleCellClick(row, cargo.id_cargo)"
             >
               <div
-                v-if="row.responsableCargoId == cargo.id_cargo"
-                class="cell-flow-node"
-                :data-row-nro="row.nro"
-                :class="getActionVisuals(row.accionId).codigoFigura"
-                :style="{ backgroundColor: getActionVisuals(row.accionId).colorHex }"
-                @click.stop="openCondicionPanel(row)"
+                v-if="shouldShowFlowNode(row, cargo, cargoIdx)"
+                class="cell-flow-node-wrap"
               >
-                <div class="cell-flow-text-wrapper">
-                  <textarea
-                    v-model="row.texto_figura"
-                    class="cell-flow-textarea"
-                    placeholder="Escribir..."
-                    rows="2"
-                    @click.stop
-                  ></textarea>
+                <div
+                  class="cell-flow-node"
+                  :data-row-nro="row.nro"
+                  :class="getActionVisuals(row.accionId).codigoFigura"
+                  :style="{ backgroundColor: getActionVisuals(row.accionId).colorHex }"
+                >
+                  <div class="cell-flow-text-wrapper">
+                    <textarea
+                      v-model="row.texto_figura"
+                      class="cell-flow-textarea"
+                      placeholder="Escribir..."
+                      rows="2"
+                      @click.stop
+                    ></textarea>
+                  </div>
                 </div>
+
+                <!-- Botón visible solo en rombos: abre el popup de rutas IF/ELSE -->
+                <v-tooltip
+                  v-if="getActionVisuals(row.accionId).codigoFigura === 'rombo'"
+                  text="Configurar rutas IF / ELSE"
+                  location="top"
+                >
+                  <template #activator="{ props: tipProps }">
+                    <v-btn
+                      v-bind="tipProps"
+                      class="condicion-open-btn"
+                      size="x-small"
+                      :color="hasCondicionConfigured(row) ? 'success' : 'orange-darken-2'"
+                      variant="flat"
+                      icon="mdi-source-branch"
+                      @click.stop="openCondicionPanel(row)"
+                    ></v-btn>
+                  </template>
+                </v-tooltip>
+
+                <v-chip
+                  v-if="hasCondicionConfigured(row)"
+                  class="condicion-cell-badge"
+                  size="x-small"
+                  color="success"
+                  variant="flat"
+                >
+                  IF
+                </v-chip>
               </div>
             </td>
             <td
@@ -1473,6 +1813,28 @@ watch(
           >
             <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#ef4444"/>
           </marker>
+          <marker 
+            id="editor-arrow-if" 
+            viewBox="0 0 10 10" 
+            refX="7" 
+            refY="5" 
+            markerWidth="6" 
+            markerHeight="6" 
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#2e7d32"/>
+          </marker>
+          <marker 
+            id="editor-arrow-else" 
+            viewBox="0 0 10 10" 
+            refX="7" 
+            refY="5" 
+            markerWidth="6" 
+            markerHeight="6" 
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#c62828"/>
+          </marker>
         </defs>
         <path 
           v-for="(path, i) in editorConnectionPaths" 
@@ -1481,7 +1843,15 @@ watch(
           :stroke="path.color"
           stroke-width="2"
           fill="none"
-          :marker-end="path.isReturn ? 'url(#editor-arrow-return)' : 'url(#editor-arrow)'"
+          :marker-end="
+            path.isIf
+              ? 'url(#editor-arrow-if)'
+              : path.isElse || path.isReturn
+                ? path.isElse
+                  ? 'url(#editor-arrow-else)'
+                  : 'url(#editor-arrow-return)'
+                : 'url(#editor-arrow)'
+          "
         />
       </svg>
       </div>
@@ -1602,8 +1972,8 @@ watch(
             </div>
             <v-list density="compact" class="flex-grow-1 overflow-y-auto">
               <v-list-item
-                v-for="cargo in allDisplayCargos"
-                :key="cargo.id_cargo"
+                v-for="(cargo, cargoIdx) in allDisplayCargos"
+                :key="cargoColumnKey(cargo, cargoIdx)"
                 class="px-2 border-bottom"
               >
                 <v-list-item-title
@@ -1682,8 +2052,8 @@ watch(
       </v-card>
     </v-dialog>
 
-    <!-- MODAL CONDICIÓN IF/ELSE (Rombo) -->
-    <v-dialog v-model="showCondicionPanel" max-width="520">
+    <!-- MODAL CONDICIÓN IF/ELSE (Rombo) — popup visual -->
+    <v-dialog v-model="showCondicionPanel" max-width="960" scrollable>
       <v-card class="rounded-xl overflow-hidden">
         <v-toolbar color="orange-darken-2" dark density="compact">
           <v-toolbar-title class="text-subtitle-1 font-weight-bold">
@@ -1695,61 +2065,227 @@ watch(
           <v-spacer></v-spacer>
           <v-btn icon="mdi-close" @click="showCondicionPanel = false"></v-btn>
         </v-toolbar>
-        <v-card-text class="pa-4" :class="{ 'opacity-50': isLoadingCondicion }">
-          <v-select
-            v-model="condicionForm.tipo_condicion"
-            :items="tipoCondicionOptions"
-            item-title="title"
-            item-value="value"
-            label="Tipo de condición"
-            variant="outlined"
-            density="compact"
-            class="mb-3"
-            hide-details
-          ></v-select>
-          <v-textarea
-            v-model="condicionForm.expresion_condicion"
-            label="Expresión de la condición"
-            placeholder="Ej: ¿Documento aprobado?"
-            variant="outlined"
-            density="compact"
-            rows="2"
-            class="mb-3"
-            hide-details
-          ></v-textarea>
-          <v-select
-            v-model="condicionForm.id_tarea_siguiente_if"
-            :items="tareaOptionsForCondicion"
-            item-title="title"
-            item-value="value"
-            label="Tarea siguiente si IF (verdadero)"
-            variant="outlined"
-            density="compact"
-            class="mb-3"
-            clearable
-            hide-details
-          ></v-select>
-          <v-select
-            v-model="condicionForm.id_tarea_siguiente_else"
-            :items="tareaOptionsForCondicion"
-            item-title="title"
-            item-value="value"
-            label="Tarea siguiente si ELSE (falso)"
-            variant="outlined"
-            density="compact"
-            class="mb-3"
-            clearable
-            hide-details
-          ></v-select>
-          <v-text-field
-            v-model.number="condicionForm.orden"
-            label="Orden"
-            type="number"
-            variant="outlined"
-            density="compact"
-            hide-details
-          ></v-text-field>
+
+        <v-card-text class="pa-0" :class="{ 'opacity-50': isLoadingCondicion }">
+          <div class="condicion-dialog-grid">
+            <!-- Panel izquierdo: expresión / tipo -->
+            <div class="condicion-panel-left pa-4">
+              <v-select
+                v-model="condicionForm.tipo_condicion"
+                :items="tipoCondicionOptions"
+                item-title="title"
+                item-value="value"
+                label="Tipo de condición"
+                variant="outlined"
+                density="compact"
+                class="mb-3"
+                hide-details
+              ></v-select>
+              <v-textarea
+                v-model="condicionForm.expresion_condicion"
+                label="Expresión de la condición"
+                placeholder="Ej: ¿Documento aprobado?"
+                variant="outlined"
+                density="compact"
+                rows="3"
+                class="mb-3"
+                hide-details
+              ></v-textarea>
+              <v-text-field
+                v-model.number="condicionForm.orden"
+                label="Orden"
+                type="number"
+                variant="outlined"
+                density="compact"
+                class="mb-4"
+                hide-details
+              ></v-text-field>
+
+              <div class="text-caption font-weight-bold text-medium-emphasis mb-2">
+                Destinos asignados
+              </div>
+              <div class="d-flex flex-column ga-2 mb-2">
+                <v-chip
+                  v-if="condicionForm.id_tarea_siguiente_if"
+                  color="success"
+                  variant="tonal"
+                  closable
+                  class="align-self-start"
+                  @click:close="clearCondicionRoute('if')"
+                >
+                  <v-icon start size="16">mdi-check-circle</v-icon>
+                  IF (SÍ): {{ getTareaLabelById(condicionForm.id_tarea_siguiente_if) }}
+                </v-chip>
+                <span v-else class="text-caption text-grey">IF (SÍ): sin asignar</span>
+
+                <v-chip
+                  v-if="condicionForm.id_tarea_siguiente_else"
+                  color="error"
+                  variant="tonal"
+                  closable
+                  class="align-self-start"
+                  @click:close="clearCondicionRoute('else')"
+                >
+                  <v-icon start size="16">mdi-close-circle</v-icon>
+                  ELSE (NO): {{ getTareaLabelById(condicionForm.id_tarea_siguiente_else) }}
+                </v-chip>
+                <span v-else class="text-caption text-grey">ELSE (NO): sin asignar</span>
+              </div>
+
+              <v-alert
+                type="info"
+                variant="tonal"
+                density="compact"
+                class="mt-4 text-caption"
+              >
+                Elige la ruta IF o ELSE y haz clic en un nodo del diagrama para asignar el destino.
+              </v-alert>
+            </div>
+
+            <!-- Panel derecho: mini diagrama -->
+            <div class="condicion-panel-right pa-4">
+              <div class="d-flex align-center flex-wrap ga-2 mb-3">
+                <span class="text-caption font-weight-bold text-medium-emphasis mr-1">
+                  Ruta activa:
+                </span>
+                <v-btn-toggle
+                  v-model="rutaActiva"
+                  mandatory
+                  density="compact"
+                  color="primary"
+                  divided
+                  class="condicion-ruta-toggle"
+                >
+                  <v-btn value="if" color="success" variant="flat" size="small">
+                    <v-icon start size="16">mdi-arrow-right-bold</v-icon>
+                    IF (verde)
+                  </v-btn>
+                  <v-btn value="else" color="error" variant="flat" size="small">
+                    <v-icon start size="16">mdi-arrow-right-bold</v-icon>
+                    ELSE (rojo)
+                  </v-btn>
+                </v-btn-toggle>
+              </div>
+
+              <div
+                ref="condicionDiagramRef"
+                class="condicion-diagram"
+                @scroll="recalculateCondicionConnections"
+              >
+                <svg class="condicion-diagram-svg" aria-hidden="true">
+                  <defs>
+                    <marker
+                      id="arrow-if"
+                      markerWidth="8"
+                      markerHeight="8"
+                      refX="6"
+                      refY="3"
+                      orient="auto"
+                    >
+                      <path d="M0,0 L6,3 L0,6 Z" fill="#2e7d32" />
+                    </marker>
+                    <marker
+                      id="arrow-else"
+                      markerWidth="8"
+                      markerHeight="8"
+                      refX="6"
+                      refY="3"
+                      orient="auto"
+                    >
+                      <path d="M0,0 L6,3 L0,6 Z" fill="#c62828" />
+                    </marker>
+                  </defs>
+                  <path
+                    v-for="(p, i) in condicionConnectionPaths"
+                    :key="'cpath-' + i"
+                    :d="p.path"
+                    fill="none"
+                    :stroke="p.color"
+                    stroke-width="2.5"
+                    :marker-end="p.color === '#2e7d32' ? 'url(#arrow-if)' : 'url(#arrow-else)'"
+                  />
+                  <text
+                    v-for="(p, i) in condicionConnectionPaths"
+                    :key="'clabel-' + i"
+                    :x="p.labelX"
+                    :y="p.labelY"
+                    :fill="p.color"
+                    font-size="11"
+                    font-weight="700"
+                    text-anchor="middle"
+                    dy="-4"
+                  >
+                    {{ p.label }}
+                  </text>
+                </svg>
+
+                <div
+                  v-for="node in condicionDiagramNodes"
+                  :key="node.tareaId"
+                  class="condicion-node-row"
+                >
+                  <div class="condicion-node-nro text-caption font-weight-bold">
+                    {{ node.nro }}
+                  </div>
+                  <div
+                    class="condicion-node preview-node"
+                    :class="[
+                      node.codigoFigura,
+                      {
+                        'is-origin': node.isOrigin,
+                        'is-if-target': node.isIfTarget,
+                        'is-else-target': node.isElseTarget,
+                        'is-selectable': !node.isOrigin,
+                      },
+                    ]"
+                    :data-tarea-id="node.tareaId"
+                    :style="{ backgroundColor: node.colorHex }"
+                    @click="!node.isOrigin && assignCondicionNode(node.tareaId)"
+                  >
+                    <span class="preview-text text-center font-weight-bold">
+                      {{ node.label }}
+                    </span>
+                    <v-chip
+                      v-if="node.isOrigin"
+                      class="condicion-node-badge"
+                      size="x-small"
+                      color="orange-darken-2"
+                      variant="flat"
+                    >
+                      Origen
+                    </v-chip>
+                    <v-chip
+                      v-else-if="node.isIfTarget"
+                      class="condicion-node-badge"
+                      size="x-small"
+                      color="success"
+                      variant="flat"
+                    >
+                      IF
+                    </v-chip>
+                    <v-chip
+                      v-else-if="node.isElseTarget"
+                      class="condicion-node-badge"
+                      size="x-small"
+                      color="error"
+                      variant="flat"
+                    >
+                      ELSE
+                    </v-chip>
+                  </div>
+                </div>
+
+                <div
+                  v-if="!condicionDiagramNodes.length"
+                  class="text-center text-grey pa-8 text-caption"
+                >
+                  No hay tareas guardadas en la matriz para conectar.
+                </div>
+              </div>
+            </div>
+          </div>
         </v-card-text>
+
         <v-divider></v-divider>
         <v-card-actions class="pa-3">
           <v-btn
@@ -1862,8 +2398,8 @@ watch(
                   <tr>
                     <th class="preview-step-subheader"></th>
                     <th
-                      v-for="cargo in allDisplayCargos"
-                      :key="cargo.id_cargo"
+                      v-for="(cargo, cargoIdx) in allDisplayCargos"
+                      :key="cargoColumnKey(cargo, cargoIdx)"
                       class="preview-cargo-header text-center"
                     >
                       {{ cargo.nombre }}
@@ -1879,13 +2415,13 @@ watch(
                     
                     <!-- Celdas de los carriles -->
                     <td
-                      v-for="cargo in allDisplayCargos"
-                      :key="cargo.id_cargo"
+                      v-for="(cargo, cargoIdx) in allDisplayCargos"
+                      :key="cargoColumnKey(cargo, cargoIdx)"
                       class="preview-lane-cell text-center"
                     >
-                      <!-- Si este cargo es responsable, renderizar la figura -->
+                      <!-- Si este cargo es responsable, renderizar la figura (solo 1ª columna si el cargo se repite) -->
                       <div 
-                        v-if="row.responsableCargoId == cargo.id_cargo"
+                        v-if="shouldShowFlowNode(row, cargo, cargoIdx)"
                         class="preview-node d-flex align-center justify-center text-center pa-4 mx-auto"
                         :data-row-nro="row.nro"
                         :class="getActionVisuals(row.accionId).codigoFigura"
@@ -1927,6 +2463,28 @@ watch(
                   >
                     <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#ef4444"/>
                   </marker>
+                  <marker 
+                    id="arrow-if" 
+                    viewBox="0 0 10 10" 
+                    refX="7" 
+                    refY="5" 
+                    markerWidth="6" 
+                    markerHeight="6" 
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#2e7d32"/>
+                  </marker>
+                  <marker 
+                    id="arrow-else" 
+                    viewBox="0 0 10 10" 
+                    refX="7" 
+                    refY="5" 
+                    markerWidth="6" 
+                    markerHeight="6" 
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#c62828"/>
+                  </marker>
                 </defs>
                 <path 
                   v-for="(path, i) in connectionPaths" 
@@ -1935,7 +2493,15 @@ watch(
                   :stroke="path.color"
                   stroke-width="2"
                   fill="none"
-                  :marker-end="path.isReturn ? 'url(#arrow-return)' : 'url(#arrow)'"
+                  :marker-end="
+                    path.isIf
+                      ? 'url(#arrow-if)'
+                      : path.isElse
+                        ? 'url(#arrow-else)'
+                        : path.isReturn
+                          ? 'url(#arrow-return)'
+                          : 'url(#arrow)'
+                  "
                 />
               </svg>
             </div>
@@ -2466,5 +3032,146 @@ watch(
 
 .border-dashed {
   border: 2px dashed #94a3b8 !important;
+}
+
+/* --- Popup visual condición IF/ELSE --- */
+.condicion-dialog-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 38%) 1fr;
+  min-height: 420px;
+  max-height: 70vh;
+}
+
+.condicion-panel-left {
+  border-right: 1px solid #e2e8f0;
+  overflow-y: auto;
+}
+
+.condicion-panel-right {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: #f8fafc;
+}
+
+.condicion-diagram {
+  position: relative;
+  flex: 1;
+  overflow: auto;
+  min-height: 320px;
+  padding: 16px 56px 24px;
+  background: #fff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+}
+
+.condicion-diagram-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: visible;
+}
+
+.condicion-node-row {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.condicion-node-nro {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #64748b;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.condicion-node {
+  cursor: default;
+  min-width: 160px !important;
+  max-width: 220px;
+  padding: 8px 12px;
+  margin: 8px 0;
+}
+
+.condicion-node.is-selectable {
+  cursor: pointer;
+}
+
+.condicion-node.is-selectable:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.35);
+}
+
+.condicion-node.is-origin {
+  box-shadow: 0 0 0 3px #ea580c, 0 4px 12px rgba(234, 88, 12, 0.35);
+}
+
+.condicion-node.is-if-target {
+  box-shadow: 0 0 0 3px #2e7d32, 0 4px 12px rgba(46, 125, 50, 0.35);
+}
+
+.condicion-node.is-else-target {
+  box-shadow: 0 0 0 3px #c62828, 0 4px 12px rgba(198, 40, 40, 0.35);
+}
+
+.condicion-node-badge {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  z-index: 3;
+}
+
+.condicion-node.rombo .condicion-node-badge {
+  transform: rotate(-45deg);
+  top: -14px;
+  right: -14px;
+}
+
+.cell-flow-node-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 70px;
+  min-width: 70px;
+}
+
+.condicion-open-btn {
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+}
+
+.condicion-cell-badge {
+  position: absolute;
+  top: -6px;
+  right: -10px;
+  z-index: 5;
+  font-weight: 800 !important;
+  pointer-events: none;
+}
+
+@media (max-width: 800px) {
+  .condicion-dialog-grid {
+    grid-template-columns: 1fr;
+    max-height: none;
+  }
+  .condicion-panel-left {
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+  }
 }
 </style>
