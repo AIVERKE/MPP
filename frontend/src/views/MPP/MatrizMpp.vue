@@ -1,5 +1,6 @@
 <script setup>
-import { ref, onMounted, computed, watch, nextTick } from "vue";
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from "vue";
+import { useDisplay } from "vuetify";
 import { useMppCoreStore } from "@/stores/mpp_core";
 import { toPng } from "html-to-image";
 import { jsPDF } from "jspdf";
@@ -13,6 +14,7 @@ const props = defineProps({
 
 const emit = defineEmits(["back", "finalize"]);
 const mppStore = useMppCoreStore();
+const { xs, smAndDown } = useDisplay();
 
 // --- ESTADOS DE UI ---
 const isSaving = ref(false);
@@ -815,14 +817,56 @@ onMounted(async () => {
   }
 });
 
+// Listener de Resize y ResizeObserver para recálculo dinámico en zoom/redimensionamiento
+let editorResizeObserver = null;
+let previewResizeObserver = null;
+
+const handleResize = () => {
+  calculateEditorConnections();
+  if (showPreview.value) {
+    calculateConnections();
+  }
+};
+
+onMounted(() => {
+  window.addEventListener("resize", handleResize);
+
+  nextTick(() => {
+    if (typeof ResizeObserver !== "undefined") {
+      editorResizeObserver = new ResizeObserver(() => {
+        calculateEditorConnections();
+      });
+      if (matrixEditorContainer.value) {
+        editorResizeObserver.observe(matrixEditorContainer.value);
+      }
+
+      previewResizeObserver = new ResizeObserver(() => {
+        if (showPreview.value) {
+          calculateConnections();
+        }
+      });
+      if (diagramContainer.value) {
+        previewResizeObserver.observe(diagramContainer.value);
+      }
+    }
+  });
+});
+
+onUnmounted(() => {
+  window.removeEventListener("resize", handleResize);
+  if (editorResizeObserver) editorResizeObserver.disconnect();
+  if (previewResizeObserver) previewResizeObserver.disconnect();
+});
+
 // Calcular las conexiones visuales (flechas) del diagrama en la cuadrícula de vista previa
 const connectionPaths = ref([]);
 
 const calculateConnections = () => {
   if (!diagramContainer.value) return;
   nextTick(() => {
-    setTimeout(() => {
+    requestAnimationFrame(() => {
       const container = diagramContainer.value;
+      if (!container) return;
       const wrapper = container.querySelector(".diagram-scroll-wrapper");
       if (!wrapper) return;
       const wrapperRect = wrapper.getBoundingClientRect();
@@ -836,20 +880,23 @@ const calculateConnections = () => {
         
         // Asociar cada nodo al paso de la fila correspondiente por data-row-nro
         const rowNro = Number(node.getAttribute("data-row-nro"));
-        const row = rows.value.find(r => Number(r.nro) === rowNro) || rows.value[index];
+        const row = rows.value.find((r) => Number(r.nro) === rowNro) || rows.value[index];
         pts.push({
           cx,
           cy,
           w: rect.width,
           h: rect.height,
-          nro: row ? row.nro : rowNro || (index + 1),
-          rowText: row ? (row.texto_figura || row.tarea || "") : ""
+          nro: row ? Number(row.nro) : rowNro || index + 1,
+          rowText: row ? row.texto_figura || row.tarea || "" : "",
         });
       });
 
+      // Ordenar secuencialmente por nro de fila ascendente
+      pts.sort((a, b) => a.nro - b.nro);
+
       const newPaths = [];
       
-      // 1. Dibujar conexiones secuenciales lineales (Indigo, Ortogonales)
+      // 1. Dibujar conexiones secuenciales lineales (Indigo, Ortogonales L-shaped)
       for (let i = 0; i < pts.length - 1; i++) {
         const start = pts[i];
         const end = pts[i + 1];
@@ -861,7 +908,7 @@ const calculateConnections = () => {
         const y2 = end.cy - end.h / 2;
 
         let path = "";
-        if (Math.abs(x1 - x2) < 8) {
+        if (Math.abs(x1 - x2) < 5) {
           path = `M ${x1} ${y1} L ${x2} ${y2}`;
         } else {
           const yMid = y1 + (y2 - y1) / 2;
@@ -873,7 +920,9 @@ const calculateConnections = () => {
       // Función helper para buscar el paso destino de retorno en el texto
       const getReturnTarget = (text) => {
         if (!text) return null;
-        const match = text.match(/(?:vuelve\s+a|vuelve\s+al|retorna\s+a|retorna\s+al|regresa\s+a|regresa\s+al|no\s*->|->|ir\s+a|paso)\s*(?:paso\s+)?(\d+)/i);
+        const match = text.match(
+          /(?:vuelve\s+a|vuelve\s+al|retorna\s+a|retorna\s+al|regresa\s+a|regresa\s+al|no\s*->|->|ir\s+a|paso)\s*(?:paso\s+)?(\d+)/i
+        );
         return match ? parseInt(match[1], 10) : null;
       };
 
@@ -881,7 +930,7 @@ const calculateConnections = () => {
       pts.forEach((start) => {
         const targetNro = getReturnTarget(start.rowText);
         if (targetNro && targetNro !== start.nro) {
-          const dest = pts.find(p => p.nro === targetNro);
+          const dest = pts.find((p) => p.nro === targetNro);
           if (dest) {
             const xStart = start.cx + start.w / 2;
             const yStart = start.cy;
@@ -896,15 +945,19 @@ const calculateConnections = () => {
       });
 
       connectionPaths.value = newPaths;
-    }, 250);
+    });
   });
 };
 
-watch([showPreview, scrollWrapper], () => {
-  if (showPreview.value && scrollWrapper.value) {
-    calculateConnections();
-  }
-}, { immediate: true });
+watch(
+  [showPreview, scrollWrapper],
+  () => {
+    if (showPreview.value && scrollWrapper.value) {
+      calculateConnections();
+    }
+  },
+  { immediate: true }
+);
 
 const editorConnectionPaths = ref([]);
 const matrixEditorContainer = ref(null);
@@ -912,8 +965,9 @@ const matrixEditorContainer = ref(null);
 const calculateEditorConnections = () => {
   if (!matrixEditorContainer.value) return;
   nextTick(() => {
-    setTimeout(() => {
+    requestAnimationFrame(() => {
       const container = matrixEditorContainer.value;
+      if (!container) return;
       const wrapper = container.querySelector(".editor-scroll-wrapper");
       if (!wrapper) return;
       const wrapperRect = wrapper.getBoundingClientRect();
@@ -925,31 +979,37 @@ const calculateEditorConnections = () => {
         const cx = rect.left - wrapperRect.left + rect.width / 2;
         const cy = rect.top - wrapperRect.top + rect.height / 2;
         
-        const parentTr = node.closest("tr");
-        let rowNro = index + 1;
-        if (parentTr) {
-          const cells = Array.from(parentTr.parentNode.children);
-          const trIndex = cells.indexOf(parentTr);
-          if (trIndex !== -1) {
-            const trRow = rows.value[trIndex];
-            if (trRow) rowNro = trRow.nro;
+        let rowNro = Number(node.getAttribute("data-row-nro"));
+        if (!rowNro) {
+          const parentTr = node.closest("tr");
+          if (parentTr && parentTr.parentNode) {
+            const cells = Array.from(parentTr.parentNode.children);
+            const trIndex = cells.indexOf(parentTr);
+            if (trIndex !== -1 && rows.value[trIndex]) {
+              rowNro = rows.value[trIndex].nro;
+            }
           }
         }
-        
-        const row = rows.value.find(r => Number(r.nro) === Number(rowNro)) || rows.value[index];
+        if (!rowNro) rowNro = index + 1;
+
+        const row = rows.value.find((r) => Number(r.nro) === Number(rowNro)) || rows.value[index];
+
         pts.push({
           cx,
           cy,
           w: rect.width,
           h: rect.height,
-          nro: row ? row.nro : rowNro,
-          rowText: row ? (row.texto_figura || row.tarea || "") : ""
+          nro: Number(rowNro),
+          rowText: row ? row.texto_figura || row.tarea || "" : "",
         });
       });
 
+      // Ordenar secuencialmente por nro de fila ascendente
+      pts.sort((a, b) => a.nro - b.nro);
+
       const newPaths = [];
       
-      // Conexiones secuenciales en el editor (Ortogonales)
+      // Conexiones secuenciales en el editor (Ortogonales L-shaped)
       for (let i = 0; i < pts.length - 1; i++) {
         const start = pts[i];
         const end = pts[i + 1];
@@ -961,7 +1021,7 @@ const calculateEditorConnections = () => {
         const y2 = end.cy - end.h / 2;
 
         let path = "";
-        if (Math.abs(x1 - x2) < 8) {
+        if (Math.abs(x1 - x2) < 5) {
           path = `M ${x1} ${y1} L ${x2} ${y2}`;
         } else {
           const yMid = y1 + (y2 - y1) / 2;
@@ -972,7 +1032,9 @@ const calculateEditorConnections = () => {
 
       const getReturnTarget = (text) => {
         if (!text) return null;
-        const match = text.match(/(?:vuelve\s+a|vuelve\s+al|retorna\s+a|retorna\s+al|regresa\s+a|regresa\s+al|no\s*->|->|ir\s+a|paso)\s*(?:paso\s+)?(\d+)/i);
+        const match = text.match(
+          /(?:vuelve\s+a|vuelve\s+al|retorna\s+a|retorna\s+al|regresa\s+a|regresa\s+al|no\s*->|->|ir\s+a|paso)\s*(?:paso\s+)?(\d+)/i
+        );
         return match ? parseInt(match[1], 10) : null;
       };
 
@@ -980,7 +1042,7 @@ const calculateEditorConnections = () => {
       pts.forEach((start) => {
         const targetNro = getReturnTarget(start.rowText);
         if (targetNro && targetNro !== start.nro) {
-          const dest = pts.find(p => p.nro === targetNro);
+          const dest = pts.find((p) => p.nro === targetNro);
           if (dest) {
             const xStart = start.cx + start.w / 2;
             const yStart = start.cy;
@@ -995,115 +1057,151 @@ const calculateEditorConnections = () => {
       });
 
       editorConnectionPaths.value = newPaths;
-    }, 250);
+    });
   });
 };
 
-watch([matrixEditorContainer, () => rows.value], () => {
-  if (matrixEditorContainer.value && rows.value.length > 0) {
-    calculateEditorConnections();
-  }
-}, { deep: true, immediate: true });
+watch(
+  [matrixEditorContainer, selectedCargoIds, () => rows.value],
+  () => {
+    if (matrixEditorContainer.value && rows.value.length > 0) {
+      calculateEditorConnections();
+    }
+  },
+  { deep: true, immediate: true }
+);
 </script>
 
 <template>
-  <div class="matrix-designer fill-height d-flex flex-column bg-surface">
-    <!-- TOOLBAR SUPERIOR -->
-    <v-toolbar
-      density="compact"
-      color="surface"
-      border
-      class="px-4 flex-shrink-0"
-    >
-      <v-btn icon="mdi-arrow-left" variant="text" @click="emit('back')"></v-btn>
-      <v-divider vertical class="mx-2"></v-divider>
-      <div class="d-flex flex-column">
-        <span class="text-subtitle-2 font-weight-bold uppercase">{{
-          procesoNombre
-        }}</span>
-        <div class="d-flex align-center ga-1 mt-n1">
-          <span class="text-caption text-grey-darken-1">{{
-            procedimientoNombre
-          }}</span>
-          <v-chip size="x-small" color="primary" variant="tonal" class="font-weight-bold ml-1">
-            v{{ procedimientoVersion }}
-          </v-chip>
-          <v-chip size="x-small" :color="estadoVersionColor" variant="tonal" class="font-weight-bold uppercase">
-            {{ procedimientoEstadoVersion }}
-          </v-chip>
-        </div>
-      </div>
-      <v-spacer></v-spacer>
-
-      <v-select
-        :model-value="procedimientoEstadoVersion"
-        :items="['Borrador', 'En Revisión', 'Aprobado', 'Obsoleto']"
-        label="Estado de Versión"
-        density="compact"
-        variant="solo-filled"
-        hide-details
-        style="max-width: 170px;"
-        class="mr-2 rounded-lg"
-        @update:model-value="changeEstadoVersion"
-      ></v-select>
-
+  <!-- VISTA DE BLOQUEO EN DISPOSITIVOS MÓVILES PEQUEÑOS (<600px) -->
+  <div v-if="xs" class="fill-height d-flex align-center justify-center pa-4 bg-slate-50">
+    <v-card class="rounded-xl pa-6 text-center border-0 shadow-lg" elevation="4" max-width="420">
+      <v-avatar color="warning" variant="tonal" size="80" class="mb-4">
+        <v-icon color="warning" size="48">mdi-cellphone-remove</v-icon>
+      </v-avatar>
+      <h2 class="text-h5 font-weight-black mb-2 text-slate-800">Vista no disponible</h2>
+      <p class="text-body-2 text-slate-600 mb-6" style="line-height: 1.5;">
+        La matriz de gestión MPP no está disponible en dispositivos móviles pequeños.
+        Utiliza una tablet o computadora para editar el diagrama de flujo.
+      </p>
       <v-btn
-        variant="tonal"
         color="primary"
-        @click="showCreateAction = true"
-        prepend-icon="mdi-plus-box-multiple"
-        class="mr-2 rounded-lg font-weight-bold text-uppercase text-caption"
-        >Crear Verbo/Acción</v-btn
-      >
-
-      <v-btn
         variant="tonal"
-        color="secondary"
-        @click="showPreview = true"
-        prepend-icon="mdi-eye-outline"
-        class="mr-2 rounded-lg font-weight-bold text-uppercase text-caption"
-        >Vista Previa Flujo</v-btn
+        block
+        class="rounded-lg font-weight-bold"
+        prepend-icon="mdi-arrow-left"
+        @click="emit('back')"
       >
+        Volver
+      </v-btn>
+    </v-card>
+  </div>
 
-      <v-btn
-        variant="tonal"
-        color="info"
-        @click="showLaneManager = true"
-        prepend-icon="mdi-account-multiple-plus"
-        class="mr-2 rounded-lg font-weight-bold text-uppercase text-caption"
-        >Gestionar Unidades</v-btn
-      >
+  <div v-else class="matrix-designer fill-height d-flex flex-column bg-surface" style="width: 100%; max-width: 100%; overflow: hidden;">
+    <!-- ÁREA DE LA MATRIZ Y TOOLBAR EN UN SOLO CONTENEDOR CON SCROLL UNIFICADO -->
+    <div class="flex-grow-1 pa-2 bg-slate-50 overflow-x-auto" ref="matrixEditorContainer" style="width: 100%; max-width: 100%; overflow-x: auto; overflow-y: auto; box-sizing: border-box; -webkit-overflow-scrolling: touch;">
+      <div class="editor-scroll-wrapper" style="position: relative; display: inline-block; min-width: 1200px; width: max-content;">
+        
+        <!-- TOOLBAR SUPERIOR (DENTRO DEL SCROLL WRAPPER, PEGAJOSO EN SCROLL VERTICAL) -->
+        <v-toolbar
+          density="compact"
+          color="surface"
+          border
+          class="px-4 mb-2 rounded-lg flex-shrink-0"
+          style="position: sticky; top: 0; z-index: 10; min-width: 100%;"
+        >
+          <v-btn icon="mdi-arrow-left" variant="text" @click="emit('back')"></v-btn>
+          <v-divider vertical class="mx-2"></v-divider>
+          <div class="d-flex flex-column">
+            <span class="text-subtitle-2 font-weight-bold uppercase">{{
+              procesoNombre
+            }}</span>
+            <div class="d-flex align-center ga-1 mt-n1">
+              <span class="text-caption text-grey-darken-1">{{
+                procedimientoNombre
+              }}</span>
+              <v-chip size="x-small" color="primary" variant="tonal" class="font-weight-bold ml-1">
+                v{{ procedimientoVersion }}
+              </v-chip>
+              <v-chip size="x-small" :color="estadoVersionColor" variant="tonal" class="font-weight-bold uppercase">
+                {{ procedimientoEstadoVersion }}
+              </v-chip>
+            </div>
+          </div>
+          <v-spacer></v-spacer>
 
-      <v-btn
-        variant="flat"
-        color="success"
-        @click="emit('finalize')"
-        prepend-icon="mdi-check-decagram"
-        class="mr-2 rounded-lg font-weight-bold text-uppercase text-caption"
-        >Finalizar Flujo</v-btn
-      >
+          <v-select
+            :model-value="procedimientoEstadoVersion"
+            :items="['Borrador', 'En Revisión', 'Aprobado', 'Obsoleto']"
+            label="Estado de Versión"
+            density="compact"
+            variant="solo-filled"
+            hide-details
+            style="max-width: 170px;"
+            class="mr-2 rounded-lg"
+            @update:model-value="changeEstadoVersion"
+          ></v-select>
 
-      <v-chip
-        v-if="lastSaved"
-        size="small"
-        color="success"
-        variant="tonal"
-        class="mr-4 uppercase"
-        >Ult. Sincro: {{ lastSaved }}</v-chip
-      >
-      <v-chip
-        size="small"
-        color="primary"
-        variant="flat"
-        class="uppercase px-4 font-weight-black"
-        >Persistencia: Auto-Fila</v-chip
-      >
-    </v-toolbar>
+          <v-btn
+            variant="tonal"
+            color="primary"
+            @click="showCreateAction = true"
+            prepend-icon="mdi-plus-box-multiple"
+            class="mr-2 rounded-lg font-weight-bold text-uppercase text-caption"
+          >
+            Crear Verbo/Acción
+          </v-btn>
 
-    <!-- ÁREA DE LA MATRIZ -->
-    <div class="flex-grow-1 pa-2 bg-slate-50 overflow-x-auto" ref="matrixEditorContainer">
-      <div class="editor-scroll-wrapper" style="position: relative; display: inline-block; min-width: 100%;">
-        <table class="mpp-matrix-table" style="position: relative; z-index: 2;">
+          <v-btn
+            variant="tonal"
+            color="secondary"
+            @click="showPreview = true"
+            prepend-icon="mdi-eye-outline"
+            class="mr-2 rounded-lg font-weight-bold text-uppercase text-caption"
+          >
+            Vista Previa Flujo
+          </v-btn>
+
+          <v-btn
+            variant="tonal"
+            color="info"
+            @click="showLaneManager = true"
+            prepend-icon="mdi-account-multiple-plus"
+            class="mr-2 rounded-lg font-weight-bold text-uppercase text-caption"
+          >
+            Gestionar Unidades
+          </v-btn>
+
+          <v-btn
+            variant="flat"
+            color="success"
+            @click="emit('finalize')"
+            prepend-icon="mdi-check-decagram"
+            class="mr-2 rounded-lg font-weight-bold text-uppercase text-caption"
+          >
+            Finalizar Flujo
+          </v-btn>
+
+          <v-chip
+            v-if="lastSaved"
+            size="small"
+            color="success"
+            variant="tonal"
+            class="mr-4 uppercase"
+          >
+            Ult. Sincro: {{ lastSaved }}
+          </v-chip>
+          <v-chip
+            size="small"
+            color="primary"
+            variant="flat"
+            class="uppercase px-4 font-weight-black"
+          >
+            Persistencia: Auto-Fila
+          </v-chip>
+        </v-toolbar>
+
+        <table class="mpp-matrix-table" style="position: relative; z-index: 2; width: 100%; min-width: 1200px;">
         <thead>
           <tr>
             <th rowspan="2" class="sticky-col nro-col">Nro</th>
@@ -1265,6 +1363,7 @@ watch([matrixEditorContainer, () => rows.value], () => {
               <div
                 v-if="row.responsableCargoId == cargo.id_cargo"
                 class="cell-flow-node"
+                :data-row-nro="row.nro"
                 :class="getActionVisuals(row.accionId).codigoFigura"
                 :style="{ backgroundColor: getActionVisuals(row.accionId).colorHex }"
                 @click.stop="openCondicionPanel(row)"
@@ -1327,6 +1426,23 @@ watch([matrixEditorContainer, () => rows.value], () => {
             </td>
           </tr>
         </tbody>
+        <tfoot>
+          <tr>
+            <td :colspan="12 + allDisplayCargos.length" class="pa-3 bg-slate-50 border-0">
+              <v-btn
+                color="secondary"
+                block
+                variant="tonal"
+                @click="addRow"
+                prepend-icon="mdi-plus"
+                height="44"
+                class="border-dashed font-weight-bold rounded-lg"
+              >
+                Añadir Nueva Fila de Operación
+              </v-btn>
+            </td>
+          </tr>
+        </tfoot>
       </table>
 
       <!-- SVG para conectar nodos en el editor directo (Sólido y Elegante) -->
@@ -1368,18 +1484,6 @@ watch([matrixEditorContainer, () => rows.value], () => {
           :marker-end="path.isReturn ? 'url(#editor-arrow-return)' : 'url(#editor-arrow)'"
         />
       </svg>
-    </div>
-      <div class="mt-4 pb-16">
-        <v-btn
-          color="secondary"
-          block
-          variant="tonal"
-          @click="addRow"
-          prepend-icon="mdi-plus"
-          height="40"
-          class="border-dashed"
-          >Añadir Nueva Fila de Operación</v-btn
-        >
       </div>
     </div>
 
@@ -2358,5 +2462,9 @@ watch([matrixEditorContainer, () => rows.value], () => {
 
 .preview-lane-cell:empty {
   background: #fafafa;
+}
+
+.border-dashed {
+  border: 2px dashed #94a3b8 !important;
 }
 </style>
