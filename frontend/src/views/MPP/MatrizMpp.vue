@@ -91,13 +91,27 @@ const estadoVersionColor = computed(() => {
 const changeEstadoVersion = async (nuevoEstado) => {
   if (!props.procedimientoId) return;
   try {
-    snackbar.value = { show: true, text: `Actualizando estado a '${nuevoEstado}'...`, color: "info" };
-    await mppStore.updateProcedimiento(props.procedimientoId, { estado_version: nuevoEstado });
+    snackbar.value = {
+      show: true,
+      text: `Actualizando estado a '${nuevoEstado}'...`,
+      color: "info",
+    };
+    await mppStore.updateProcedimiento(props.procedimientoId, {
+      estado_version: nuevoEstado,
+    });
     await mppStore.fetchProcedimientos(props.procesoId);
-    snackbar.value = { show: true, text: `Estado de versión actualizado a '${nuevoEstado}'`, color: "success" };
+    snackbar.value = {
+      show: true,
+      text: `Estado de versión actualizado a '${nuevoEstado}'`,
+      color: "success",
+    };
   } catch (err) {
     console.error("Error al cambiar estado de versión:", err);
-    snackbar.value = { show: true, text: "Error al actualizar el estado de versión", color: "error" };
+    snackbar.value = {
+      show: true,
+      text: "Error al actualizar el estado de versión",
+      color: "error",
+    };
   }
 };
 
@@ -143,7 +157,9 @@ const savingRows = new Set();
 
 const saveMatrixRow = async (row) => {
   if (!props.procedimientoId || savingRows.has(row.id)) {
-    console.log(`⏳ [Matriz-UI] Guardado Fila ${row.nro} omitido (ya guardándose o sin procedimientoId)`);
+    console.log(
+      `⏳ [Matriz-UI] Guardado Fila ${row.nro} omitido (ya guardándose o sin procedimientoId)`,
+    );
     return;
   }
 
@@ -157,17 +173,24 @@ const saveMatrixRow = async (row) => {
     !row.control &&
     !row.requisitos
   ) {
-    console.log(`⏳ [Matriz-UI] Guardado Fila ${row.nro} omitido (sin contenido mínimo)`);
+    console.log(
+      `⏳ [Matriz-UI] Guardado Fila ${row.nro} omitido (sin contenido mínimo)`,
+    );
     return;
   }
 
   try {
     savingRows.add(row.id);
     row.status = "saving";
-    console.log(`💾 [Matriz-UI] Iniciando sincronización de Fila ${row.nro} en base de datos. Responsable ID: ${row.responsableCargoId}`);
+    console.log(
+      `💾 [Matriz-UI] Iniciando sincronización de Fila ${row.nro} en base de datos. Responsable ID: ${row.responsableCargoId}`,
+    );
 
     const ids = await mppStore.saveMatrixRow(row, props.procedimientoId);
-    console.log(`✅ [Matriz-UI] Fila ${row.nro} sincronizada exitosamente. Nuevos IDs de registros guardados:`, JSON.stringify(ids));
+    console.log(
+      `✅ [Matriz-UI] Fila ${row.nro} sincronizada exitosamente. Nuevos IDs de registros guardados:`,
+      JSON.stringify(ids),
+    );
 
     // Actualización atómica de IDs y estado
     row.savedIds = ids;
@@ -200,19 +223,34 @@ watch(
     if (isHydrating.value) {
       return;
     }
-    
+
     newRows.forEach((row, index) => {
       const oldRow = oldRows ? oldRows[index] : null;
-      
+
       if (!oldRow) {
         // Nueva fila
       } else {
-        const fieldsToWatch = ['actividad', 'tarea', 'texto_figura', 'accionId', 'responsableCargoId', 'riesgo', 'control', 'requisitos', 'referencia', 'solicitante', 'salida', 'plazo'];
-        const changedField = fieldsToWatch.find(f => row[f] !== oldRow[f]);
+        const fieldsToWatch = [
+          "actividad",
+          "tarea",
+          "texto_figura",
+          "accionId",
+          "responsableCargoId",
+          "riesgo",
+          "control",
+          "requisitos",
+          "referencia",
+          "solicitante",
+          "salida",
+          "plazo",
+        ];
+        const changedField = fieldsToWatch.find((f) => row[f] !== oldRow[f]);
 
         if (!changedField) return;
-        
-        console.log(`🔔 [Matriz-UI] Detectado cambio en Fila ${row.nro} en campo [${changedField}]. Antes: "${oldRow[changedField]}", Ahora: "${row[changedField]}"`);
+
+        console.log(
+          `🔔 [Matriz-UI] Detectado cambio en Fila ${row.nro} en campo [${changedField}]. Antes: "${oldRow[changedField]}", Ahora: "${row[changedField]}"`,
+        );
       }
 
       // Programar guardado usando el objeto reactivo original (no el clon del watch)
@@ -230,12 +268,16 @@ watch(
 const handleCellClick = (row, cargoId) => {
   const cId = Number(cargoId);
   const oldCargoId = row.responsableCargoId;
-  console.log(`🖱️ [Matriz-UI] Click en celda responsable - Fila: ${row.nro}, Cargo ID clicado: ${cId}, Responsable previo: ${oldCargoId}`);
+  console.log(
+    `🖱️ [Matriz-UI] Click en celda responsable - Fila: ${row.nro}, Cargo ID clicado: ${cId}, Responsable previo: ${oldCargoId}`,
+  );
 
   // Si ya es el responsable, lo quitamos (toggle)
   if (row.responsableCargoId && Number(row.responsableCargoId) === cId) {
     row.responsableCargoId = null;
-    console.log(`❌ [Matriz-UI] Click removió al responsable. Nuevo responsableCargoId: null`);
+    console.log(
+      `❌ [Matriz-UI] Click removió al responsable. Nuevo responsableCargoId: null`,
+    );
   } else {
     row.responsableCargoId = cId;
     console.log(`✅ [Matriz-UI] Click asignó nuevo responsableCargoId: ${cId}`);
@@ -328,18 +370,22 @@ const addRow = () => {
 
 const removeRow = async (index) => {
   const row = rows.value[index];
-  
+
   // Si la fila tiene IDs guardados, borrar físicamente en el backend
   if (row.savedIds && row.savedIds.operacion) {
     try {
-      const confirmDelete = confirm(`¿Estás seguro de eliminar físicamente la fila ${row.nro} y todos sus datos vinculados?`);
+      const confirmDelete = confirm(
+        `¿Estás seguro de eliminar físicamente la fila ${row.nro} y todos sus datos vinculados?`,
+      );
       if (!confirmDelete) return;
 
-      console.log(`[MatrixUI] Solicitando eliminación física de fila ${row.nro}...`);
+      console.log(
+        `[MatrixUI] Solicitando eliminación física de fila ${row.nro}...`,
+      );
       row.status = "saving"; // Mostrar spinner mientras borra
-      
+
       await mppStore.deleteMatrixRow(row.savedIds);
-      
+
       snackbar.value = {
         show: true,
         text: `Fila ${row.nro} eliminada físicamente de la base de datos`,
@@ -395,7 +441,13 @@ const removeRow = async (index) => {
 // --- LÓGICA DE FIGURAS DINÁMICAS ---
 const getActionVisuals = (accionId) => {
   const accion = mppStore.acciones.find((a) => a.id_accion === accionId);
-  if (!accion || !accion.figura) return { icon: "mdi-checkbox-blank-circle", color: "primary", colorHex: "#6366f1", codigoFigura: "rectangulo" };
+  if (!accion || !accion.figura)
+    return {
+      icon: "mdi-checkbox-blank-circle",
+      color: "primary",
+      colorHex: "#6366f1",
+      codigoFigura: "rectangulo",
+    };
 
   const codigoFigura = accion.figura.codigo;
   const nombreAccion = (accion.nombre_accion || "").toLowerCase();
@@ -403,15 +455,34 @@ const getActionVisuals = (accionId) => {
   // Color basado en semántica del nombre
   let color = "primary";
   let colorHex = "#6366f1";
-  if (nombreAccion.includes("inicio") || nombreAccion.includes("empezar") || nombreAccion.includes("comenzar") || nombreAccion.includes("start")) { 
-    color = "success"; 
-    colorHex = "#10b981"; 
-  } else if (nombreAccion.includes("fin") || nombreAccion.includes("terminar") || nombreAccion.includes("concluir") || nombreAccion.includes("archivar") || nombreAccion.includes("end")) { 
-    color = "error"; 
-    colorHex = "#ef4444"; 
-  } else if (nombreAccion.includes("decisión") || nombreAccion.includes("validar") || nombreAccion.includes("aprob") || nombreAccion.includes("revisar") || nombreAccion.includes("control") || nombreAccion.includes("analiz") || nombreAccion.includes("decid")) { 
-    color = "orange-darken-2"; 
-    colorHex = "#f59e0b"; 
+  if (
+    nombreAccion.includes("inicio") ||
+    nombreAccion.includes("empezar") ||
+    nombreAccion.includes("comenzar") ||
+    nombreAccion.includes("start")
+  ) {
+    color = "success";
+    colorHex = "#10b981";
+  } else if (
+    nombreAccion.includes("fin") ||
+    nombreAccion.includes("terminar") ||
+    nombreAccion.includes("concluir") ||
+    nombreAccion.includes("archivar") ||
+    nombreAccion.includes("end")
+  ) {
+    color = "error";
+    colorHex = "#ef4444";
+  } else if (
+    nombreAccion.includes("decisión") ||
+    nombreAccion.includes("validar") ||
+    nombreAccion.includes("aprob") ||
+    nombreAccion.includes("revisar") ||
+    nombreAccion.includes("control") ||
+    nombreAccion.includes("analiz") ||
+    nombreAccion.includes("decid")
+  ) {
+    color = "orange-darken-2";
+    colorHex = "#f59e0b";
   }
 
   // Icono basado en el código de la figura del backend (extensible)
@@ -467,7 +538,8 @@ const openCondicionPanel = async (row) => {
     const list = Array.isArray(condiciones) ? condiciones : [];
     if (list.length > 0) {
       const sorted = [...list].sort(
-        (a, b) => (a.orden ?? 0) - (b.orden ?? 0) || a.id_condicion - b.id_condicion,
+        (a, b) =>
+          (a.orden ?? 0) - (b.orden ?? 0) || a.id_condicion - b.id_condicion,
       );
       const first = sorted[0];
       condicionForm.value = {
@@ -519,7 +591,8 @@ const saveCondicionPanel = async () => {
       tipo_condicion: condicionForm.value.tipo_condicion,
       expresion_condicion: condicionForm.value.expresion_condicion.trim(),
       id_tarea_siguiente_if: condicionForm.value.id_tarea_siguiente_if || null,
-      id_tarea_siguiente_else: condicionForm.value.id_tarea_siguiente_else || null,
+      id_tarea_siguiente_else:
+        condicionForm.value.id_tarea_siguiente_else || null,
       orden: Number(condicionForm.value.orden) || 1,
     };
 
@@ -666,20 +739,20 @@ const exportDiagramPdf = async () => {
       pixelRatio: 2,
       cacheBust: true,
     });
-    
+
     const rect = diagramContainer.value.getBoundingClientRect();
     const widthMm = rect.width * 0.264583;
     const heightMm = rect.height * 0.264583;
-    
+
     const pdf = new jsPDF({
       orientation: widthMm > heightMm ? "landscape" : "portrait",
       unit: "mm",
-      format: [widthMm + 20, heightMm + 20]
+      format: [widthMm + 20, heightMm + 20],
     });
-    
+
     pdf.addImage(dataUrl, "PNG", 10, 10, widthMm, heightMm);
     pdf.save(`Diagrama_${procedimientoNombre.value.replace(/\s+/g, "_")}.pdf`);
-    
+
     snackbar.value = {
       show: true,
       text: "Diagrama exportado a PDF con éxito",
@@ -714,7 +787,9 @@ const toggleCargo = async (cId) => {
       } catch (e) {
         console.error("[MatrixUI] Error al guardar relación cargo-proceso:", e);
         // Revertir
-        const revIdx = selectedCargoIds.value.findIndex((id) => Number(id) === numId);
+        const revIdx = selectedCargoIds.value.findIndex(
+          (id) => Number(id) === numId,
+        );
         if (revIdx !== -1) selectedCargoIds.value.splice(revIdx, 1);
         snackbar.value = {
           show: true,
@@ -737,7 +812,10 @@ const toggleCargo = async (cId) => {
           await mppStore.fetchCargoProcesos(props.procesoId);
         }
       } catch (e) {
-        console.error("[MatrixUI] Error al eliminar relación cargo-proceso:", e);
+        console.error(
+          "[MatrixUI] Error al eliminar relación cargo-proceso:",
+          e,
+        );
         // Revertir
         if (!selectedCargoIds.value.some((id) => Number(id) === numId)) {
           selectedCargoIds.value.push(numId);
@@ -768,7 +846,10 @@ onMounted(async () => {
 
     // Cargar cargos ya asociados al proceso (columnas persistidas)
     if (props.procesoId) {
-      console.log("👉 [Matriz-UI] Cargando cargos asociados al proceso ID:", props.procesoId);
+      console.log(
+        "👉 [Matriz-UI] Cargando cargos asociados al proceso ID:",
+        props.procesoId,
+      );
       await mppStore.fetchCargoProcesos(props.procesoId);
       mppStore.cargoProcesos.forEach((cp) => {
         const cId = cp.cargo?.id_cargo || cp.id_cargo;
@@ -783,14 +864,21 @@ onMounted(async () => {
 
     // Hidratación de la Matriz: Cargar datos existentes si hay procedimientoId
     if (props.procedimientoId) {
-      console.log("👉 [Matriz-UI] Solicitando hidratación de matriz para procedimiento ID:", props.procedimientoId);
-      const existingRows = await mppStore.fetchMatrixData(props.procedimientoId);
+      console.log(
+        "👉 [Matriz-UI] Solicitando hidratación de matriz para procedimiento ID:",
+        props.procedimientoId,
+      );
+      const existingRows = await mppStore.fetchMatrixData(
+        props.procedimientoId,
+      );
       if (existingRows && existingRows.length > 0) {
         rows.value = existingRows;
 
         // Auto-activar carriles basados en los cargos responsables encontrados (por consistencia)
         const activeCargos = [
-          ...new Set(existingRows.map((r) => r.responsableCargoId).filter(Boolean)),
+          ...new Set(
+            existingRows.map((r) => r.responsableCargoId).filter(Boolean),
+          ),
         ];
         activeCargos.forEach((cId) => {
           const numId = Number(cId);
@@ -811,7 +899,9 @@ onMounted(async () => {
     // IMPORTANTE: Esperar al siguiente ciclo de renderizado para apagar el escudo
     nextTick(() => {
       isHydrating.value = false; // APAGAR ESCUDO
-      console.log("👉 [Matriz-UI] Escudo de hidratación apagado. Auto-guardado de matriz activo.");
+      console.log(
+        "👉 [Matriz-UI] Escudo de hidratación apagado. Auto-guardado de matriz activo.",
+      );
       calculateEditorConnections();
     });
   }
@@ -837,7 +927,7 @@ onMounted(() => {
         calculateEditorConnections();
       });
       if (matrixEditorContainer.value) {
-        editorResizeObserver.observe(matrixEditorContainer.value);
+        updateEditorObserver();
       }
 
       previewResizeObserver = new ResizeObserver(() => {
@@ -846,17 +936,151 @@ onMounted(() => {
         }
       });
       if (diagramContainer.value) {
-        previewResizeObserver.observe(diagramContainer.value);
+        updatePreviewObserver();
       }
     }
   });
 });
+
+const updateEditorObserver = () => {
+  if (!editorResizeObserver || !matrixEditorContainer.value) return;
+  editorResizeObserver.disconnect();
+  editorResizeObserver.observe(matrixEditorContainer.value);
+  const wrapper = matrixEditorContainer.value.querySelector(
+    ".editor-scroll-wrapper",
+  );
+  if (wrapper) editorResizeObserver.observe(wrapper);
+  const nodes = matrixEditorContainer.value.querySelectorAll(".cell-flow-node");
+  nodes.forEach((n) => editorResizeObserver.observe(n));
+};
+
+const updatePreviewObserver = () => {
+  if (!previewResizeObserver || !diagramContainer.value) return;
+  previewResizeObserver.disconnect();
+  previewResizeObserver.observe(diagramContainer.value);
+  const wrapper = diagramContainer.value.querySelector(
+    ".diagram-scroll-wrapper",
+  );
+  if (wrapper) previewResizeObserver.observe(wrapper);
+  const nodes = diagramContainer.value.querySelectorAll(".preview-node");
+  nodes.forEach((n) => previewResizeObserver.observe(n));
+};
 
 onUnmounted(() => {
   window.removeEventListener("resize", handleResize);
   if (editorResizeObserver) editorResizeObserver.disconnect();
   if (previewResizeObserver) previewResizeObserver.disconnect();
 });
+
+// Helpers para extracción de destinos condicionales y de retorno
+const getReturnTarget = (text) => {
+  if (!text) return null;
+  const match = text.match(
+    /(?:vuelve\s+a|vuelve\s+al|retorna\s+a|retorna\s+al|regresa\s+a|regresa\s+al|ir\s+a|paso)\s*(?:paso\s+)?(\d+)/i,
+  );
+  return match ? parseInt(match[1], 10) : null;
+};
+
+const getIfTarget = (text) => {
+  if (!text) return null;
+  const match = text.match(/(?:si|if)\s*(?:->|:|=|a)?\s*(?:paso\s+)?(\d+)/i);
+  return match ? parseInt(match[1], 10) : null;
+};
+
+const getElseTarget = (text) => {
+  if (!text) return null;
+  const match = text.match(/(?:no|else)\s*(?:->|:|=|a)?\s*(?:paso\s+)?(\d+)/i);
+  return match ? parseInt(match[1], 10) : null;
+};
+
+// Función para construir la ruta ortogonal SVG entre dos puntos/nodos
+const buildOrthogonalPath = (start, end, options = {}) => {
+  const { type = "sequential", isEditor = false } = options;
+  const prefix = isEditor ? "editor-" : "";
+
+  let color = "#4f46e5";
+  let markerEnd = `url(#${prefix}arrow)`;
+  let isReturn = false;
+
+  if (type === "return") {
+    color = "#ef4444";
+    markerEnd = `url(#${prefix}arrow-return)`;
+    isReturn = true;
+  } else if (type === "if") {
+    color = "#16a34a";
+    markerEnd = `url(#${prefix}arrow-if)`;
+  } else if (type === "else") {
+    color = "#dc2626";
+    markerEnd = `url(#${prefix}arrow-else)`;
+  }
+
+  // Ajustes de altura/ancho según geometría del nodo
+  const startYOffset = start.h / 2;
+  const endYOffset = end.h / 2;
+
+  if (type === "return") {
+    const xStart = start.cx + start.w / 2;
+    const yStart = start.cy;
+    const xEnd = end.cx + end.w / 2;
+    const yEnd = end.cy;
+
+    const xRight = Math.max(xStart, xEnd) + 40;
+    const path = `M ${xStart} ${yStart} L ${xRight} ${yStart} L ${xRight} ${yEnd} L ${xEnd} ${yEnd}`;
+    return { path, color, isReturn, markerEnd };
+  }
+
+  if (type === "if") {
+    const x1 = start.cx - start.w / 2;
+    const y1 = start.cy;
+    const x2 = end.cx;
+    const y2 = end.cy - endYOffset;
+
+    if (Math.abs(x1 - x2) < 8) {
+      const path = `M ${x1} ${y1} L ${x2} ${y2}`;
+      return { path, color, isReturn, markerEnd };
+    } else {
+      const xLeft = Math.min(x1, x2) - 30;
+      const path = `M ${x1} ${y1} L ${xLeft} ${y1} L ${xLeft} ${y2} L ${x2} ${y2}`;
+      return { path, color, isReturn, markerEnd };
+    }
+  }
+
+  if (type === "else") {
+    const x1 = start.cx + start.w / 2;
+    const y1 = start.cy;
+    const x2 = end.cx;
+    const y2 = end.cy - endYOffset;
+
+    if (Math.abs(x1 - x2) < 8) {
+      const path = `M ${x1} ${y1} L ${x2} ${y2}`;
+      return { path, color, isReturn, markerEnd };
+    } else {
+      const xRight = Math.max(x1, x2) + 30;
+      const path = `M ${x1} ${y1} L ${xRight} ${y1} L ${xRight} ${y2} L ${x2} ${y2}`;
+      return { path, color, isReturn, markerEnd };
+    }
+  }
+
+  // Secuencial por defecto (centro superior a centro inferior)
+  const x1 = start.cx;
+  const y1 = start.cy + startYOffset;
+
+  const x2 = end.cx;
+  const y2 = end.cy - endYOffset;
+
+  let path = "";
+  if (Math.abs(x1 - x2) < 8) {
+    path = `M ${x1} ${y1} L ${x2} ${y2}`;
+  } else {
+    let yMid = y1 + (y2 - y1) / 2;
+    if (y2 - y1 < 30) {
+      yMid = Math.max(y1 + 15, y2 - 15);
+    }
+    path = `M ${x1} ${y1} L ${x1} ${yMid} L ${x2} ${yMid} L ${x2} ${y2}`;
+  }
+
+  return { path, color, isReturn, markerEnd };
+};
 
 // Calcular las conexiones visuales (flechas) del diagrama en la cuadrícula de vista previa
 const connectionPaths = ref([]);
@@ -871,16 +1095,17 @@ const calculateConnections = () => {
       if (!wrapper) return;
       const wrapperRect = wrapper.getBoundingClientRect();
       const nodes = container.querySelectorAll(".preview-node");
-      
+
       const pts = [];
       nodes.forEach((node, index) => {
         const rect = node.getBoundingClientRect();
         const cx = rect.left - wrapperRect.left + rect.width / 2;
         const cy = rect.top - wrapperRect.top + rect.height / 2;
-        
+
         // Asociar cada nodo al paso de la fila correspondiente por data-row-nro
         const rowNro = Number(node.getAttribute("data-row-nro"));
-        const row = rows.value.find((r) => Number(r.nro) === rowNro) || rows.value[index];
+        const row =
+          rows.value.find((r) => Number(r.nro) === rowNro) || rows.value[index];
         pts.push({
           cx,
           cy,
@@ -888,6 +1113,10 @@ const calculateConnections = () => {
           h: rect.height,
           nro: row ? Number(row.nro) : rowNro || index + 1,
           rowText: row ? row.texto_figura || row.tarea || "" : "",
+          shape: row
+            ? getActionVisuals(row.accionId)?.codigoFigura || "rectangulo"
+            : "rectangulo",
+          rowObj: row,
         });
       });
 
@@ -895,51 +1124,60 @@ const calculateConnections = () => {
       pts.sort((a, b) => a.nro - b.nro);
 
       const newPaths = [];
-      
-      // 1. Dibujar conexiones secuenciales lineales (Indigo, Ortogonales L-shaped)
+
+      // 1. Conexiones secuenciales lineales entre pasos consecutivos
       for (let i = 0; i < pts.length - 1; i++) {
         const start = pts[i];
         const end = pts[i + 1];
 
-        const x1 = start.cx;
-        const y1 = start.cy + start.h / 2;
-
-        const x2 = end.cx;
-        const y2 = end.cy - end.h / 2;
-
-        let path = "";
-        if (Math.abs(x1 - x2) < 5) {
-          path = `M ${x1} ${y1} L ${x2} ${y2}`;
-        } else {
-          const yMid = y1 + (y2 - y1) / 2;
-          path = `M ${x1} ${y1} L ${x1} ${yMid} L ${x2} ${yMid} L ${x2} ${y2}`;
+        const returnTarget = getReturnTarget(start.rowText);
+        if (!returnTarget || returnTarget === end.nro) {
+          const seqPath = buildOrthogonalPath(start, end, {
+            type: "sequential",
+            isEditor: false,
+          });
+          newPaths.push(seqPath);
         }
-        newPaths.push({ path, color: "#4f46e5", isReturn: false });
       }
 
-      // Función helper para buscar el paso destino de retorno en el texto
-      const getReturnTarget = (text) => {
-        if (!text) return null;
-        const match = text.match(
-          /(?:vuelve\s+a|vuelve\s+al|retorna\s+a|retorna\s+al|regresa\s+a|regresa\s+al|no\s*->|->|ir\s+a|paso)\s*(?:paso\s+)?(\d+)/i
-        );
-        return match ? parseInt(match[1], 10) : null;
-      };
-
-      // 2. Dibujar retornos/bucles condicionales (Rojos, Ortogonales)
+      // 2. Conexiones de Retorno / Bucles condicionales (Rojas)
       pts.forEach((start) => {
         const targetNro = getReturnTarget(start.rowText);
         if (targetNro && targetNro !== start.nro) {
           const dest = pts.find((p) => p.nro === targetNro);
           if (dest) {
-            const xStart = start.cx + start.w / 2;
-            const yStart = start.cy;
-            const xEnd = dest.cx + dest.w / 2;
-            const yEnd = dest.cy;
+            const retPath = buildOrthogonalPath(start, dest, {
+              type: "return",
+              isEditor: false,
+            });
+            newPaths.push(retPath);
+          }
+        }
+      });
 
-            const xRight = Math.max(xStart, xEnd) + 40;
-            const path = `M ${xStart} ${yStart} L ${xRight} ${yStart} L ${xRight} ${yEnd} L ${xEnd} ${yEnd}`;
-            newPaths.push({ path, color: "#ef4444", isReturn: true });
+      // 3. Conexiones Condicionales IF (Verdes) y ELSE (Rojas)
+      pts.forEach((start) => {
+        const ifNro = getIfTarget(start.rowText);
+        if (ifNro && ifNro !== start.nro) {
+          const dest = pts.find((p) => p.nro === ifNro);
+          if (dest) {
+            const ifPath = buildOrthogonalPath(start, dest, {
+              type: "if",
+              isEditor: false,
+            });
+            newPaths.push(ifPath);
+          }
+        }
+
+        const elseNro = getElseTarget(start.rowText);
+        if (elseNro && elseNro !== start.nro) {
+          const dest = pts.find((p) => p.nro === elseNro);
+          if (dest) {
+            const elsePath = buildOrthogonalPath(start, dest, {
+              type: "else",
+              isEditor: false,
+            });
+            newPaths.push(elsePath);
           }
         }
       });
@@ -950,13 +1188,20 @@ const calculateConnections = () => {
 };
 
 watch(
-  [showPreview, scrollWrapper],
+  [showPreview, scrollWrapper, diagramContainer],
   () => {
-    if (showPreview.value && scrollWrapper.value) {
-      calculateConnections();
+    if (showPreview.value) {
+      nextTick(() => {
+        updatePreviewObserver();
+        calculateConnections();
+        setTimeout(calculateConnections, 50);
+        setTimeout(calculateConnections, 150);
+        setTimeout(calculateConnections, 300);
+        setTimeout(calculateConnections, 500);
+      });
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 const editorConnectionPaths = ref([]);
@@ -972,13 +1217,13 @@ const calculateEditorConnections = () => {
       if (!wrapper) return;
       const wrapperRect = wrapper.getBoundingClientRect();
       const nodes = container.querySelectorAll(".cell-flow-node");
-      
+
       const pts = [];
       nodes.forEach((node, index) => {
         const rect = node.getBoundingClientRect();
         const cx = rect.left - wrapperRect.left + rect.width / 2;
         const cy = rect.top - wrapperRect.top + rect.height / 2;
-        
+
         let rowNro = Number(node.getAttribute("data-row-nro"));
         if (!rowNro) {
           const parentTr = node.closest("tr");
@@ -992,7 +1237,9 @@ const calculateEditorConnections = () => {
         }
         if (!rowNro) rowNro = index + 1;
 
-        const row = rows.value.find((r) => Number(r.nro) === Number(rowNro)) || rows.value[index];
+        const row =
+          rows.value.find((r) => Number(r.nro) === Number(rowNro)) ||
+          rows.value[index];
 
         pts.push({
           cx,
@@ -1001,6 +1248,10 @@ const calculateEditorConnections = () => {
           h: rect.height,
           nro: Number(rowNro),
           rowText: row ? row.texto_figura || row.tarea || "" : "",
+          shape: row
+            ? getActionVisuals(row.accionId)?.codigoFigura || "rectangulo"
+            : "rectangulo",
+          rowObj: row,
         });
       });
 
@@ -1008,50 +1259,60 @@ const calculateEditorConnections = () => {
       pts.sort((a, b) => a.nro - b.nro);
 
       const newPaths = [];
-      
-      // Conexiones secuenciales en el editor (Ortogonales L-shaped)
+
+      // Conexiones secuenciales en el editor
       for (let i = 0; i < pts.length - 1; i++) {
         const start = pts[i];
         const end = pts[i + 1];
 
-        const x1 = start.cx;
-        const y1 = start.cy + start.h / 2;
-
-        const x2 = end.cx;
-        const y2 = end.cy - end.h / 2;
-
-        let path = "";
-        if (Math.abs(x1 - x2) < 5) {
-          path = `M ${x1} ${y1} L ${x2} ${y2}`;
-        } else {
-          const yMid = y1 + (y2 - y1) / 2;
-          path = `M ${x1} ${y1} L ${x1} ${yMid} L ${x2} ${yMid} L ${x2} ${y2}`;
+        const returnTarget = getReturnTarget(start.rowText);
+        if (!returnTarget || returnTarget === end.nro) {
+          const seqPath = buildOrthogonalPath(start, end, {
+            type: "sequential",
+            isEditor: true,
+          });
+          newPaths.push(seqPath);
         }
-        newPaths.push({ path, color: "#4f46e5", isReturn: false });
       }
 
-      const getReturnTarget = (text) => {
-        if (!text) return null;
-        const match = text.match(
-          /(?:vuelve\s+a|vuelve\s+al|retorna\s+a|retorna\s+al|regresa\s+a|regresa\s+al|no\s*->|->|ir\s+a|paso)\s*(?:paso\s+)?(\d+)/i
-        );
-        return match ? parseInt(match[1], 10) : null;
-      };
-
-      // Conexiones de retorno en el editor (Ortogonales)
+      // Conexiones de retorno en el editor
       pts.forEach((start) => {
         const targetNro = getReturnTarget(start.rowText);
         if (targetNro && targetNro !== start.nro) {
           const dest = pts.find((p) => p.nro === targetNro);
           if (dest) {
-            const xStart = start.cx + start.w / 2;
-            const yStart = start.cy;
-            const xEnd = dest.cx + dest.w / 2;
-            const yEnd = dest.cy;
+            const retPath = buildOrthogonalPath(start, dest, {
+              type: "return",
+              isEditor: true,
+            });
+            newPaths.push(retPath);
+          }
+        }
+      });
 
-            const xRight = Math.max(xStart, xEnd) + 40;
-            const path = `M ${xStart} ${yStart} L ${xRight} ${yStart} L ${xRight} ${yEnd} L ${xEnd} ${yEnd}`;
-            newPaths.push({ path, color: "#ef4444", isReturn: true });
+      // Conexiones condenciales IF y ELSE en el editor
+      pts.forEach((start) => {
+        const ifNro = getIfTarget(start.rowText);
+        if (ifNro && ifNro !== start.nro) {
+          const dest = pts.find((p) => p.nro === ifNro);
+          if (dest) {
+            const ifPath = buildOrthogonalPath(start, dest, {
+              type: "if",
+              isEditor: true,
+            });
+            newPaths.push(ifPath);
+          }
+        }
+
+        const elseNro = getElseTarget(start.rowText);
+        if (elseNro && elseNro !== start.nro) {
+          const dest = pts.find((p) => p.nro === elseNro);
+          if (dest) {
+            const elsePath = buildOrthogonalPath(start, dest, {
+              type: "else",
+              isEditor: true,
+            });
+            newPaths.push(elsePath);
           }
         }
       });
@@ -1065,24 +1326,40 @@ watch(
   [matrixEditorContainer, selectedCargoIds, () => rows.value],
   () => {
     if (matrixEditorContainer.value && rows.value.length > 0) {
-      calculateEditorConnections();
+      nextTick(() => {
+        updateEditorObserver();
+        calculateEditorConnections();
+        setTimeout(calculateEditorConnections, 50);
+        setTimeout(calculateEditorConnections, 150);
+        setTimeout(calculateEditorConnections, 300);
+      });
     }
   },
-  { deep: true, immediate: true }
+  { deep: true, immediate: true },
 );
 </script>
 
 <template>
   <!-- VISTA DE BLOQUEO EN DISPOSITIVOS MÓVILES PEQUEÑOS (<600px) -->
-  <div v-if="xs" class="fill-height d-flex align-center justify-center pa-4 bg-slate-50">
-    <v-card class="rounded-xl pa-6 text-center border-0 shadow-lg" elevation="4" max-width="420">
+  <div
+    v-if="xs"
+    class="fill-height d-flex align-center justify-center pa-4 bg-slate-50"
+  >
+    <v-card
+      class="rounded-xl pa-6 text-center border-0 shadow-lg"
+      elevation="4"
+      max-width="420"
+    >
       <v-avatar color="warning" variant="tonal" size="80" class="mb-4">
         <v-icon color="warning" size="48">mdi-cellphone-remove</v-icon>
       </v-avatar>
-      <h2 class="text-h5 font-weight-black mb-2 text-slate-800">Vista no disponible</h2>
-      <p class="text-body-2 text-slate-600 mb-6" style="line-height: 1.5;">
-        La matriz de gestión MPP no está disponible en dispositivos móviles pequeños.
-        Utiliza una tablet o computadora para editar el diagrama de flujo.
+      <h2 class="text-h5 font-weight-black mb-2 text-slate-800">
+        Vista no disponible
+      </h2>
+      <p class="text-body-2 text-slate-600 mb-6" style="line-height: 1.5">
+        La matriz de gestión MPP no está disponible en dispositivos móviles
+        pequeños. Utiliza una tablet o computadora para editar el diagrama de
+        flujo.
       </p>
       <v-btn
         color="primary"
@@ -1097,20 +1374,46 @@ watch(
     </v-card>
   </div>
 
-  <div v-else class="matrix-designer fill-height d-flex flex-column bg-surface" style="width: 100%; max-width: 100%; overflow: hidden;">
+  <div
+    v-else
+    class="matrix-designer fill-height d-flex flex-column bg-surface"
+    style="width: 100%; max-width: 100%; overflow: hidden"
+  >
     <!-- ÁREA DE LA MATRIZ Y TOOLBAR EN UN SOLO CONTENEDOR CON SCROLL UNIFICADO -->
-    <div class="flex-grow-1 pa-2 bg-slate-50 overflow-x-auto" ref="matrixEditorContainer" style="width: 100%; max-width: 100%; overflow-x: auto; overflow-y: auto; box-sizing: border-box; -webkit-overflow-scrolling: touch;">
-      <div class="editor-scroll-wrapper" style="position: relative; display: inline-block; min-width: 1200px; width: max-content;">
-        
+    <div
+      class="flex-grow-1 pa-2 bg-slate-50 overflow-x-auto"
+      ref="matrixEditorContainer"
+      style="
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        overflow-y: auto;
+        box-sizing: border-box;
+        -webkit-overflow-scrolling: touch;
+      "
+    >
+      <div
+        class="editor-scroll-wrapper"
+        style="
+          position: relative;
+          display: inline-block;
+          min-width: 1200px;
+          width: max-content;
+        "
+      >
         <!-- TOOLBAR SUPERIOR (DENTRO DEL SCROLL WRAPPER, PEGAJOSO EN SCROLL VERTICAL) -->
         <v-toolbar
           density="compact"
           color="surface"
           border
           class="px-4 mb-2 rounded-lg flex-shrink-0"
-          style="position: sticky; top: 0; z-index: 10; min-width: 100%;"
+          style="position: sticky; top: 0; z-index: 10; min-width: 100%"
         >
-          <v-btn icon="mdi-arrow-left" variant="text" @click="emit('back')"></v-btn>
+          <v-btn
+            icon="mdi-arrow-left"
+            variant="text"
+            @click="emit('back')"
+          ></v-btn>
           <v-divider vertical class="mx-2"></v-divider>
           <div class="d-flex flex-column">
             <span class="text-subtitle-2 font-weight-bold uppercase">{{
@@ -1120,10 +1423,20 @@ watch(
               <span class="text-caption text-grey-darken-1">{{
                 procedimientoNombre
               }}</span>
-              <v-chip size="x-small" color="primary" variant="tonal" class="font-weight-bold ml-1">
+              <v-chip
+                size="x-small"
+                color="primary"
+                variant="tonal"
+                class="font-weight-bold ml-1"
+              >
                 v{{ procedimientoVersion }}
               </v-chip>
-              <v-chip size="x-small" :color="estadoVersionColor" variant="tonal" class="font-weight-bold uppercase">
+              <v-chip
+                size="x-small"
+                :color="estadoVersionColor"
+                variant="tonal"
+                class="font-weight-bold uppercase"
+              >
                 {{ procedimientoEstadoVersion }}
               </v-chip>
             </div>
@@ -1137,7 +1450,7 @@ watch(
             density="compact"
             variant="solo-filled"
             hide-details
-            style="max-width: 170px;"
+            style="max-width: 170px"
             class="mr-2 rounded-lg"
             @update:model-value="changeEstadoVersion"
           ></v-select>
@@ -1201,289 +1514,342 @@ watch(
           </v-chip>
         </v-toolbar>
 
-        <table class="mpp-matrix-table" style="position: relative; z-index: 2; width: 100%; min-width: 1200px;">
-        <thead>
-          <tr>
-            <th rowspan="2" class="sticky-col nro-col">Nro</th>
-            <th rowspan="2" class="data-col">Requisitos (Entrada)</th>
-            <th colspan="2" class="text-center group-header">Operaciones</th>
-            <th rowspan="2" class="data-col">
-              Documento o Material de Referencia
-            </th>
-            <th rowspan="2" class="data-col">Riesgos</th>
-            <th rowspan="2" class="data-col">Controles</th>
-            <th rowspan="2" class="data-col">
-              Documento, Registro o Disposición Resultante (Salida)
-            </th>
-            <th rowspan="2" class="plazo-col">Plazo [días]</th>
-            <th class="solicitante-header text-center">Solicitante</th>
+        <table
+          class="mpp-matrix-table"
+          style="position: relative; z-index: 2; width: 100%; min-width: 1200px"
+        >
+          <thead>
+            <tr>
+              <th rowspan="2" class="sticky-col nro-col">Nro</th>
+              <th rowspan="2" class="data-col">Requisitos (Entrada)</th>
+              <th colspan="2" class="text-center group-header">Operaciones</th>
+              <th rowspan="2" class="data-col">
+                Documento o Material de Referencia
+              </th>
+              <th rowspan="2" class="data-col">Riesgos</th>
+              <th rowspan="2" class="data-col">Controles</th>
+              <th rowspan="2" class="data-col">
+                Documento, Registro o Disposición Resultante (Salida)
+              </th>
+              <th rowspan="2" class="plazo-col">Plazo [días]</th>
+              <th class="solicitante-header text-center">Solicitante</th>
 
-            <th
-              v-for="group in swimlaneGroups"
-              :key="group.id"
-              :colspan="group.cargos.length"
-              class="text-center swimlane-header"
-            >
-              {{ group.name }}
-            </th>
-
-            <th class="accion-header text-center border-left-bold">Acción</th>
-            <th rowspan="2" width="40"></th>
-          </tr>
-          <tr>
-            <th class="sub-header text-center">Actividades</th>
-            <th class="sub-header text-center">Tareas</th>
-            <th class="sub-header solicitante-sub text-center">
-              Persona / Unidad Solicitante
-            </th>
-
-            <th
-              v-for="cargo in allDisplayCargos"
-              :key="cargo.id_cargo"
-              class="cargo-header text-center"
-            >
-              {{ cargo.nombre }}
-            </th>
-
-            <th class="sub-header accion-sub text-center border-left-bold">
-              Verbo
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(row, index) in rows" :key="row.id">
-            <td
-              class="text-center font-weight-bold sticky-col nro-col"
-              style="vertical-align: middle"
-            >
-              <div class="d-flex flex-column align-center">
-                <span>{{ row.nro }}</span>
-                <v-progress-circular
-                  v-if="row.status === 'saving'"
-                  indeterminate
-                  size="12"
-                  width="2"
-                  color="primary"
-                  class="mt-1"
-                ></v-progress-circular>
-                <v-icon
-                  v-if="row.status === 'saved'"
-                  color="success"
-                  size="14"
-                  class="mt-1"
-                  >mdi-check-circle</v-icon
-                >
-                <v-icon
-                  v-if="row.status === 'error'"
-                  color="error"
-                  size="14"
-                  class="mt-1"
-                  >mdi-alert-circle</v-icon
-                >
-              </div>
-            </td>
-            <td>
-              <textarea
-                v-model="row.requisitos"
-                class="cell-textarea"
-                placeholder="..."
-                @input="adjustHeight"
-              ></textarea>
-            </td>
-            <td class="bg-grey-lighten-4">
-              <textarea
-                v-model="row.actividad"
-                class="cell-textarea font-weight-bold"
-                placeholder="..."
-                @input="adjustHeight"
-              ></textarea>
-            </td>
-            <td>
-              <textarea
-                v-model="row.tarea"
-                class="cell-textarea font-weight-medium"
-                placeholder="Descripción de la tarea..."
-                @input="adjustHeight"
-              ></textarea>
-            </td>
-            <td>
-              <textarea
-                v-model="row.referencia"
-                class="cell-textarea"
-                placeholder="..."
-                @input="adjustHeight"
-              ></textarea>
-            </td>
-            <td>
-              <textarea
-                v-model="row.riesgo"
-                class="cell-textarea"
-                placeholder="..."
-                @input="adjustHeight"
-              ></textarea>
-            </td>
-            <td>
-              <textarea
-                v-model="row.control"
-                class="cell-textarea"
-                placeholder="..."
-                @input="adjustHeight"
-              ></textarea>
-            </td>
-            <td>
-              <textarea
-                v-model="row.salida"
-                class="cell-textarea"
-                placeholder="..."
-                @input="adjustHeight"
-              ></textarea>
-            </td>
-            <td>
-              <input
-                type="number"
-                v-model.number="row.plazo"
-                class="cell-input-number text-center"
-              />
-            </td>
-            <td class="bg-blue-lighten-5">
-              <textarea
-                v-model="row.solicitante"
-                class="cell-textarea"
-                placeholder="..."
-                @input="adjustHeight"
-              ></textarea>
-            </td>
-
-            <td
-              v-for="cargo in allDisplayCargos"
-              :key="cargo.id_cargo"
-              class="text-center diagram-cell"
-              @click="handleCellClick(row, cargo.id_cargo)"
-            >
-              <div
-                v-if="row.responsableCargoId == cargo.id_cargo"
-                class="cell-flow-node"
-                :data-row-nro="row.nro"
-                :class="getActionVisuals(row.accionId).codigoFigura"
-                :style="{ backgroundColor: getActionVisuals(row.accionId).colorHex }"
-                @click.stop="openCondicionPanel(row)"
+              <th
+                v-for="group in swimlaneGroups"
+                :key="group.id"
+                :colspan="group.cargos.length"
+                class="text-center swimlane-header"
               >
-                <div class="cell-flow-text-wrapper">
-                  <textarea
-                    v-model="row.texto_figura"
-                    class="cell-flow-textarea"
-                    placeholder="Escribir..."
-                    rows="2"
-                    @click.stop
-                  ></textarea>
+                {{ group.name }}
+              </th>
+
+              <th class="accion-header text-center border-left-bold">Acción</th>
+              <th rowspan="2" width="40"></th>
+            </tr>
+            <tr>
+              <th class="sub-header text-center">Actividades</th>
+              <th class="sub-header text-center">Tareas</th>
+              <th class="sub-header solicitante-sub text-center">
+                Persona / Unidad Solicitante
+              </th>
+
+              <th
+                v-for="cargo in allDisplayCargos"
+                :key="cargo.id_cargo"
+                class="cargo-header text-center"
+              >
+                {{ cargo.nombre }}
+              </th>
+
+              <th class="sub-header accion-sub text-center border-left-bold">
+                Verbo
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, index) in rows" :key="row.id">
+              <td
+                class="text-center font-weight-bold sticky-col nro-col"
+                style="vertical-align: middle"
+              >
+                <div class="d-flex flex-column align-center">
+                  <span>{{ row.nro }}</span>
+                  <v-progress-circular
+                    v-if="row.status === 'saving'"
+                    indeterminate
+                    size="12"
+                    width="2"
+                    color="primary"
+                    class="mt-1"
+                  ></v-progress-circular>
+                  <v-icon
+                    v-if="row.status === 'saved'"
+                    color="success"
+                    size="14"
+                    class="mt-1"
+                    >mdi-check-circle</v-icon
+                  >
+                  <v-icon
+                    v-if="row.status === 'error'"
+                    color="error"
+                    size="14"
+                    class="mt-1"
+                    >mdi-alert-circle</v-icon
+                  >
                 </div>
-              </div>
-            </td>
-            <td
-              class="bg-indigo-lighten-5 border-left-bold"
-              style="vertical-align: middle"
-            >
-              <v-select
-                v-model="row.accionId"
-                :items="mppStore.acciones"
-                item-title="nombre_accion"
-                item-value="id_accion"
-                density="compact"
-                variant="plain"
-                hide-details
-                placeholder="Verbo"
-                class="px-2"
+              </td>
+              <td>
+                <textarea
+                  v-model="row.requisitos"
+                  class="cell-textarea"
+                  placeholder="..."
+                  @input="adjustHeight"
+                ></textarea>
+              </td>
+              <td class="bg-grey-lighten-4">
+                <textarea
+                  v-model="row.actividad"
+                  class="cell-textarea font-weight-bold"
+                  placeholder="..."
+                  @input="adjustHeight"
+                ></textarea>
+              </td>
+              <td>
+                <textarea
+                  v-model="row.tarea"
+                  class="cell-textarea font-weight-medium"
+                  placeholder="Descripción de la tarea..."
+                  @input="adjustHeight"
+                ></textarea>
+              </td>
+              <td>
+                <textarea
+                  v-model="row.referencia"
+                  class="cell-textarea"
+                  placeholder="..."
+                  @input="adjustHeight"
+                ></textarea>
+              </td>
+              <td>
+                <textarea
+                  v-model="row.riesgo"
+                  class="cell-textarea"
+                  placeholder="..."
+                  @input="adjustHeight"
+                ></textarea>
+              </td>
+              <td>
+                <textarea
+                  v-model="row.control"
+                  class="cell-textarea"
+                  placeholder="..."
+                  @input="adjustHeight"
+                ></textarea>
+              </td>
+              <td>
+                <textarea
+                  v-model="row.salida"
+                  class="cell-textarea"
+                  placeholder="..."
+                  @input="adjustHeight"
+                ></textarea>
+              </td>
+              <td>
+                <input
+                  type="number"
+                  v-model.number="row.plazo"
+                  class="cell-input-number text-center"
+                />
+              </td>
+              <td class="bg-blue-lighten-5">
+                <textarea
+                  v-model="row.solicitante"
+                  class="cell-textarea"
+                  placeholder="..."
+                  @input="adjustHeight"
+                ></textarea>
+              </td>
+
+              <td
+                v-for="cargo in allDisplayCargos"
+                :key="cargo.id_cargo"
+                class="text-center diagram-cell"
+                @click="handleCellClick(row, cargo.id_cargo)"
               >
-                <template v-slot:item="{ props, item }">
-                  <v-list-item v-bind="props">
-                    <template v-slot:prepend>
-                      <v-icon :color="getActionVisuals(item.raw.id_accion).color" size="18" class="mr-2">
+                <div
+                  v-if="row.responsableCargoId == cargo.id_cargo"
+                  class="cell-flow-node"
+                  :data-row-nro="row.nro"
+                  :class="getActionVisuals(row.accionId).codigoFigura"
+                  :style="{
+                    backgroundColor: getActionVisuals(row.accionId).colorHex,
+                  }"
+                  @click.stop="openCondicionPanel(row)"
+                >
+                  <div class="cell-flow-text-wrapper">
+                    <textarea
+                      v-model="row.texto_figura"
+                      class="cell-flow-textarea"
+                      placeholder="Escribir..."
+                      rows="2"
+                      @click.stop
+                    ></textarea>
+                  </div>
+                </div>
+              </td>
+              <td
+                class="bg-indigo-lighten-5 border-left-bold"
+                style="vertical-align: middle"
+              >
+                <v-select
+                  v-model="row.accionId"
+                  :items="mppStore.acciones"
+                  item-title="nombre_accion"
+                  item-value="id_accion"
+                  density="compact"
+                  variant="plain"
+                  hide-details
+                  placeholder="Verbo"
+                  class="px-2"
+                >
+                  <template v-slot:item="{ props, item }">
+                    <v-list-item v-bind="props">
+                      <template v-slot:prepend>
+                        <v-icon
+                          :color="getActionVisuals(item.raw.id_accion).color"
+                          size="18"
+                          class="mr-2"
+                        >
+                          {{ getActionVisuals(item.raw.id_accion).icon }}
+                        </v-icon>
+                      </template>
+                    </v-list-item>
+                  </template>
+                  <template v-slot:selection="{ item }">
+                    <div class="d-flex align-center">
+                      <v-icon
+                        :color="getActionVisuals(item.raw.id_accion).color"
+                        size="14"
+                        class="mr-1"
+                      >
                         {{ getActionVisuals(item.raw.id_accion).icon }}
                       </v-icon>
-                    </template>
-                  </v-list-item>
-                </template>
-                <template v-slot:selection="{ item }">
-                  <div class="d-flex align-center">
-                    <v-icon :color="getActionVisuals(item.raw.id_accion).color" size="14" class="mr-1">
-                      {{ getActionVisuals(item.raw.id_accion).icon }}
-                    </v-icon>
-                    <span class="text-caption font-weight-bold">{{ item.raw.nombre_accion }}</span>
-                  </div>
-                </template>
-              </v-select>
-            </td>
+                      <span class="text-caption font-weight-bold">{{
+                        item.raw.nombre_accion
+                      }}</span>
+                    </div>
+                  </template>
+                </v-select>
+              </td>
 
-            <td class="text-center" style="vertical-align: middle">
-              <v-btn
-                icon="mdi-delete-outline"
-                variant="text"
-                color="error"
-                size="x-small"
-                @click="removeRow(index)"
-                :disabled="rows.length === 1"
-              ></v-btn>
-            </td>
-          </tr>
-        </tbody>
-        <tfoot>
-          <tr>
-            <td :colspan="12 + allDisplayCargos.length" class="pa-3 bg-slate-50 border-0">
-              <v-btn
-                color="secondary"
-                block
-                variant="tonal"
-                @click="addRow"
-                prepend-icon="mdi-plus"
-                height="44"
-                class="border-dashed font-weight-bold rounded-lg"
+              <td class="text-center" style="vertical-align: middle">
+                <v-btn
+                  icon="mdi-delete-outline"
+                  variant="text"
+                  color="error"
+                  size="x-small"
+                  @click="removeRow(index)"
+                  :disabled="rows.length === 1"
+                ></v-btn>
+              </td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td
+                :colspan="12 + allDisplayCargos.length"
+                class="pa-3 bg-slate-50 border-0"
               >
-                Añadir Nueva Fila de Operación
-              </v-btn>
-            </td>
-          </tr>
-        </tfoot>
-      </table>
+                <v-btn
+                  color="secondary"
+                  block
+                  variant="tonal"
+                  @click="addRow"
+                  prepend-icon="mdi-plus"
+                  height="44"
+                  class="border-dashed font-weight-bold rounded-lg"
+                >
+                  Añadir Nueva Fila de Operación
+                </v-btn>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
 
-      <!-- SVG para conectar nodos en el editor directo (Sólido y Elegante) -->
-      <svg 
-        v-if="allDisplayCargos.length > 0"
-        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3;"
-      >
-        <defs>
-          <marker 
-            id="editor-arrow" 
-            viewBox="0 0 10 10" 
-            refX="7" 
-            refY="5" 
-            markerWidth="6" 
-            markerHeight="6" 
-            orient="auto-start-reverse"
-          >
-            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#4f46e5"/>
-          </marker>
-          <marker 
-            id="editor-arrow-return" 
-            viewBox="0 0 10 10" 
-            refX="7" 
-            refY="5" 
-            markerWidth="6" 
-            markerHeight="6" 
-            orient="auto-start-reverse"
-          >
-            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#ef4444"/>
-          </marker>
-        </defs>
-        <path 
-          v-for="(path, i) in editorConnectionPaths" 
-          :key="i"
-          :d="path.path"
-          :stroke="path.color"
-          stroke-width="2"
-          fill="none"
-          :marker-end="path.isReturn ? 'url(#editor-arrow-return)' : 'url(#editor-arrow)'"
-        />
-      </svg>
+        <!-- SVG para conectar nodos en el editor directo (Sólido y Elegante) -->
+        <svg
+          v-if="allDisplayCargos.length > 0"
+          style="
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+          "
+        >
+          <defs>
+            <marker
+              id="editor-arrow"
+              viewBox="0 0 10 10"
+              refX="8"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#4f46e5" />
+            </marker>
+            <marker
+              id="editor-arrow-return"
+              viewBox="0 0 10 10"
+              refX="8"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#ef4444" />
+            </marker>
+            <marker
+              id="editor-arrow-if"
+              viewBox="0 0 10 10"
+              refX="8"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#16a34a" />
+            </marker>
+            <marker
+              id="editor-arrow-else"
+              viewBox="0 0 10 10"
+              refX="8"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#dc2626" />
+            </marker>
+          </defs>
+          <path
+            v-for="(path, i) in editorConnectionPaths"
+            :key="i"
+            :d="path.path"
+            :stroke="path.color"
+            stroke-width="2"
+            fill="none"
+            :marker-end="
+              path.markerEnd ||
+              (path.isReturn
+                ? 'url(#editor-arrow-return)'
+                : 'url(#editor-arrow)')
+            "
+          />
+        </svg>
       </div>
     </div>
 
@@ -1533,7 +1899,9 @@ watch(
                   <v-badge
                     v-if="
                       u.cargos?.some((c) =>
-                        selectedCargoIds.some((id) => Number(id) === Number(c.id_cargo)),
+                        selectedCargoIds.some(
+                          (id) => Number(id) === Number(c.id_cargo),
+                        ),
                       )
                     "
                     color="info"
@@ -1561,7 +1929,11 @@ watch(
                 >
                   <template v-slot:prepend>
                     <v-checkbox-btn
-                      :model-value="selectedCargoIds.some((id) => Number(id) === Number(c.id_cargo))"
+                      :model-value="
+                        selectedCargoIds.some(
+                          (id) => Number(id) === Number(c.id_cargo),
+                        )
+                      "
                       color="primary"
                     ></v-checkbox-btn>
                   </template>
@@ -1676,8 +2048,21 @@ watch(
         <v-divider></v-divider>
         <v-card-actions class="pa-3">
           <v-spacer></v-spacer>
-          <v-btn color="primary" variant="outlined" class="rounded-lg font-weight-bold text-uppercase text-caption mr-2" @click="showCreateAction = false">Cancelar</v-btn>
-          <v-btn color="primary" variant="flat" class="rounded-lg font-weight-bold text-uppercase text-caption px-4" @click="createQuickAction" :loading="isSavingAction">Guardar Acción</v-btn>
+          <v-btn
+            color="primary"
+            variant="outlined"
+            class="rounded-lg font-weight-bold text-uppercase text-caption mr-2"
+            @click="showCreateAction = false"
+            >Cancelar</v-btn
+          >
+          <v-btn
+            color="primary"
+            variant="flat"
+            class="rounded-lg font-weight-bold text-uppercase text-caption px-4"
+            @click="createQuickAction"
+            :loading="isSavingAction"
+            >Guardar Acción</v-btn
+          >
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -1688,7 +2073,10 @@ watch(
         <v-toolbar color="orange-darken-2" dark density="compact">
           <v-toolbar-title class="text-subtitle-1 font-weight-bold">
             CONDICIÓN IF/ELSE
-            <span v-if="condicionRow" class="text-caption font-weight-regular ml-2">
+            <span
+              v-if="condicionRow"
+              class="text-caption font-weight-regular ml-2"
+            >
               — Paso {{ condicionRow.nro }}
             </span>
           </v-toolbar-title>
@@ -1785,14 +2173,23 @@ watch(
     </v-dialog>
 
     <!-- DIÁLOGO DE PREVISUALIZACIÓN -->
-    <v-dialog v-model="showPreview" max-width="950">
+    <v-dialog
+      v-model="showPreview"
+      max-width="950"
+      @after-enter="
+        () => {
+          updatePreviewObserver();
+          calculateConnections();
+        }
+      "
+    >
       <v-card class="rounded-xl overflow-hidden">
         <v-toolbar color="primary" dark density="compact">
           <v-toolbar-title class="text-subtitle-1 font-weight-bold"
-            >VISTA PREVIA DEL DIAGRAMA DE FLUJO (SWIMLANES)</v-toolbar-title
-          >
+            >VISTA PREVIA DEL DIAGRAMA DE FLUJO
+          </v-toolbar-title>
           <v-spacer></v-spacer>
-          
+
           <v-btn
             variant="flat"
             color="white"
@@ -1804,7 +2201,7 @@ watch(
           >
             PNG
           </v-btn>
-          
+
           <v-btn
             variant="flat"
             color="white"
@@ -1821,30 +2218,58 @@ watch(
         </v-toolbar>
 
         <div class="pa-8 bg-slate-50 overflow-y-auto" style="max-height: 75vh">
-          <div 
+          <div
             ref="diagramContainer"
             class="pa-8 bg-surface rounded-lg border overflow-x-auto"
-            style="min-height: 400px; min-width: 100%;"
+            style="min-height: 400px; min-width: 100%"
           >
             <!-- TÍTULO DEL DIAGRAMA -->
             <div class="text-center mb-6">
-              <h2 class="text-h6 font-weight-black uppercase text-primary-darken-3 mb-1">{{ procedimientoNombre }}</h2>
+              <h2
+                class="text-h6 font-weight-black uppercase text-primary-darken-3 mb-1"
+              >
+                {{ procedimientoNombre }}
+              </h2>
               <div class="d-flex justify-center align-center">
-                <v-chip size="x-small" color="primary" variant="tonal" class="font-weight-bold uppercase">{{ procesoNombre }}</v-chip>
+                <v-chip
+                  size="x-small"
+                  color="primary"
+                  variant="tonal"
+                  class="font-weight-bold uppercase"
+                  >{{ procesoNombre }}</v-chip
+                >
               </div>
             </div>
 
             <!-- ADVERTENCIA DE CARRIL VACÍO -->
-            <div v-if="allDisplayCargos.length === 0" class="text-center pa-10 text-grey-darken-1">
-              <v-icon size="48" color="warning" class="mb-2">mdi-alert-circle-outline</v-icon>
-              <p class="font-weight-bold">No has asignado ningún carril (Cargo) en la matriz todavía.</p>
-              <p class="text-caption">Cierra esta ventana, gestiona las unidades y selecciona cargos para poder generar el diagrama.</p>
+            <div
+              v-if="allDisplayCargos.length === 0"
+              class="text-center pa-10 text-grey-darken-1"
+            >
+              <v-icon size="48" color="warning" class="mb-2"
+                >mdi-alert-circle-outline</v-icon
+              >
+              <p class="font-weight-bold">
+                No has asignado ningún carril (Cargo) en la matriz todavía.
+              </p>
+              <p class="text-caption">
+                Cierra esta ventana, gestiona las unidades y selecciona cargos
+                para poder generar el diagrama.
+              </p>
             </div>
 
             <!-- Contenedor alineable para SVG y Tabla -->
-            <div v-else ref="scrollWrapper" class="diagram-scroll-wrapper" style="position: relative; display: inline-block; min-width: 100%;">
+            <div
+              v-else
+              ref="scrollWrapper"
+              class="diagram-scroll-wrapper"
+              style="position: relative; display: inline-block; min-width: 100%"
+            >
               <!-- TABLA DE SWIMLANES -->
-              <table class="preview-swimlane-table" style="position: relative; z-index: 2;">
+              <table
+                class="preview-swimlane-table"
+                style="position: relative; z-index: 2"
+              >
                 <thead>
                   <!-- Fila de Unidades -->
                   <tr>
@@ -1876,7 +2301,7 @@ watch(
                     <td class="text-center font-weight-bold preview-step-cell">
                       <span class="step-badge">{{ row.nro }}</span>
                     </td>
-                    
+
                     <!-- Celdas de los carriles -->
                     <td
                       v-for="cargo in allDisplayCargos"
@@ -1884,15 +2309,18 @@ watch(
                       class="preview-lane-cell text-center"
                     >
                       <!-- Si este cargo es responsable, renderizar la figura -->
-                      <div 
+                      <div
                         v-if="row.responsableCargoId == cargo.id_cargo"
                         class="preview-node d-flex align-center justify-center text-center pa-4 mx-auto"
                         :data-row-nro="row.nro"
                         :class="getActionVisuals(row.accionId).codigoFigura"
-                        :style="{ backgroundColor: getActionVisuals(row.accionId).colorHex }"
+                        :style="{
+                          backgroundColor: getActionVisuals(row.accionId)
+                            .colorHex,
+                        }"
                       >
                         <span class="preview-text font-weight-bold">
-                          {{ row.texto_figura || row.tarea || 'Sin texto' }}
+                          {{ row.texto_figura || row.tarea || "Sin texto" }}
                         </span>
                       </div>
                     </td>
@@ -1901,51 +2329,90 @@ watch(
               </table>
 
               <!-- SVG para conectar nodos (Sólido y Elegante) -->
-              <svg 
-                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3;"
+              <svg
+                style="
+                  position: absolute;
+                  top: 0;
+                  left: 0;
+                  width: 100%;
+                  height: 100%;
+                  pointer-events: none;
+                  z-index: 5;
+                "
               >
                 <defs>
-                  <marker 
-                    id="arrow" 
-                    viewBox="0 0 10 10" 
-                    refX="7" 
-                    refY="5" 
-                    markerWidth="6" 
-                    markerHeight="6" 
+                  <marker
+                    id="arrow"
+                    viewBox="0 0 10 10"
+                    refX="8"
+                    refY="5"
+                    markerWidth="6"
+                    markerHeight="6"
                     orient="auto-start-reverse"
                   >
-                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#4f46e5"/>
+                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#4f46e5" />
                   </marker>
-                  <marker 
-                    id="arrow-return" 
-                    viewBox="0 0 10 10" 
-                    refX="7" 
-                    refY="5" 
-                    markerWidth="6" 
-                    markerHeight="6" 
+                  <marker
+                    id="arrow-return"
+                    viewBox="0 0 10 10"
+                    refX="8"
+                    refY="5"
+                    markerWidth="6"
+                    markerHeight="6"
                     orient="auto-start-reverse"
                   >
-                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#ef4444"/>
+                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#ef4444" />
+                  </marker>
+                  <marker
+                    id="arrow-if"
+                    viewBox="0 0 10 10"
+                    refX="8"
+                    refY="5"
+                    markerWidth="6"
+                    markerHeight="6"
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#16a34a" />
+                  </marker>
+                  <marker
+                    id="arrow-else"
+                    viewBox="0 0 10 10"
+                    refX="8"
+                    refY="5"
+                    markerWidth="6"
+                    markerHeight="6"
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#dc2626" />
                   </marker>
                 </defs>
-                <path 
-                  v-for="(path, i) in connectionPaths" 
+                <path
+                  v-for="(path, i) in connectionPaths"
                   :key="i"
                   :d="path.path"
                   :stroke="path.color"
                   stroke-width="2"
                   fill="none"
-                  :marker-end="path.isReturn ? 'url(#arrow-return)' : 'url(#arrow)'"
+                  :marker-end="
+                    path.markerEnd ||
+                    (path.isReturn ? 'url(#arrow-return)' : 'url(#arrow)')
+                  "
                 />
               </svg>
             </div>
           </div>
         </div>
-        
+
         <v-divider></v-divider>
         <v-card-actions class="pa-4 bg-grey-lighten-4">
           <v-spacer></v-spacer>
-          <v-btn color="primary" variant="outlined" class="rounded-lg font-weight-bold text-uppercase text-caption px-6" @click="showPreview = false">Cerrar</v-btn>
+          <v-btn
+            color="primary"
+            variant="outlined"
+            class="rounded-lg font-weight-bold text-uppercase text-caption px-6"
+            @click="showPreview = false"
+            >Cerrar</v-btn
+          >
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -2058,6 +2525,10 @@ watch(
   transition: background 0.2s;
   border-left: 1px dashed #cbd5e1 !important;
   border-right: 1px dashed #cbd5e1 !important;
+  padding: 24px 8px !important;
+  height: 110px !important;
+  min-height: 110px !important;
+  vertical-align: middle !important;
 }
 .diagram-cell:hover {
   background: #f5f3ff;
@@ -2242,7 +2713,7 @@ watch(
   justify-content: center;
   position: relative;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
   box-sizing: border-box;
 }
 
@@ -2395,7 +2866,7 @@ watch(
 .preview-swimlane-table th,
 .preview-swimlane-table td {
   border: 1px solid #e2e8f0;
-  padding: 16px 8px;
+  padding: 32px 12px;
   position: relative;
 }
 
@@ -2456,8 +2927,8 @@ watch(
 .preview-lane-cell {
   background: #ffffff;
   vertical-align: middle;
-  min-width: 125px;
-  height: 90px;
+  min-width: 150px;
+  height: 140px;
 }
 
 .preview-lane-cell:empty {
