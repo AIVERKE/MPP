@@ -1,53 +1,84 @@
 <script setup>
-import { onMounted, computed } from "vue";
+import { ref, onMounted, computed } from "vue";
+import axios from "axios";
 import { useAllUnidadesMofStore } from "@/stores/unidades_mof";
 import { useAuthStore } from "@/stores/auth";
 
 const unidadesStore = useAllUnidadesMofStore();
 const authStore = useAuthStore();
 
+const statsData = ref({
+  totalProcesos: 0,
+  totalProcedimientos: 0,
+  totalUsuarios: 0,
+  totalUnidades: 0,
+});
+
+const fetchStats = async () => {
+  try {
+    const response = await axios.get("http://localhost:3000/dashboard/stats", {
+      headers: authStore.getAuthHeader(),
+    });
+    if (response.data) {
+      statsData.value = response.data;
+    }
+  } catch (err) {
+    console.error("Error al obtener estadísticas del dashboard:", err);
+  }
+};
+
 onMounted(async () => {
+  await fetchStats();
   if (unidadesStore.unidades.length === 0) {
     await unidadesStore.getFetchUnidades();
   }
 });
 
-// Simulamos conteo de usuarios (Ya que el store de auth solo maneja el logueado por ahora)
-const totalUsuarios = ref(1); // Mínimo el usuario actual
-
-// Unidades recientes (Las últimas 5 creadas según ID o fecha si estuviera disponible)
+// Unidades recientes (Las últimas 6 creadas según ID)
 const actividadesRecientes = computed(() => {
   return [...unidadesStore.unidades]
     .sort((a, b) => b.id - a.id)
     .slice(0, 6)
-    .map(u => ({
+    .map((u) => ({
       id: u.id,
       nombre: u.nombre || u.denominacion,
       codigo: u.codigo,
-      color: u.color || '#1976D2',
+      color: u.color || "#1976D2",
       clase: u.clase,
-      fecha: 'Reciente'
+      fecha: "Reciente",
     }));
 });
 
 const stats = computed(() => [
   {
+    title: "Procesos",
+    value: statsData.value.totalProcesos,
+    icon: "mdi-file-tree",
+    gradient: "linear-gradient(135deg, #FF0844 0%, #FFB199 100%)",
+    suffix: "Registrados",
+  },
+  {
+    title: "Procedimientos",
+    value: statsData.value.totalProcedimientos,
+    icon: "mdi-file-document-outline",
+    gradient: "linear-gradient(135deg, #11998E 0%, #38EF7D 100%)",
+    suffix: "Registrados",
+  },
+  {
     title: "Usuarios del Sistema",
-    value: totalUsuarios.value,
+    value: statsData.value.totalUsuarios,
     icon: "mdi-account-multiple",
     gradient: "linear-gradient(135deg, #667EEA 0%, #764BA2 100%)",
-    suffix: "Activo"
+    suffix: "Activos",
   },
   {
     title: "Unidades en MOF",
-    value: unidadesStore.unidades.length,
+    value: unidadesStore.unidades.length || statsData.value.totalUnidades,
     icon: "mdi-sitemap",
     gradient: "linear-gradient(135deg, #4FACFE 0%, #00F2FE 100%)",
-    suffix: "Registradas"
-  }
+    suffix: "Registradas",
+  },
 ]);
-
-import { ref } from "vue";
 </script>
 
 <template>
