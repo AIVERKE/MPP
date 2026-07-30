@@ -13,6 +13,7 @@ import { RecursosModule } from './modules/recursos/recursos.module';
 import { CalidadModule } from './modules/calidad/calidad.module';
 import { MofModule } from './modules/mof/mof.module';
 import { VersionesModule } from './modules/versiones/versiones.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { VersionesModule } from './modules/versiones/versiones.module';
     CalidadModule,
     MofModule,
     VersionesModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],
