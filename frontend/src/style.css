@@ -271,3 +271,27 @@
 .border-top-primary {
   border-top: 8px solid var(--v-theme-primary) !important;
 }
+
+/* Estilos de barra de desplazamiento horizontal visibles y táctiles */
+.overflow-x-auto::-webkit-scrollbar {
+  height: 10px !important;
+}
+.overflow-x-auto::-webkit-scrollbar-track {
+  background: #f1f5f9 !important;
+  border-radius: 6px !important;
+}
+.overflow-x-auto::-webkit-scrollbar-thumb {
+  background: #818cf8 !important;
+  border-radius: 6px !important;
+}
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+  background: #4f46e5 !important;
+}
+
+.v-theme--dark .overflow-x-auto::-webkit-scrollbar-track {
+  background: #0f172a !important;
+}
+.v-theme--dark .overflow-x-auto::-webkit-scrollbar-thumb {
+  background: #475569 !important;
+}
+

@@ -305,11 +305,11 @@ const handleLogout = async () => {
     </v-navigation-drawer>
 
     <!-- Contenido principal con Scroll Independiente -->
-    <v-main style="padding-top: 70px; height: 100vh; overflow-y: auto;">
+    <v-main style="padding-top: 70px; height: 100vh; overflow-y: auto; overflow-x: hidden;">
       <v-container
         fluid
         :class="isLoginPage ? 'pa-0' : 'pa-6'"
-        style="min-height: calc(100vh - 70px);"
+        style="min-height: calc(100vh - 70px); max-width: 100%; overflow-x: hidden;"
       >
         <router-view />
       </v-container>
