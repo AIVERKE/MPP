@@ -299,27 +299,98 @@ const shouldShowFlowNode = (row, cargo, cargoIndex) => {
 const cargoColumnKey = (cargo, index) =>
   `${cargo.unitId ?? "u"}-${cargo.id_cargo}-${index}`;
 
-const buildOrthogonalPath = (start, end, side = "center") => {
+const getReturnTarget = (text) => {
+  if (!text) return null;
+  const match = text.match(
+    /(?:vuelve\s+a|vuelve\s+al|retorna\s+a|retorna\s+al|regresa\s+a|regresa\s+al|ir\s+a|paso)\s*(?:paso\s+)?(\d+)/i,
+  );
+  return match ? parseInt(match[1], 10) : null;
+};
+
+const buildOrthogonalPath = (start, end, options = {}) => {
+  const { type = "sequential", isEditor = false } = options;
+  const prefix = isEditor ? "editor-" : "";
+
+  let color = "#4f46e5";
+  let markerEnd = `url(#${prefix}arrow)`;
+  let isReturn = false;
+
+  if (type === "return") {
+    color = "#ef4444";
+    markerEnd = `url(#${prefix}arrow-return)`;
+    isReturn = true;
+  } else if (type === "if") {
+    color = "#16a34a";
+    markerEnd = `url(#${prefix}arrow-if)`;
+  } else if (type === "else") {
+    color = "#dc2626";
+    markerEnd = `url(#${prefix}arrow-else)`;
+  }
+
+  const startYOffset = start.h / 2;
+  const endYOffset = end.h / 2;
+
+  if (type === "return") {
+    const xStart = start.cx + start.w / 2;
+    const yStart = start.cy;
+    const xEnd = end.cx + end.w / 2;
+    const yEnd = end.cy;
+    const xRight = Math.max(xStart, xEnd) + 40;
+    const path = `M ${xStart} ${yStart} L ${xRight} ${yStart} L ${xRight} ${yEnd} L ${xEnd} ${yEnd}`;
+    return { path, color, isReturn, markerEnd };
+  }
+
+  if (type === "if") {
+    const x1 = start.cx - start.w / 2;
+    const y1 = start.cy;
+    const x2 = end.cx;
+    const y2 = end.cy - endYOffset;
+    if (Math.abs(x1 - x2) < 8) {
+      return { path: `M ${x1} ${y1} L ${x2} ${y2}`, color, isReturn, markerEnd };
+    }
+    const xLeft = Math.min(x1, x2) - 30;
+    return {
+      path: `M ${x1} ${y1} L ${xLeft} ${y1} L ${xLeft} ${y2} L ${x2} ${y2}`,
+      color,
+      isReturn,
+      markerEnd,
+    };
+  }
+
+  if (type === "else") {
+    const x1 = start.cx + start.w / 2;
+    const y1 = start.cy;
+    const x2 = end.cx;
+    const y2 = end.cy - endYOffset;
+    if (Math.abs(x1 - x2) < 8) {
+      return { path: `M ${x1} ${y1} L ${x2} ${y2}`, color, isReturn, markerEnd };
+    }
+    const xRight = Math.max(x1, x2) + 30;
+    return {
+      path: `M ${x1} ${y1} L ${xRight} ${y1} L ${xRight} ${y2} L ${x2} ${y2}`,
+      color,
+      isReturn,
+      markerEnd,
+    };
+  }
+
   const x1 = start.cx;
-  const y1 = start.cy + start.h / 2;
+  const y1 = start.cy + startYOffset;
   const x2 = end.cx;
-  const y2 = end.cy - end.h / 2;
+  const y2 = end.cy - endYOffset;
 
+  let path = "";
   if (Math.abs(x1 - x2) < 8) {
-    return `M ${x1} ${y1} L ${x2} ${y2}`;
+    path = `M ${x1} ${y1} L ${x2} ${y2}`;
+  } else {
+    let yMid = y1 + (y2 - y1) / 2;
+    if (y2 - y1 < 30) {
+      yMid = Math.max(y1 + 15, y2 - 15);
+    }
+    path = `M ${x1} ${y1} L ${x1} ${yMid} L ${x2} ${yMid} L ${x2} ${y2}`;
   }
 
-  if (side === "left") {
-    const xLeft = Math.min(start.cx - start.w / 2, end.cx - end.w / 2) - 36;
-    return `M ${start.cx - start.w / 2} ${start.cy} L ${xLeft} ${start.cy} L ${xLeft} ${end.cy} L ${end.cx - end.w / 2} ${end.cy}`;
-  }
-  if (side === "right") {
-    const xRight = Math.max(start.cx + start.w / 2, end.cx + end.w / 2) + 36;
-    return `M ${start.cx + start.w / 2} ${start.cy} L ${xRight} ${start.cy} L ${xRight} ${end.cy} L ${end.cx + end.w / 2} ${end.cy}`;
-  }
-
-  const yMid = y1 + (y2 - y1) / 2;
-  return `M ${x1} ${y1} L ${x1} ${yMid} L ${x2} ${yMid} L ${x2} ${y2}`;
+  return { path, color, isReturn, markerEnd };
 };
 
 const getRowCondicion = (row) => {
@@ -1174,7 +1245,7 @@ onMounted(() => {
         calculateEditorConnections();
       });
       if (matrixEditorContainer.value) {
-        editorResizeObserver.observe(matrixEditorContainer.value);
+        updateEditorObserver();
       }
 
       previewResizeObserver = new ResizeObserver(() => {
@@ -1183,11 +1254,35 @@ onMounted(() => {
         }
       });
       if (diagramContainer.value) {
-        previewResizeObserver.observe(diagramContainer.value);
+        updatePreviewObserver();
       }
     }
   });
 });
+
+const updateEditorObserver = () => {
+  if (!editorResizeObserver || !matrixEditorContainer.value) return;
+  editorResizeObserver.disconnect();
+  editorResizeObserver.observe(matrixEditorContainer.value);
+  const wrapper = matrixEditorContainer.value.querySelector(
+    ".editor-scroll-wrapper",
+  );
+  if (wrapper) editorResizeObserver.observe(wrapper);
+  const nodes = matrixEditorContainer.value.querySelectorAll(".cell-flow-node");
+  nodes.forEach((n) => editorResizeObserver.observe(n));
+};
+
+const updatePreviewObserver = () => {
+  if (!previewResizeObserver || !diagramContainer.value) return;
+  previewResizeObserver.disconnect();
+  previewResizeObserver.observe(diagramContainer.value);
+  const wrapper = diagramContainer.value.querySelector(
+    ".diagram-scroll-wrapper",
+  );
+  if (wrapper) previewResizeObserver.observe(wrapper);
+  const nodes = diagramContainer.value.querySelectorAll(".preview-node");
+  nodes.forEach((n) => previewResizeObserver.observe(n));
+};
 
 onUnmounted(() => {
   window.removeEventListener("resize", handleResize);
@@ -1216,7 +1311,8 @@ const calculateConnections = () => {
         const cy = rect.top - wrapperRect.top + rect.height / 2;
 
         const rowNro = Number(node.getAttribute("data-row-nro"));
-        const row = rows.value.find((r) => Number(r.nro) === rowNro) || rows.value[index];
+        const row =
+          rows.value.find((r) => Number(r.nro) === rowNro) || rows.value[index];
         const tareaId = row?.savedIds?.tarea ? Number(row.savedIds.tarea) : null;
         pts.push({
           cx,
@@ -1228,10 +1324,12 @@ const calculateConnections = () => {
           row,
           rowText: row ? row.texto_figura || row.tarea || "" : "",
           skipsSequential: rowSkipsSequentialOut(row),
+          shape: row
+            ? getActionVisuals(row.accionId)?.codigoFigura || "rectangulo"
+            : "rectangulo",
         });
       });
 
-      // Ordenar secuencialmente por nro de fila ascendente
       pts.sort((a, b) => a.nro - b.nro);
 
       const byTareaId = new Map(
@@ -1239,17 +1337,23 @@ const calculateConnections = () => {
       );
       const newPaths = [];
 
+      // 1. Secuenciales (omitir rombos con IF/ELSE configurado)
       for (let i = 0; i < pts.length - 1; i++) {
         const start = pts[i];
         if (start.skipsSequential) continue;
         const end = pts[i + 1];
-        newPaths.push({
-          path: buildOrthogonalPath(start, end),
-          color: "#4f46e5",
-          isReturn: false,
-        });
+        const returnTarget = getReturnTarget(start.rowText);
+        if (!returnTarget || returnTarget === end.nro) {
+          newPaths.push(
+            buildOrthogonalPath(start, end, {
+              type: "sequential",
+              isEditor: false,
+            }),
+          );
+        }
       }
 
+      // 2. IF / ELSE desde condiciones guardadas en DB
       pts.forEach((start) => {
         const cond = getRowCondicion(start.row);
         if (!cond) return;
@@ -1262,42 +1366,36 @@ const calculateConnections = () => {
           : null;
 
         if (ifDest) {
-          newPaths.push({
-            path: buildOrthogonalPath(start, ifDest, "right"),
-            color: "#2e7d32",
-            isReturn: false,
-            isIf: true,
-          });
+          newPaths.push(
+            buildOrthogonalPath(start, ifDest, {
+              type: "if",
+              isEditor: false,
+            }),
+          );
         }
         if (elseDest) {
-          newPaths.push({
-            path: buildOrthogonalPath(start, elseDest, "left"),
-            color: "#c62828",
-            isReturn: true,
-            isElse: true,
-          });
+          newPaths.push(
+            buildOrthogonalPath(start, elseDest, {
+              type: "else",
+              isEditor: false,
+            }),
+          );
         }
       });
 
-      const getReturnTarget = (text) => {
-        if (!text) return null;
-        const match = text.match(
-          /(?:vuelve\s+a|vuelve\s+al|retorna\s+a|retorna\s+al|regresa\s+a|regresa\s+al|no\s*->|->|ir\s+a|paso)\s*(?:paso\s+)?(\d+)/i,
-        );
-        return match ? parseInt(match[1], 10) : null;
-      };
-
+      // 3. Retornos / bucles desde texto de la figura
       pts.forEach((start) => {
-        if (rowSkipsSequentialOut(start.row)) return;
+        if (start.skipsSequential) return;
         const targetNro = getReturnTarget(start.rowText);
         if (targetNro && targetNro !== start.nro) {
           const dest = pts.find((p) => p.nro === targetNro);
           if (dest) {
-            newPaths.push({
-              path: buildOrthogonalPath(start, dest, "right"),
-              color: "#ef4444",
-              isReturn: true,
-            });
+            newPaths.push(
+              buildOrthogonalPath(start, dest, {
+                type: "return",
+                isEditor: false,
+              }),
+            );
           }
         }
       });
@@ -1307,11 +1405,22 @@ const calculateConnections = () => {
   });
 };
 
-watch([showPreview, scrollWrapper, () => condicionesPorTarea.value], () => {
-  if (showPreview.value && scrollWrapper.value) {
-    calculateConnections();
-  }
-}, { immediate: true, deep: true });
+watch(
+  [showPreview, scrollWrapper, diagramContainer, () => condicionesPorTarea.value],
+  () => {
+    if (showPreview.value) {
+      nextTick(() => {
+        updatePreviewObserver();
+        calculateConnections();
+        setTimeout(calculateConnections, 50);
+        setTimeout(calculateConnections, 150);
+        setTimeout(calculateConnections, 300);
+        setTimeout(calculateConnections, 500);
+      });
+    }
+  },
+  { immediate: true, deep: true },
+);
 
 const editorConnectionPaths = ref([]);
 const matrixEditorContainer = ref(null);
@@ -1332,6 +1441,7 @@ const calculateEditorConnections = () => {
         const rect = node.getBoundingClientRect();
         const cx = rect.left - wrapperRect.left + rect.width / 2;
         const cy = rect.top - wrapperRect.top + rect.height / 2;
+
         let rowNro = Number(node.getAttribute("data-row-nro"));
         if (!rowNro) {
           const parentTr = node.closest("tr");
@@ -1349,6 +1459,7 @@ const calculateEditorConnections = () => {
           rows.value.find((r) => Number(r.nro) === Number(rowNro)) ||
           rows.value[index];
         const tareaId = row?.savedIds?.tarea ? Number(row.savedIds.tarea) : null;
+
         pts.push({
           cx,
           cy,
@@ -1359,10 +1470,12 @@ const calculateEditorConnections = () => {
           row,
           rowText: row ? row.texto_figura || row.tarea || "" : "",
           skipsSequential: rowSkipsSequentialOut(row),
+          shape: row
+            ? getActionVisuals(row.accionId)?.codigoFigura || "rectangulo"
+            : "rectangulo",
         });
       });
 
-      // Ordenar secuencialmente por nro de fila ascendente
       pts.sort((a, b) => a.nro - b.nro);
 
       const byTareaId = new Map(
@@ -1370,19 +1483,23 @@ const calculateEditorConnections = () => {
       );
       const newPaths = [];
 
-      // Secuenciales solo si el origen NO es un rombo con IF/ELSE configurado
+      // Secuenciales — omitir rombos con IF/ELSE configurado
       for (let i = 0; i < pts.length - 1; i++) {
         const start = pts[i];
         if (start.skipsSequential) continue;
         const end = pts[i + 1];
-        newPaths.push({
-          path: buildOrthogonalPath(start, end),
-          color: "#4f46e5",
-          isReturn: false,
-        });
+        const returnTarget = getReturnTarget(start.rowText);
+        if (!returnTarget || returnTarget === end.nro) {
+          newPaths.push(
+            buildOrthogonalPath(start, end, {
+              type: "sequential",
+              isEditor: true,
+            }),
+          );
+        }
       }
 
-      // Rutas IF (verde) / ELSE (rojo) desde condiciones guardadas
+      // IF / ELSE desde condiciones guardadas
       pts.forEach((start) => {
         const cond = getRowCondicion(start.row);
         if (!cond) return;
@@ -1395,42 +1512,36 @@ const calculateEditorConnections = () => {
           : null;
 
         if (ifDest) {
-          newPaths.push({
-            path: buildOrthogonalPath(start, ifDest, "right"),
-            color: "#2e7d32",
-            isReturn: false,
-            isIf: true,
-          });
+          newPaths.push(
+            buildOrthogonalPath(start, ifDest, {
+              type: "if",
+              isEditor: true,
+            }),
+          );
         }
         if (elseDest) {
-          newPaths.push({
-            path: buildOrthogonalPath(start, elseDest, "left"),
-            color: "#c62828",
-            isReturn: true,
-            isElse: true,
-          });
+          newPaths.push(
+            buildOrthogonalPath(start, elseDest, {
+              type: "else",
+              isEditor: true,
+            }),
+          );
         }
       });
 
-      const getReturnTarget = (text) => {
-        if (!text) return null;
-        const match = text.match(
-          /(?:vuelve\s+a|vuelve\s+al|retorna\s+a|retorna\s+al|regresa\s+a|regresa\s+al|no\s*->|->|ir\s+a|paso)\s*(?:paso\s+)?(\d+)/i,
-        );
-        return match ? parseInt(match[1], 10) : null;
-      };
-
+      // Retornos desde texto
       pts.forEach((start) => {
         if (start.skipsSequential) return;
         const targetNro = getReturnTarget(start.rowText);
         if (targetNro && targetNro !== start.nro) {
           const dest = pts.find((p) => p.nro === targetNro);
           if (dest) {
-            newPaths.push({
-              path: buildOrthogonalPath(start, dest, "right"),
-              color: "#ef4444",
-              isReturn: true,
-            });
+            newPaths.push(
+              buildOrthogonalPath(start, dest, {
+                type: "return",
+                isEditor: true,
+              }),
+            );
           }
         }
       });
@@ -1441,10 +1552,21 @@ const calculateEditorConnections = () => {
 };
 
 watch(
-  [matrixEditorContainer, selectedCargoIds, () => rows.value, () => condicionesPorTarea.value],
+  [
+    matrixEditorContainer,
+    selectedCargoIds,
+    () => rows.value,
+    () => condicionesPorTarea.value,
+  ],
   () => {
     if (matrixEditorContainer.value && rows.value.length > 0) {
-      calculateEditorConnections();
+      nextTick(() => {
+        updateEditorObserver();
+        calculateEditorConnections();
+        setTimeout(calculateEditorConnections, 50);
+        setTimeout(calculateEditorConnections, 150);
+        setTimeout(calculateEditorConnections, 300);
+      });
     }
   },
   { deep: true, immediate: true },
@@ -1857,71 +1979,76 @@ watch(
       </table>
 
       <!-- SVG para conectar nodos en el editor directo (Sólido y Elegante) -->
-      <svg 
+      <svg
         v-if="allDisplayCargos.length > 0"
-        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3;"
+        style="
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          pointer-events: none;
+          z-index: 5;
+        "
       >
         <defs>
-          <marker 
-            id="editor-arrow" 
-            viewBox="0 0 10 10" 
-            refX="7" 
-            refY="5" 
-            markerWidth="6" 
-            markerHeight="6" 
+          <marker
+            id="editor-arrow"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
             orient="auto-start-reverse"
           >
-            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#4f46e5"/>
+            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#4f46e5" />
           </marker>
-          <marker 
-            id="editor-arrow-return" 
-            viewBox="0 0 10 10" 
-            refX="7" 
-            refY="5" 
-            markerWidth="6" 
-            markerHeight="6" 
+          <marker
+            id="editor-arrow-return"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
             orient="auto-start-reverse"
           >
-            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#ef4444"/>
+            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#ef4444" />
           </marker>
-          <marker 
-            id="editor-arrow-if" 
-            viewBox="0 0 10 10" 
-            refX="7" 
-            refY="5" 
-            markerWidth="6" 
-            markerHeight="6" 
+          <marker
+            id="editor-arrow-if"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
             orient="auto-start-reverse"
           >
-            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#2e7d32"/>
+            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#16a34a" />
           </marker>
-          <marker 
-            id="editor-arrow-else" 
-            viewBox="0 0 10 10" 
-            refX="7" 
-            refY="5" 
-            markerWidth="6" 
-            markerHeight="6" 
+          <marker
+            id="editor-arrow-else"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
             orient="auto-start-reverse"
           >
-            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#c62828"/>
+            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#dc2626" />
           </marker>
         </defs>
-        <path 
-          v-for="(path, i) in editorConnectionPaths" 
+        <path
+          v-for="(path, i) in editorConnectionPaths"
           :key="i"
           :d="path.path"
           :stroke="path.color"
           stroke-width="2"
           fill="none"
           :marker-end="
-            path.isIf
-              ? 'url(#editor-arrow-if)'
-              : path.isElse || path.isReturn
-                ? path.isElse
-                  ? 'url(#editor-arrow-else)'
-                  : 'url(#editor-arrow-return)'
-                : 'url(#editor-arrow)'
+            path.markerEnd ||
+            (path.isReturn
+              ? 'url(#editor-arrow-return)'
+              : 'url(#editor-arrow)')
           "
         />
       </svg>
@@ -2563,70 +2690,73 @@ watch(
               </table>
 
               <!-- SVG para conectar nodos (Sólido y Elegante) -->
-              <svg 
-                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3;"
+              <svg
+                style="
+                  position: absolute;
+                  top: 0;
+                  left: 0;
+                  width: 100%;
+                  height: 100%;
+                  pointer-events: none;
+                  z-index: 5;
+                "
               >
                 <defs>
-                  <marker 
-                    id="arrow" 
-                    viewBox="0 0 10 10" 
-                    refX="7" 
-                    refY="5" 
-                    markerWidth="6" 
-                    markerHeight="6" 
+                  <marker
+                    id="arrow"
+                    viewBox="0 0 10 10"
+                    refX="8"
+                    refY="5"
+                    markerWidth="6"
+                    markerHeight="6"
                     orient="auto-start-reverse"
                   >
-                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#4f46e5"/>
+                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#4f46e5" />
                   </marker>
-                  <marker 
-                    id="arrow-return" 
-                    viewBox="0 0 10 10" 
-                    refX="7" 
-                    refY="5" 
-                    markerWidth="6" 
-                    markerHeight="6" 
+                  <marker
+                    id="arrow-return"
+                    viewBox="0 0 10 10"
+                    refX="8"
+                    refY="5"
+                    markerWidth="6"
+                    markerHeight="6"
                     orient="auto-start-reverse"
                   >
-                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#ef4444"/>
+                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#ef4444" />
                   </marker>
-                  <marker 
-                    id="arrow-if" 
-                    viewBox="0 0 10 10" 
-                    refX="7" 
-                    refY="5" 
-                    markerWidth="6" 
-                    markerHeight="6" 
+                  <marker
+                    id="arrow-if"
+                    viewBox="0 0 10 10"
+                    refX="8"
+                    refY="5"
+                    markerWidth="6"
+                    markerHeight="6"
                     orient="auto-start-reverse"
                   >
-                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#2e7d32"/>
+                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#16a34a" />
                   </marker>
-                  <marker 
-                    id="arrow-else" 
-                    viewBox="0 0 10 10" 
-                    refX="7" 
-                    refY="5" 
-                    markerWidth="6" 
-                    markerHeight="6" 
+                  <marker
+                    id="arrow-else"
+                    viewBox="0 0 10 10"
+                    refX="8"
+                    refY="5"
+                    markerWidth="6"
+                    markerHeight="6"
                     orient="auto-start-reverse"
                   >
-                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#c62828"/>
+                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#dc2626" />
                   </marker>
                 </defs>
-                <path 
-                  v-for="(path, i) in connectionPaths" 
+                <path
+                  v-for="(path, i) in connectionPaths"
                   :key="i"
                   :d="path.path"
                   :stroke="path.color"
                   stroke-width="2"
                   fill="none"
                   :marker-end="
-                    path.isIf
-                      ? 'url(#arrow-if)'
-                      : path.isElse
-                        ? 'url(#arrow-else)'
-                        : path.isReturn
-                          ? 'url(#arrow-return)'
-                          : 'url(#arrow)'
+                    path.markerEnd ||
+                    (path.isReturn ? 'url(#arrow-return)' : 'url(#arrow)')
                   "
                 />
               </svg>
