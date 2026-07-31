@@ -45,6 +45,10 @@ const condicionForm = ref({
   id_tarea_siguiente_else: null,
   orden: 1,
 });
+const rutaActiva = ref("if"); // 'if' | 'else' — próximo clic en el mini diagrama
+const condicionesPorTarea = ref({}); // { [id_tarea]: condicion }
+const condicionDiagramRef = ref(null);
+const condicionConnectionPaths = ref([]);
 
 const tipoCondicionOptions = [
   { title: "IF", value: "if" },
@@ -91,27 +95,13 @@ const estadoVersionColor = computed(() => {
 const changeEstadoVersion = async (nuevoEstado) => {
   if (!props.procedimientoId) return;
   try {
-    snackbar.value = {
-      show: true,
-      text: `Actualizando estado a '${nuevoEstado}'...`,
-      color: "info",
-    };
-    await mppStore.updateProcedimiento(props.procedimientoId, {
-      estado_version: nuevoEstado,
-    });
+    snackbar.value = { show: true, text: `Actualizando estado a '${nuevoEstado}'...`, color: "info" };
+    await mppStore.updateProcedimiento(props.procedimientoId, { estado_version: nuevoEstado });
     await mppStore.fetchProcedimientos(props.procesoId);
-    snackbar.value = {
-      show: true,
-      text: `Estado de versión actualizado a '${nuevoEstado}'`,
-      color: "success",
-    };
+    snackbar.value = { show: true, text: `Estado de versión actualizado a '${nuevoEstado}'`, color: "success" };
   } catch (err) {
     console.error("Error al cambiar estado de versión:", err);
-    snackbar.value = {
-      show: true,
-      text: "Error al actualizar el estado de versión",
-      color: "error",
-    };
+    snackbar.value = { show: true, text: "Error al actualizar el estado de versión", color: "error" };
   }
 };
 
@@ -157,9 +147,7 @@ const savingRows = new Set();
 
 const saveMatrixRow = async (row) => {
   if (!props.procedimientoId || savingRows.has(row.id)) {
-    console.log(
-      `⏳ [Matriz-UI] Guardado Fila ${row.nro} omitido (ya guardándose o sin procedimientoId)`,
-    );
+    console.log(`⏳ [Matriz-UI] Guardado Fila ${row.nro} omitido (ya guardándose o sin procedimientoId)`);
     return;
   }
 
@@ -173,24 +161,17 @@ const saveMatrixRow = async (row) => {
     !row.control &&
     !row.requisitos
   ) {
-    console.log(
-      `⏳ [Matriz-UI] Guardado Fila ${row.nro} omitido (sin contenido mínimo)`,
-    );
+    console.log(`⏳ [Matriz-UI] Guardado Fila ${row.nro} omitido (sin contenido mínimo)`);
     return;
   }
 
   try {
     savingRows.add(row.id);
     row.status = "saving";
-    console.log(
-      `💾 [Matriz-UI] Iniciando sincronización de Fila ${row.nro} en base de datos. Responsable ID: ${row.responsableCargoId}`,
-    );
+    console.log(`💾 [Matriz-UI] Iniciando sincronización de Fila ${row.nro} en base de datos. Responsable ID: ${row.responsableCargoId}`);
 
     const ids = await mppStore.saveMatrixRow(row, props.procedimientoId);
-    console.log(
-      `✅ [Matriz-UI] Fila ${row.nro} sincronizada exitosamente. Nuevos IDs de registros guardados:`,
-      JSON.stringify(ids),
-    );
+    console.log(`✅ [Matriz-UI] Fila ${row.nro} sincronizada exitosamente. Nuevos IDs de registros guardados:`, JSON.stringify(ids));
 
     // Actualización atómica de IDs y estado
     row.savedIds = ids;
@@ -223,34 +204,19 @@ watch(
     if (isHydrating.value) {
       return;
     }
-
+    
     newRows.forEach((row, index) => {
       const oldRow = oldRows ? oldRows[index] : null;
-
+      
       if (!oldRow) {
         // Nueva fila
       } else {
-        const fieldsToWatch = [
-          "actividad",
-          "tarea",
-          "texto_figura",
-          "accionId",
-          "responsableCargoId",
-          "riesgo",
-          "control",
-          "requisitos",
-          "referencia",
-          "solicitante",
-          "salida",
-          "plazo",
-        ];
-        const changedField = fieldsToWatch.find((f) => row[f] !== oldRow[f]);
+        const fieldsToWatch = ['actividad', 'tarea', 'texto_figura', 'accionId', 'responsableCargoId', 'riesgo', 'control', 'requisitos', 'referencia', 'solicitante', 'salida', 'plazo'];
+        const changedField = fieldsToWatch.find(f => row[f] !== oldRow[f]);
 
         if (!changedField) return;
-
-        console.log(
-          `🔔 [Matriz-UI] Detectado cambio en Fila ${row.nro} en campo [${changedField}]. Antes: "${oldRow[changedField]}", Ahora: "${row[changedField]}"`,
-        );
+        
+        console.log(`🔔 [Matriz-UI] Detectado cambio en Fila ${row.nro} en campo [${changedField}]. Antes: "${oldRow[changedField]}", Ahora: "${row[changedField]}"`);
       }
 
       // Programar guardado usando el objeto reactivo original (no el clon del watch)
@@ -268,16 +234,12 @@ watch(
 const handleCellClick = (row, cargoId) => {
   const cId = Number(cargoId);
   const oldCargoId = row.responsableCargoId;
-  console.log(
-    `🖱️ [Matriz-UI] Click en celda responsable - Fila: ${row.nro}, Cargo ID clicado: ${cId}, Responsable previo: ${oldCargoId}`,
-  );
+  console.log(`🖱️ [Matriz-UI] Click en celda responsable - Fila: ${row.nro}, Cargo ID clicado: ${cId}, Responsable previo: ${oldCargoId}`);
 
   // Si ya es el responsable, lo quitamos (toggle)
   if (row.responsableCargoId && Number(row.responsableCargoId) === cId) {
     row.responsableCargoId = null;
-    console.log(
-      `❌ [Matriz-UI] Click removió al responsable. Nuevo responsableCargoId: null`,
-    );
+    console.log(`❌ [Matriz-UI] Click removió al responsable. Nuevo responsableCargoId: null`);
   } else {
     row.responsableCargoId = cId;
     console.log(`✅ [Matriz-UI] Click asignó nuevo responsableCargoId: ${cId}`);
@@ -322,6 +284,129 @@ const swimlaneGroups = computed(() => {
 const allDisplayCargos = computed(() =>
   swimlaneGroups.value.flatMap((g) => g.cargos),
 );
+
+/** Índice de la primera columna que muestra un cargo (evita duplicar figura si el mismo id_cargo está en varias unidades). */
+const primaryCargoColumnIndex = (cargoId) => {
+  const id = Number(cargoId);
+  return allDisplayCargos.value.findIndex((c) => Number(c.id_cargo) === id);
+};
+
+const shouldShowFlowNode = (row, cargo, cargoIndex) => {
+  if (Number(row.responsableCargoId) !== Number(cargo.id_cargo)) return false;
+  return primaryCargoColumnIndex(cargo.id_cargo) === cargoIndex;
+};
+
+const cargoColumnKey = (cargo, index) =>
+  `${cargo.unitId ?? "u"}-${cargo.id_cargo}-${index}`;
+
+const getReturnTarget = (text) => {
+  if (!text) return null;
+  const match = text.match(
+    /(?:vuelve\s+a|vuelve\s+al|retorna\s+a|retorna\s+al|regresa\s+a|regresa\s+al|ir\s+a|paso)\s*(?:paso\s+)?(\d+)/i,
+  );
+  return match ? parseInt(match[1], 10) : null;
+};
+
+const buildOrthogonalPath = (start, end, options = {}) => {
+  const { type = "sequential", isEditor = false } = options;
+  const prefix = isEditor ? "editor-" : "";
+
+  let color = "#4f46e5";
+  let markerEnd = `url(#${prefix}arrow)`;
+  let isReturn = false;
+
+  if (type === "return") {
+    color = "#ef4444";
+    markerEnd = `url(#${prefix}arrow-return)`;
+    isReturn = true;
+  } else if (type === "if") {
+    color = "#16a34a";
+    markerEnd = `url(#${prefix}arrow-if)`;
+  } else if (type === "else") {
+    color = "#dc2626";
+    markerEnd = `url(#${prefix}arrow-else)`;
+  }
+
+  const startYOffset = start.h / 2;
+  const endYOffset = end.h / 2;
+
+  if (type === "return") {
+    const xStart = start.cx + start.w / 2;
+    const yStart = start.cy;
+    const xEnd = end.cx + end.w / 2;
+    const yEnd = end.cy;
+    const xRight = Math.max(xStart, xEnd) + 40;
+    const path = `M ${xStart} ${yStart} L ${xRight} ${yStart} L ${xRight} ${yEnd} L ${xEnd} ${yEnd}`;
+    return { path, color, isReturn, markerEnd };
+  }
+
+  if (type === "if") {
+    const x1 = start.cx - start.w / 2;
+    const y1 = start.cy;
+    const x2 = end.cx;
+    const y2 = end.cy - endYOffset;
+    if (Math.abs(x1 - x2) < 8) {
+      return { path: `M ${x1} ${y1} L ${x2} ${y2}`, color, isReturn, markerEnd };
+    }
+    const xLeft = Math.min(x1, x2) - 30;
+    return {
+      path: `M ${x1} ${y1} L ${xLeft} ${y1} L ${xLeft} ${y2} L ${x2} ${y2}`,
+      color,
+      isReturn,
+      markerEnd,
+    };
+  }
+
+  if (type === "else") {
+    const x1 = start.cx + start.w / 2;
+    const y1 = start.cy;
+    const x2 = end.cx;
+    const y2 = end.cy - endYOffset;
+    if (Math.abs(x1 - x2) < 8) {
+      return { path: `M ${x1} ${y1} L ${x2} ${y2}`, color, isReturn, markerEnd };
+    }
+    const xRight = Math.max(x1, x2) + 30;
+    return {
+      path: `M ${x1} ${y1} L ${xRight} ${y1} L ${xRight} ${y2} L ${x2} ${y2}`,
+      color,
+      isReturn,
+      markerEnd,
+    };
+  }
+
+  const x1 = start.cx;
+  const y1 = start.cy + startYOffset;
+  const x2 = end.cx;
+  const y2 = end.cy - endYOffset;
+
+  let path = "";
+  if (Math.abs(x1 - x2) < 8) {
+    path = `M ${x1} ${y1} L ${x2} ${y2}`;
+  } else {
+    let yMid = y1 + (y2 - y1) / 2;
+    if (y2 - y1 < 30) {
+      yMid = Math.max(y1 + 15, y2 - 15);
+    }
+    path = `M ${x1} ${y1} L ${x1} ${yMid} L ${x2} ${yMid} L ${x2} ${y2}`;
+  }
+
+  return { path, color, isReturn, markerEnd };
+};
+
+const getRowCondicion = (row) => {
+  const tareaId = row?.savedIds?.tarea ? Number(row.savedIds.tarea) : null;
+  if (!tareaId) return null;
+  return condicionesPorTarea.value[tareaId] || null;
+};
+
+const rowSkipsSequentialOut = (row) => {
+  if (!row) return false;
+  const visuals = getActionVisuals(row.accionId);
+  if (visuals.codigoFigura !== "rombo") return false;
+  const cond = getRowCondicion(row);
+  if (!cond) return false;
+  return !!(cond.id_tarea_siguiente_if || cond.id_tarea_siguiente_else);
+};
 
 const filteredUnits = computed(() => {
   if (!unitSearch.value) return mppStore.unidades;
@@ -370,22 +455,18 @@ const addRow = () => {
 
 const removeRow = async (index) => {
   const row = rows.value[index];
-
+  
   // Si la fila tiene IDs guardados, borrar físicamente en el backend
   if (row.savedIds && row.savedIds.operacion) {
     try {
-      const confirmDelete = confirm(
-        `¿Estás seguro de eliminar físicamente la fila ${row.nro} y todos sus datos vinculados?`,
-      );
+      const confirmDelete = confirm(`¿Estás seguro de eliminar físicamente la fila ${row.nro} y todos sus datos vinculados?`);
       if (!confirmDelete) return;
 
-      console.log(
-        `[MatrixUI] Solicitando eliminación física de fila ${row.nro}...`,
-      );
+      console.log(`[MatrixUI] Solicitando eliminación física de fila ${row.nro}...`);
       row.status = "saving"; // Mostrar spinner mientras borra
-
+      
       await mppStore.deleteMatrixRow(row.savedIds);
-
+      
       snackbar.value = {
         show: true,
         text: `Fila ${row.nro} eliminada físicamente de la base de datos`,
@@ -441,13 +522,7 @@ const removeRow = async (index) => {
 // --- LÓGICA DE FIGURAS DINÁMICAS ---
 const getActionVisuals = (accionId) => {
   const accion = mppStore.acciones.find((a) => a.id_accion === accionId);
-  if (!accion || !accion.figura)
-    return {
-      icon: "mdi-checkbox-blank-circle",
-      color: "primary",
-      colorHex: "#6366f1",
-      codigoFigura: "rectangulo",
-    };
+  if (!accion || !accion.figura) return { icon: "mdi-checkbox-blank-circle", color: "primary", colorHex: "#6366f1", codigoFigura: "rectangulo" };
 
   const codigoFigura = accion.figura.codigo;
   const nombreAccion = (accion.nombre_accion || "").toLowerCase();
@@ -455,34 +530,15 @@ const getActionVisuals = (accionId) => {
   // Color basado en semántica del nombre
   let color = "primary";
   let colorHex = "#6366f1";
-  if (
-    nombreAccion.includes("inicio") ||
-    nombreAccion.includes("empezar") ||
-    nombreAccion.includes("comenzar") ||
-    nombreAccion.includes("start")
-  ) {
-    color = "success";
-    colorHex = "#10b981";
-  } else if (
-    nombreAccion.includes("fin") ||
-    nombreAccion.includes("terminar") ||
-    nombreAccion.includes("concluir") ||
-    nombreAccion.includes("archivar") ||
-    nombreAccion.includes("end")
-  ) {
-    color = "error";
-    colorHex = "#ef4444";
-  } else if (
-    nombreAccion.includes("decisión") ||
-    nombreAccion.includes("validar") ||
-    nombreAccion.includes("aprob") ||
-    nombreAccion.includes("revisar") ||
-    nombreAccion.includes("control") ||
-    nombreAccion.includes("analiz") ||
-    nombreAccion.includes("decid")
-  ) {
-    color = "orange-darken-2";
-    colorHex = "#f59e0b";
+  if (nombreAccion.includes("inicio") || nombreAccion.includes("empezar") || nombreAccion.includes("comenzar") || nombreAccion.includes("start")) { 
+    color = "success"; 
+    colorHex = "#10b981"; 
+  } else if (nombreAccion.includes("fin") || nombreAccion.includes("terminar") || nombreAccion.includes("concluir") || nombreAccion.includes("archivar") || nombreAccion.includes("end")) { 
+    color = "error"; 
+    colorHex = "#ef4444"; 
+  } else if (nombreAccion.includes("decisión") || nombreAccion.includes("validar") || nombreAccion.includes("aprob") || nombreAccion.includes("revisar") || nombreAccion.includes("control") || nombreAccion.includes("analiz") || nombreAccion.includes("decid")) { 
+    color = "orange-darken-2"; 
+    colorHex = "#f59e0b"; 
   }
 
   // Icono basado en el código de la figura del backend (extensible)
@@ -504,8 +560,253 @@ const tareaOptionsForCondicion = computed(() => {
     .map((r) => ({
       title: `${r.nro}. ${r.texto_figura || r.tarea || `Tarea #${r.savedIds.tarea}`}`,
       value: Number(r.savedIds.tarea),
+      nro: Number(r.nro),
     }));
 });
+
+/** Destinos posibles: cualquier figura guardada excepto el rombo origen (anteriores y posteriores). */
+const condicionDestinoOptions = computed(() => {
+  const originTareaId = condicionRow.value?.savedIds?.tarea
+    ? Number(condicionRow.value.savedIds.tarea)
+    : null;
+  const originNro = Number(condicionRow.value?.nro) || 0;
+  return tareaOptionsForCondicion.value
+    .filter((o) => Number(o.value) !== originTareaId)
+    .map((o) => {
+      const delta = Number(o.nro) - originNro;
+      const rel =
+        delta === 0
+          ? ""
+          : delta > 0
+            ? ` (↓ +${delta})`
+            : ` (↑ ${delta})`;
+      return {
+        ...o,
+        title: `${o.title}${rel}`,
+      };
+    });
+});
+
+const condicionDiagramNodes = computed(() => {
+  const originTareaId = condicionRow.value?.savedIds?.tarea
+    ? Number(condicionRow.value.savedIds.tarea)
+    : null;
+  const originNro = Number(condicionRow.value?.nro) || 0;
+
+  return rows.value.map((r) => {
+    const tareaId = r.savedIds?.tarea ? Number(r.savedIds.tarea) : null;
+    const visuals = getActionVisuals(r.accionId);
+    const delta = Number(r.nro) - originNro;
+    const isOrigin = originTareaId != null && tareaId === originTareaId;
+    return {
+      nro: r.nro,
+      tareaId,
+      label: r.texto_figura || r.tarea || (tareaId ? `Tarea #${tareaId}` : "Sin guardar"),
+      isOrigin,
+      isSelectable: !!tareaId && !isOrigin,
+      isUnsaved: !tareaId,
+      isIfTarget: tareaId != null && Number(condicionForm.value.id_tarea_siguiente_if) === tareaId,
+      isElseTarget: tareaId != null && Number(condicionForm.value.id_tarea_siguiente_else) === tareaId,
+      colorHex: visuals.colorHex,
+      codigoFigura: visuals.codigoFigura,
+      relativeHint:
+        delta === 0 ? "Origen" : delta > 0 ? `+${delta}` : `${delta}`,
+    };
+  });
+});
+
+const getTareaLabelById = (tareaId) => {
+  if (!tareaId) return null;
+  const opt = tareaOptionsForCondicion.value.find(
+    (o) => Number(o.value) === Number(tareaId),
+  );
+  return opt?.title || `Tarea #${tareaId}`;
+};
+
+const hasCondicionConfigured = (row) => {
+  const tareaId = row?.savedIds?.tarea ? Number(row.savedIds.tarea) : null;
+  if (!tareaId) return false;
+  return !!condicionesPorTarea.value[tareaId];
+};
+
+const recalculateCondicionConnections = () => {
+  nextTick(() => {
+    setTimeout(() => {
+      const container = condicionDiagramRef.value;
+      if (!container) {
+        condicionConnectionPaths.value = [];
+        return;
+      }
+      const containerRect = container.getBoundingClientRect();
+      const originEl = container.querySelector(".condicion-node.is-origin");
+      if (!originEl) {
+        condicionConnectionPaths.value = [];
+        return;
+      }
+
+      const svg = container.querySelector(".condicion-diagram-svg");
+      if (svg) {
+        svg.setAttribute("width", String(container.scrollWidth));
+        svg.setAttribute("height", String(container.scrollHeight));
+        svg.style.width = `${container.scrollWidth}px`;
+        svg.style.height = `${container.scrollHeight}px`;
+      }
+
+      const toLocal = (rect) => ({
+        x: rect.left - containerRect.left + container.scrollLeft + rect.width / 2,
+        y: rect.top - containerRect.top + container.scrollTop + rect.height / 2,
+        top: rect.top - containerRect.top + container.scrollTop,
+        bottom: rect.bottom - containerRect.top + container.scrollTop,
+        left: rect.left - containerRect.left + container.scrollLeft,
+        right: rect.right - containerRect.left + container.scrollLeft,
+        w: rect.width,
+        h: rect.height,
+      });
+
+      const origin = toLocal(originEl.getBoundingClientRect());
+
+      const buildPath = (targetSelector, color, label, side) => {
+        const targetEl = container.querySelector(targetSelector);
+        if (!targetEl) return null;
+        const target = toLocal(targetEl.getBoundingClientRect());
+        const goingUp = target.y < origin.y - 8;
+        const offsetX = side === "left" ? -52 : 52;
+        const midX = (side === "left" ? Math.min(origin.x, target.x) : Math.max(origin.x, target.x)) + offsetX;
+
+        let path;
+        if (goingUp) {
+          // Destino anterior (hacia arriba): sale por el costado y entra por abajo del destino
+          const yStart = origin.y;
+          const yEnd = target.bottom;
+          path = `M ${origin.x} ${yStart} L ${midX} ${yStart} L ${midX} ${yEnd} L ${target.x} ${yEnd}`;
+        } else {
+          // Destino posterior (hacia abajo) o misma altura
+          const yStart = origin.y;
+          const yEnd = target.top;
+          path = `M ${origin.x} ${yStart} L ${midX} ${yStart} L ${midX} ${yEnd} L ${target.x} ${yEnd}`;
+        }
+
+        return {
+          path,
+          color,
+          label,
+          labelX: midX,
+          labelY: (origin.y + target.y) / 2,
+        };
+      };
+
+      const paths = [];
+      const ifPath = buildPath(
+        ".condicion-node.is-if-target",
+        "#2e7d32",
+        "SÍ",
+        "right",
+      );
+      const elsePath = buildPath(
+        ".condicion-node.is-else-target",
+        "#c62828",
+        "NO",
+        "left",
+      );
+      if (ifPath) paths.push(ifPath);
+      if (elsePath) paths.push(elsePath);
+      condicionConnectionPaths.value = paths;
+    }, 80);
+  });
+};
+
+const assignCondicionNode = (tareaId) => {
+  const originId = condicionRow.value?.savedIds?.tarea
+    ? Number(condicionRow.value.savedIds.tarea)
+    : null;
+  const id = Number(tareaId);
+  if (!id || id === originId) return;
+
+  if (rutaActiva.value === "if") {
+    if (Number(condicionForm.value.id_tarea_siguiente_if) === id) {
+      condicionForm.value.id_tarea_siguiente_if = null;
+    } else {
+      condicionForm.value.id_tarea_siguiente_if = id;
+      if (Number(condicionForm.value.id_tarea_siguiente_else) === id) {
+        condicionForm.value.id_tarea_siguiente_else = null;
+      }
+    }
+  } else {
+    if (Number(condicionForm.value.id_tarea_siguiente_else) === id) {
+      condicionForm.value.id_tarea_siguiente_else = null;
+    } else {
+      condicionForm.value.id_tarea_siguiente_else = id;
+      if (Number(condicionForm.value.id_tarea_siguiente_if) === id) {
+        condicionForm.value.id_tarea_siguiente_if = null;
+      }
+    }
+  }
+  recalculateCondicionConnections();
+};
+
+const onSelectCondicionDestino = (route, tareaId) => {
+  rutaActiva.value = route;
+  const id = tareaId ? Number(tareaId) : null;
+  if (!id) {
+    clearCondicionRoute(route);
+    return;
+  }
+  // Reutilizar la misma lógica de asignación (toggle no aplica desde select)
+  if (route === "if") {
+    condicionForm.value.id_tarea_siguiente_if = id;
+    if (Number(condicionForm.value.id_tarea_siguiente_else) === id) {
+      condicionForm.value.id_tarea_siguiente_else = null;
+    }
+  } else {
+    condicionForm.value.id_tarea_siguiente_else = id;
+    if (Number(condicionForm.value.id_tarea_siguiente_if) === id) {
+      condicionForm.value.id_tarea_siguiente_if = null;
+    }
+  }
+  recalculateCondicionConnections();
+};
+
+const clearCondicionRoute = (route) => {
+  if (route === "if") condicionForm.value.id_tarea_siguiente_if = null;
+  if (route === "else") condicionForm.value.id_tarea_siguiente_else = null;
+  recalculateCondicionConnections();
+};
+
+const refreshCondicionesBadges = async () => {
+  const romboRows = rows.value.filter((r) => {
+    if (!r.savedIds?.tarea) return false;
+    return getActionVisuals(r.accionId).codigoFigura === "rombo";
+  });
+
+  if (!romboRows.length) {
+    condicionesPorTarea.value = {};
+    return;
+  }
+
+  const results = await Promise.all(
+    romboRows.map(async (r) => {
+      const tareaId = Number(r.savedIds.tarea);
+      try {
+        const condiciones = await mppStore.fetchCondicionesByTarea(tareaId);
+        const list = Array.isArray(condiciones) ? condiciones : [];
+        if (!list.length) return [tareaId, null];
+        const sorted = [...list].sort(
+          (a, b) =>
+            (a.orden ?? 0) - (b.orden ?? 0) || a.id_condicion - b.id_condicion,
+        );
+        return [tareaId, sorted[0]];
+      } catch {
+        return [tareaId, null];
+      }
+    }),
+  );
+
+  const map = {};
+  results.forEach(([tareaId, cond]) => {
+    if (cond) map[tareaId] = cond;
+  });
+  condicionesPorTarea.value = map;
+};
 
 const openCondicionPanel = async (row) => {
   const visuals = getActionVisuals(row.accionId);
@@ -522,6 +823,7 @@ const openCondicionPanel = async (row) => {
   }
 
   condicionRow.value = row;
+  rutaActiva.value = "if";
   condicionForm.value = {
     id_condicion: null,
     tipo_condicion: "if",
@@ -530,6 +832,7 @@ const openCondicionPanel = async (row) => {
     id_tarea_siguiente_else: null,
     orden: 1,
   };
+  condicionConnectionPaths.value = [];
   showCondicionPanel.value = true;
   isLoadingCondicion.value = true;
 
@@ -538,8 +841,7 @@ const openCondicionPanel = async (row) => {
     const list = Array.isArray(condiciones) ? condiciones : [];
     if (list.length > 0) {
       const sorted = [...list].sort(
-        (a, b) =>
-          (a.orden ?? 0) - (b.orden ?? 0) || a.id_condicion - b.id_condicion,
+        (a, b) => (a.orden ?? 0) - (b.orden ?? 0) || a.id_condicion - b.id_condicion,
       );
       const first = sorted[0];
       condicionForm.value = {
@@ -549,6 +851,10 @@ const openCondicionPanel = async (row) => {
         id_tarea_siguiente_if: first.id_tarea_siguiente_if ?? null,
         id_tarea_siguiente_else: first.id_tarea_siguiente_else ?? null,
         orden: first.orden ?? 1,
+      };
+      condicionesPorTarea.value = {
+        ...condicionesPorTarea.value,
+        [tareaId]: first,
       };
     }
   } catch (e) {
@@ -560,6 +866,7 @@ const openCondicionPanel = async (row) => {
     };
   } finally {
     isLoadingCondicion.value = false;
+    recalculateCondicionConnections();
   }
 };
 
@@ -591,18 +898,24 @@ const saveCondicionPanel = async () => {
       tipo_condicion: condicionForm.value.tipo_condicion,
       expresion_condicion: condicionForm.value.expresion_condicion.trim(),
       id_tarea_siguiente_if: condicionForm.value.id_tarea_siguiente_if || null,
-      id_tarea_siguiente_else:
-        condicionForm.value.id_tarea_siguiente_else || null,
+      id_tarea_siguiente_else: condicionForm.value.id_tarea_siguiente_else || null,
       orden: Number(condicionForm.value.orden) || 1,
     };
 
+    let savedCond = { ...payload, id_condicion: condicionForm.value.id_condicion };
     if (condicionForm.value.id_condicion) {
       await mppStore.updateCondicion(condicionForm.value.id_condicion, payload);
     } else {
       const res = await mppStore.saveCondicion(payload);
       const saved = res.data?.data || res.data;
       condicionForm.value.id_condicion = saved?.id_condicion ?? null;
+      savedCond = { ...savedCond, ...saved, id_condicion: condicionForm.value.id_condicion };
     }
+
+    condicionesPorTarea.value = {
+      ...condicionesPorTarea.value,
+      [tareaId]: savedCond,
+    };
 
     snackbar.value = {
       show: true,
@@ -623,6 +936,10 @@ const saveCondicionPanel = async () => {
 };
 
 const deleteCondicionPanel = async () => {
+  const tareaId = condicionRow.value?.savedIds?.tarea
+    ? Number(condicionRow.value.savedIds.tarea)
+    : null;
+
   if (!condicionForm.value.id_condicion) {
     showCondicionPanel.value = false;
     return;
@@ -631,6 +948,11 @@ const deleteCondicionPanel = async () => {
   isSavingCondicion.value = true;
   try {
     await mppStore.deleteCondicion(condicionForm.value.id_condicion);
+    if (tareaId) {
+      const next = { ...condicionesPorTarea.value };
+      delete next[tareaId];
+      condicionesPorTarea.value = next;
+    }
     snackbar.value = {
       show: true,
       text: "Condición eliminada",
@@ -648,6 +970,17 @@ const deleteCondicionPanel = async () => {
     isSavingCondicion.value = false;
   }
 };
+
+watch(
+  () => [
+    condicionForm.value.id_tarea_siguiente_if,
+    condicionForm.value.id_tarea_siguiente_else,
+    showCondicionPanel.value,
+  ],
+  () => {
+    if (showCondicionPanel.value) recalculateCondicionConnections();
+  },
+);
 
 // Obtener nombre del cargo
 const getCargoName = (cargoId) => {
@@ -739,20 +1072,20 @@ const exportDiagramPdf = async () => {
       pixelRatio: 2,
       cacheBust: true,
     });
-
+    
     const rect = diagramContainer.value.getBoundingClientRect();
     const widthMm = rect.width * 0.264583;
     const heightMm = rect.height * 0.264583;
-
+    
     const pdf = new jsPDF({
       orientation: widthMm > heightMm ? "landscape" : "portrait",
       unit: "mm",
-      format: [widthMm + 20, heightMm + 20],
+      format: [widthMm + 20, heightMm + 20]
     });
-
+    
     pdf.addImage(dataUrl, "PNG", 10, 10, widthMm, heightMm);
     pdf.save(`Diagrama_${procedimientoNombre.value.replace(/\s+/g, "_")}.pdf`);
-
+    
     snackbar.value = {
       show: true,
       text: "Diagrama exportado a PDF con éxito",
@@ -787,9 +1120,7 @@ const toggleCargo = async (cId) => {
       } catch (e) {
         console.error("[MatrixUI] Error al guardar relación cargo-proceso:", e);
         // Revertir
-        const revIdx = selectedCargoIds.value.findIndex(
-          (id) => Number(id) === numId,
-        );
+        const revIdx = selectedCargoIds.value.findIndex((id) => Number(id) === numId);
         if (revIdx !== -1) selectedCargoIds.value.splice(revIdx, 1);
         snackbar.value = {
           show: true,
@@ -812,10 +1143,7 @@ const toggleCargo = async (cId) => {
           await mppStore.fetchCargoProcesos(props.procesoId);
         }
       } catch (e) {
-        console.error(
-          "[MatrixUI] Error al eliminar relación cargo-proceso:",
-          e,
-        );
+        console.error("[MatrixUI] Error al eliminar relación cargo-proceso:", e);
         // Revertir
         if (!selectedCargoIds.value.some((id) => Number(id) === numId)) {
           selectedCargoIds.value.push(numId);
@@ -846,10 +1174,7 @@ onMounted(async () => {
 
     // Cargar cargos ya asociados al proceso (columnas persistidas)
     if (props.procesoId) {
-      console.log(
-        "👉 [Matriz-UI] Cargando cargos asociados al proceso ID:",
-        props.procesoId,
-      );
+      console.log("👉 [Matriz-UI] Cargando cargos asociados al proceso ID:", props.procesoId);
       await mppStore.fetchCargoProcesos(props.procesoId);
       mppStore.cargoProcesos.forEach((cp) => {
         const cId = cp.cargo?.id_cargo || cp.id_cargo;
@@ -864,21 +1189,14 @@ onMounted(async () => {
 
     // Hidratación de la Matriz: Cargar datos existentes si hay procedimientoId
     if (props.procedimientoId) {
-      console.log(
-        "👉 [Matriz-UI] Solicitando hidratación de matriz para procedimiento ID:",
-        props.procedimientoId,
-      );
-      const existingRows = await mppStore.fetchMatrixData(
-        props.procedimientoId,
-      );
+      console.log("👉 [Matriz-UI] Solicitando hidratación de matriz para procedimiento ID:", props.procedimientoId);
+      const existingRows = await mppStore.fetchMatrixData(props.procedimientoId);
       if (existingRows && existingRows.length > 0) {
         rows.value = existingRows;
 
         // Auto-activar carriles basados en los cargos responsables encontrados (por consistencia)
         const activeCargos = [
-          ...new Set(
-            existingRows.map((r) => r.responsableCargoId).filter(Boolean),
-          ),
+          ...new Set(existingRows.map((r) => r.responsableCargoId).filter(Boolean)),
         ];
         activeCargos.forEach((cId) => {
           const numId = Number(cId);
@@ -886,6 +1204,8 @@ onMounted(async () => {
             selectedCargoIds.value.push(numId);
           }
         });
+
+        await refreshCondicionesBadges();
       }
     }
   } catch (e) {
@@ -899,9 +1219,7 @@ onMounted(async () => {
     // IMPORTANTE: Esperar al siguiente ciclo de renderizado para apagar el escudo
     nextTick(() => {
       isHydrating.value = false; // APAGAR ESCUDO
-      console.log(
-        "👉 [Matriz-UI] Escudo de hidratación apagado. Auto-guardado de matriz activo.",
-      );
+      console.log("👉 [Matriz-UI] Escudo de hidratación apagado. Auto-guardado de matriz activo.");
       calculateEditorConnections();
     });
   }
@@ -972,116 +1290,6 @@ onUnmounted(() => {
   if (previewResizeObserver) previewResizeObserver.disconnect();
 });
 
-// Helpers para extracción de destinos condicionales y de retorno
-const getReturnTarget = (text) => {
-  if (!text) return null;
-  const match = text.match(
-    /(?:vuelve\s+a|vuelve\s+al|retorna\s+a|retorna\s+al|regresa\s+a|regresa\s+al|ir\s+a|paso)\s*(?:paso\s+)?(\d+)/i,
-  );
-  return match ? parseInt(match[1], 10) : null;
-};
-
-const getIfTarget = (text) => {
-  if (!text) return null;
-  const match = text.match(/(?:si|if)\s*(?:->|:|=|a)?\s*(?:paso\s+)?(\d+)/i);
-  return match ? parseInt(match[1], 10) : null;
-};
-
-const getElseTarget = (text) => {
-  if (!text) return null;
-  const match = text.match(/(?:no|else)\s*(?:->|:|=|a)?\s*(?:paso\s+)?(\d+)/i);
-  return match ? parseInt(match[1], 10) : null;
-};
-
-// Función para construir la ruta ortogonal SVG entre dos puntos/nodos
-const buildOrthogonalPath = (start, end, options = {}) => {
-  const { type = "sequential", isEditor = false } = options;
-  const prefix = isEditor ? "editor-" : "";
-
-  let color = "#4f46e5";
-  let markerEnd = `url(#${prefix}arrow)`;
-  let isReturn = false;
-
-  if (type === "return") {
-    color = "#ef4444";
-    markerEnd = `url(#${prefix}arrow-return)`;
-    isReturn = true;
-  } else if (type === "if") {
-    color = "#16a34a";
-    markerEnd = `url(#${prefix}arrow-if)`;
-  } else if (type === "else") {
-    color = "#dc2626";
-    markerEnd = `url(#${prefix}arrow-else)`;
-  }
-
-  // Ajustes de altura/ancho según geometría del nodo
-  const startYOffset = start.h / 2;
-  const endYOffset = end.h / 2;
-
-  if (type === "return") {
-    const xStart = start.cx + start.w / 2;
-    const yStart = start.cy;
-    const xEnd = end.cx + end.w / 2;
-    const yEnd = end.cy;
-
-    const xRight = Math.max(xStart, xEnd) + 40;
-    const path = `M ${xStart} ${yStart} L ${xRight} ${yStart} L ${xRight} ${yEnd} L ${xEnd} ${yEnd}`;
-    return { path, color, isReturn, markerEnd };
-  }
-
-  if (type === "if") {
-    const x1 = start.cx - start.w / 2;
-    const y1 = start.cy;
-    const x2 = end.cx;
-    const y2 = end.cy - endYOffset;
-
-    if (Math.abs(x1 - x2) < 8) {
-      const path = `M ${x1} ${y1} L ${x2} ${y2}`;
-      return { path, color, isReturn, markerEnd };
-    } else {
-      const xLeft = Math.min(x1, x2) - 30;
-      const path = `M ${x1} ${y1} L ${xLeft} ${y1} L ${xLeft} ${y2} L ${x2} ${y2}`;
-      return { path, color, isReturn, markerEnd };
-    }
-  }
-
-  if (type === "else") {
-    const x1 = start.cx + start.w / 2;
-    const y1 = start.cy;
-    const x2 = end.cx;
-    const y2 = end.cy - endYOffset;
-
-    if (Math.abs(x1 - x2) < 8) {
-      const path = `M ${x1} ${y1} L ${x2} ${y2}`;
-      return { path, color, isReturn, markerEnd };
-    } else {
-      const xRight = Math.max(x1, x2) + 30;
-      const path = `M ${x1} ${y1} L ${xRight} ${y1} L ${xRight} ${y2} L ${x2} ${y2}`;
-      return { path, color, isReturn, markerEnd };
-    }
-  }
-
-  // Secuencial por defecto (centro superior a centro inferior)
-  const x1 = start.cx;
-  const y1 = start.cy + startYOffset;
-
-  const x2 = end.cx;
-  const y2 = end.cy - endYOffset;
-
-  let path = "";
-  if (Math.abs(x1 - x2) < 8) {
-    path = `M ${x1} ${y1} L ${x2} ${y2}`;
-  } else {
-    let yMid = y1 + (y2 - y1) / 2;
-    if (y2 - y1 < 30) {
-      yMid = Math.max(y1 + 15, y2 - 15);
-    }
-    path = `M ${x1} ${y1} L ${x1} ${yMid} L ${x2} ${yMid} L ${x2} ${y2}`;
-  }
-
-  return { path, color, isReturn, markerEnd };
-};
-
 // Calcular las conexiones visuales (flechas) del diagrama en la cuadrícula de vista previa
 const connectionPaths = ref([]);
 
@@ -1102,82 +1310,92 @@ const calculateConnections = () => {
         const cx = rect.left - wrapperRect.left + rect.width / 2;
         const cy = rect.top - wrapperRect.top + rect.height / 2;
 
-        // Asociar cada nodo al paso de la fila correspondiente por data-row-nro
         const rowNro = Number(node.getAttribute("data-row-nro"));
         const row =
           rows.value.find((r) => Number(r.nro) === rowNro) || rows.value[index];
+        const tareaId = row?.savedIds?.tarea ? Number(row.savedIds.tarea) : null;
         pts.push({
           cx,
           cy,
           w: rect.width,
           h: rect.height,
           nro: row ? Number(row.nro) : rowNro || index + 1,
+          tareaId,
+          row,
           rowText: row ? row.texto_figura || row.tarea || "" : "",
+          skipsSequential: rowSkipsSequentialOut(row),
           shape: row
             ? getActionVisuals(row.accionId)?.codigoFigura || "rectangulo"
             : "rectangulo",
-          rowObj: row,
         });
       });
 
-      // Ordenar secuencialmente por nro de fila ascendente
       pts.sort((a, b) => a.nro - b.nro);
 
+      const byTareaId = new Map(
+        pts.filter((p) => p.tareaId).map((p) => [p.tareaId, p]),
+      );
       const newPaths = [];
 
-      // 1. Conexiones secuenciales lineales entre pasos consecutivos
+      // 1. Secuenciales (omitir rombos con IF/ELSE configurado)
       for (let i = 0; i < pts.length - 1; i++) {
         const start = pts[i];
+        if (start.skipsSequential) continue;
         const end = pts[i + 1];
-
         const returnTarget = getReturnTarget(start.rowText);
         if (!returnTarget || returnTarget === end.nro) {
-          const seqPath = buildOrthogonalPath(start, end, {
-            type: "sequential",
-            isEditor: false,
-          });
-          newPaths.push(seqPath);
+          newPaths.push(
+            buildOrthogonalPath(start, end, {
+              type: "sequential",
+              isEditor: false,
+            }),
+          );
         }
       }
 
-      // 2. Conexiones de Retorno / Bucles condicionales (Rojas)
+      // 2. IF / ELSE desde condiciones guardadas en DB
       pts.forEach((start) => {
+        const cond = getRowCondicion(start.row);
+        if (!cond) return;
+
+        const ifDest = cond.id_tarea_siguiente_if
+          ? byTareaId.get(Number(cond.id_tarea_siguiente_if))
+          : null;
+        const elseDest = cond.id_tarea_siguiente_else
+          ? byTareaId.get(Number(cond.id_tarea_siguiente_else))
+          : null;
+
+        if (ifDest) {
+          newPaths.push(
+            buildOrthogonalPath(start, ifDest, {
+              type: "if",
+              isEditor: false,
+            }),
+          );
+        }
+        if (elseDest) {
+          newPaths.push(
+            buildOrthogonalPath(start, elseDest, {
+              type: "else",
+              isEditor: false,
+            }),
+          );
+        }
+      });
+
+      // 3. Retornos / bucles desde texto de la figura
+      pts.forEach((start) => {
+        if (start.skipsSequential) return;
         const targetNro = getReturnTarget(start.rowText);
         if (targetNro && targetNro !== start.nro) {
           const dest = pts.find((p) => p.nro === targetNro);
           if (dest) {
-            const retPath = buildOrthogonalPath(start, dest, {
-              type: "return",
-              isEditor: false,
-            });
-            newPaths.push(retPath);
-          }
-        }
-      });
-
-      // 3. Conexiones Condicionales IF (Verdes) y ELSE (Rojas)
-      pts.forEach((start) => {
-        const ifNro = getIfTarget(start.rowText);
-        if (ifNro && ifNro !== start.nro) {
-          const dest = pts.find((p) => p.nro === ifNro);
-          if (dest) {
-            const ifPath = buildOrthogonalPath(start, dest, {
-              type: "if",
-              isEditor: false,
-            });
-            newPaths.push(ifPath);
-          }
-        }
-
-        const elseNro = getElseTarget(start.rowText);
-        if (elseNro && elseNro !== start.nro) {
-          const dest = pts.find((p) => p.nro === elseNro);
-          if (dest) {
-            const elsePath = buildOrthogonalPath(start, dest, {
-              type: "else",
-              isEditor: false,
-            });
-            newPaths.push(elsePath);
+            newPaths.push(
+              buildOrthogonalPath(start, dest, {
+                type: "return",
+                isEditor: false,
+              }),
+            );
           }
         }
       });
@@ -1188,7 +1406,7 @@ const calculateConnections = () => {
 };
 
 watch(
-  [showPreview, scrollWrapper, diagramContainer],
+  [showPreview, scrollWrapper, diagramContainer, () => condicionesPorTarea.value],
   () => {
     if (showPreview.value) {
       nextTick(() => {
@@ -1201,7 +1419,7 @@ watch(
       });
     }
   },
-  { immediate: true },
+  { immediate: true, deep: true },
 );
 
 const editorConnectionPaths = ref([]);
@@ -1240,6 +1458,7 @@ const calculateEditorConnections = () => {
         const row =
           rows.value.find((r) => Number(r.nro) === Number(rowNro)) ||
           rows.value[index];
+        const tareaId = row?.savedIds?.tarea ? Number(row.savedIds.tarea) : null;
 
         pts.push({
           cx,
@@ -1247,72 +1466,82 @@ const calculateEditorConnections = () => {
           w: rect.width,
           h: rect.height,
           nro: Number(rowNro),
+          tareaId,
+          row,
           rowText: row ? row.texto_figura || row.tarea || "" : "",
+          skipsSequential: rowSkipsSequentialOut(row),
           shape: row
             ? getActionVisuals(row.accionId)?.codigoFigura || "rectangulo"
             : "rectangulo",
-          rowObj: row,
         });
       });
 
-      // Ordenar secuencialmente por nro de fila ascendente
       pts.sort((a, b) => a.nro - b.nro);
 
+      const byTareaId = new Map(
+        pts.filter((p) => p.tareaId).map((p) => [p.tareaId, p]),
+      );
       const newPaths = [];
 
-      // Conexiones secuenciales en el editor
+      // Secuenciales — omitir rombos con IF/ELSE configurado
       for (let i = 0; i < pts.length - 1; i++) {
         const start = pts[i];
+        if (start.skipsSequential) continue;
         const end = pts[i + 1];
-
         const returnTarget = getReturnTarget(start.rowText);
         if (!returnTarget || returnTarget === end.nro) {
-          const seqPath = buildOrthogonalPath(start, end, {
-            type: "sequential",
-            isEditor: true,
-          });
-          newPaths.push(seqPath);
+          newPaths.push(
+            buildOrthogonalPath(start, end, {
+              type: "sequential",
+              isEditor: true,
+            }),
+          );
         }
       }
 
-      // Conexiones de retorno en el editor
+      // IF / ELSE desde condiciones guardadas
       pts.forEach((start) => {
+        const cond = getRowCondicion(start.row);
+        if (!cond) return;
+
+        const ifDest = cond.id_tarea_siguiente_if
+          ? byTareaId.get(Number(cond.id_tarea_siguiente_if))
+          : null;
+        const elseDest = cond.id_tarea_siguiente_else
+          ? byTareaId.get(Number(cond.id_tarea_siguiente_else))
+          : null;
+
+        if (ifDest) {
+          newPaths.push(
+            buildOrthogonalPath(start, ifDest, {
+              type: "if",
+              isEditor: true,
+            }),
+          );
+        }
+        if (elseDest) {
+          newPaths.push(
+            buildOrthogonalPath(start, elseDest, {
+              type: "else",
+              isEditor: true,
+            }),
+          );
+        }
+      });
+
+      // Retornos desde texto
+      pts.forEach((start) => {
+        if (start.skipsSequential) return;
         const targetNro = getReturnTarget(start.rowText);
         if (targetNro && targetNro !== start.nro) {
           const dest = pts.find((p) => p.nro === targetNro);
           if (dest) {
-            const retPath = buildOrthogonalPath(start, dest, {
-              type: "return",
-              isEditor: true,
-            });
-            newPaths.push(retPath);
-          }
-        }
-      });
-
-      // Conexiones condenciales IF y ELSE en el editor
-      pts.forEach((start) => {
-        const ifNro = getIfTarget(start.rowText);
-        if (ifNro && ifNro !== start.nro) {
-          const dest = pts.find((p) => p.nro === ifNro);
-          if (dest) {
-            const ifPath = buildOrthogonalPath(start, dest, {
-              type: "if",
-              isEditor: true,
-            });
-            newPaths.push(ifPath);
-          }
-        }
-
-        const elseNro = getElseTarget(start.rowText);
-        if (elseNro && elseNro !== start.nro) {
-          const dest = pts.find((p) => p.nro === elseNro);
-          if (dest) {
-            const elsePath = buildOrthogonalPath(start, dest, {
-              type: "else",
-              isEditor: true,
-            });
-            newPaths.push(elsePath);
+            newPaths.push(
+              buildOrthogonalPath(start, dest, {
+                type: "return",
+                isEditor: true,
+              }),
+            );
           }
         }
       });
@@ -1323,7 +1552,12 @@ const calculateEditorConnections = () => {
 };
 
 watch(
-  [matrixEditorContainer, selectedCargoIds, () => rows.value],
+  [
+    matrixEditorContainer,
+    selectedCargoIds,
+    () => rows.value,
+    () => condicionesPorTarea.value,
+  ],
   () => {
     if (matrixEditorContainer.value && rows.value.length > 0) {
       nextTick(() => {
@@ -1341,25 +1575,15 @@ watch(
 
 <template>
   <!-- VISTA DE BLOQUEO EN DISPOSITIVOS MÓVILES PEQUEÑOS (<600px) -->
-  <div
-    v-if="xs"
-    class="fill-height d-flex align-center justify-center pa-4 bg-slate-50"
-  >
-    <v-card
-      class="rounded-xl pa-6 text-center border-0 shadow-lg"
-      elevation="4"
-      max-width="420"
-    >
+  <div v-if="xs" class="fill-height d-flex align-center justify-center pa-4 bg-slate-50">
+    <v-card class="rounded-xl pa-6 text-center border-0 shadow-lg" elevation="4" max-width="420">
       <v-avatar color="warning" variant="tonal" size="80" class="mb-4">
         <v-icon color="warning" size="48">mdi-cellphone-remove</v-icon>
       </v-avatar>
-      <h2 class="text-h5 font-weight-black mb-2 text-slate-800">
-        Vista no disponible
-      </h2>
-      <p class="text-body-2 text-slate-600 mb-6" style="line-height: 1.5">
-        La matriz de gestión MPP no está disponible en dispositivos móviles
-        pequeños. Utiliza una tablet o computadora para editar el diagrama de
-        flujo.
+      <h2 class="text-h5 font-weight-black mb-2 text-slate-800">Vista no disponible</h2>
+      <p class="text-body-2 text-slate-600 mb-6" style="line-height: 1.5;">
+        La matriz de gestión MPP no está disponible en dispositivos móviles pequeños.
+        Utiliza una tablet o computadora para editar el diagrama de flujo.
       </p>
       <v-btn
         color="primary"
@@ -1374,46 +1598,20 @@ watch(
     </v-card>
   </div>
 
-  <div
-    v-else
-    class="matrix-designer fill-height d-flex flex-column bg-surface"
-    style="width: 100%; max-width: 100%; overflow: hidden"
-  >
+  <div v-else class="matrix-designer fill-height d-flex flex-column bg-surface" style="width: 100%; max-width: 100%; overflow: hidden;">
     <!-- ÁREA DE LA MATRIZ Y TOOLBAR EN UN SOLO CONTENEDOR CON SCROLL UNIFICADO -->
-    <div
-      class="flex-grow-1 pa-2 bg-slate-50 overflow-x-auto"
-      ref="matrixEditorContainer"
-      style="
-        width: 100%;
-        max-width: 100%;
-        overflow-x: auto;
-        overflow-y: auto;
-        box-sizing: border-box;
-        -webkit-overflow-scrolling: touch;
-      "
-    >
-      <div
-        class="editor-scroll-wrapper"
-        style="
-          position: relative;
-          display: inline-block;
-          min-width: 1200px;
-          width: max-content;
-        "
-      >
+    <div class="flex-grow-1 pa-2 bg-slate-50 overflow-x-auto" ref="matrixEditorContainer" style="width: 100%; max-width: 100%; overflow-x: auto; overflow-y: auto; box-sizing: border-box; -webkit-overflow-scrolling: touch;">
+      <div class="editor-scroll-wrapper" style="position: relative; display: inline-block; min-width: 1200px; width: max-content;">
+        
         <!-- TOOLBAR SUPERIOR (DENTRO DEL SCROLL WRAPPER, PEGAJOSO EN SCROLL VERTICAL) -->
         <v-toolbar
           density="compact"
           color="surface"
           border
           class="px-4 mb-2 rounded-lg flex-shrink-0"
-          style="position: sticky; top: 0; z-index: 10; min-width: 100%"
+          style="position: sticky; top: 0; z-index: 10; min-width: 100%;"
         >
-          <v-btn
-            icon="mdi-arrow-left"
-            variant="text"
-            @click="emit('back')"
-          ></v-btn>
+          <v-btn icon="mdi-arrow-left" variant="text" @click="emit('back')"></v-btn>
           <v-divider vertical class="mx-2"></v-divider>
           <div class="d-flex flex-column">
             <span class="text-subtitle-2 font-weight-bold uppercase">{{
@@ -1423,20 +1621,10 @@ watch(
               <span class="text-caption text-grey-darken-1">{{
                 procedimientoNombre
               }}</span>
-              <v-chip
-                size="x-small"
-                color="primary"
-                variant="tonal"
-                class="font-weight-bold ml-1"
-              >
+              <v-chip size="x-small" color="primary" variant="tonal" class="font-weight-bold ml-1">
                 v{{ procedimientoVersion }}
               </v-chip>
-              <v-chip
-                size="x-small"
-                :color="estadoVersionColor"
-                variant="tonal"
-                class="font-weight-bold uppercase"
-              >
+              <v-chip size="x-small" :color="estadoVersionColor" variant="tonal" class="font-weight-bold uppercase">
                 {{ procedimientoEstadoVersion }}
               </v-chip>
             </div>
@@ -1450,7 +1638,7 @@ watch(
             density="compact"
             variant="solo-filled"
             hide-details
-            style="max-width: 170px"
+            style="max-width: 170px;"
             class="mr-2 rounded-lg"
             @update:model-value="changeEstadoVersion"
           ></v-select>
@@ -1514,177 +1702,174 @@ watch(
           </v-chip>
         </v-toolbar>
 
-        <table
-          class="mpp-matrix-table"
-          style="position: relative; z-index: 2; width: 100%; min-width: 1200px"
-        >
-          <thead>
-            <tr>
-              <th rowspan="2" class="sticky-col nro-col">Nro</th>
-              <th rowspan="2" class="data-col">Requisitos (Entrada)</th>
-              <th colspan="2" class="text-center group-header">Operaciones</th>
-              <th rowspan="2" class="data-col">
-                Documento o Material de Referencia
-              </th>
-              <th rowspan="2" class="data-col">Riesgos</th>
-              <th rowspan="2" class="data-col">Controles</th>
-              <th rowspan="2" class="data-col">
-                Documento, Registro o Disposición Resultante (Salida)
-              </th>
-              <th rowspan="2" class="plazo-col">Plazo [días]</th>
-              <th class="solicitante-header text-center">Solicitante</th>
+        <table class="mpp-matrix-table" style="position: relative; z-index: 2; width: 100%; min-width: 1200px;">
+        <thead>
+          <tr>
+            <th rowspan="2" class="sticky-col nro-col">Nro</th>
+            <th rowspan="2" class="data-col">Requisitos (Entrada)</th>
+            <th colspan="2" class="text-center group-header">Operaciones</th>
+            <th rowspan="2" class="data-col">
+              Documento o Material de Referencia
+            </th>
+            <th rowspan="2" class="data-col">Riesgos</th>
+            <th rowspan="2" class="data-col">Controles</th>
+            <th rowspan="2" class="data-col">
+              Documento, Registro o Disposición Resultante (Salida)
+            </th>
+            <th rowspan="2" class="plazo-col">Plazo [días]</th>
+            <th class="solicitante-header text-center">Solicitante</th>
 
-              <th
-                v-for="group in swimlaneGroups"
-                :key="group.id"
-                :colspan="group.cargos.length"
-                class="text-center swimlane-header"
-              >
-                {{ group.name }}
-              </th>
+            <th
+              v-for="group in swimlaneGroups"
+              :key="group.id"
+              :colspan="group.cargos.length"
+              class="text-center swimlane-header"
+            >
+              {{ group.name }}
+            </th>
 
-              <th class="accion-header text-center border-left-bold">Acción</th>
-              <th rowspan="2" width="40"></th>
-            </tr>
-            <tr>
-              <th class="sub-header text-center">Actividades</th>
-              <th class="sub-header text-center">Tareas</th>
-              <th class="sub-header solicitante-sub text-center">
-                Persona / Unidad Solicitante
-              </th>
+            <th class="accion-header text-center border-left-bold">Acción</th>
+            <th rowspan="2" width="40"></th>
+          </tr>
+          <tr>
+            <th class="sub-header text-center">Actividades</th>
+            <th class="sub-header text-center">Tareas</th>
+            <th class="sub-header solicitante-sub text-center">
+              Persona / Unidad Solicitante
+            </th>
 
-              <th
-                v-for="cargo in allDisplayCargos"
-                :key="cargo.id_cargo"
-                class="cargo-header text-center"
-              >
-                {{ cargo.nombre }}
-              </th>
+            <th
+              v-for="(cargo, cargoIdx) in allDisplayCargos"
+              :key="cargoColumnKey(cargo, cargoIdx)"
+              class="cargo-header text-center"
+            >
+              {{ cargo.nombre }}
+            </th>
 
-              <th class="sub-header accion-sub text-center border-left-bold">
-                Verbo
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, index) in rows" :key="row.id">
-              <td
-                class="text-center font-weight-bold sticky-col nro-col"
-                style="vertical-align: middle"
-              >
-                <div class="d-flex flex-column align-center">
-                  <span>{{ row.nro }}</span>
-                  <v-progress-circular
-                    v-if="row.status === 'saving'"
-                    indeterminate
-                    size="12"
-                    width="2"
-                    color="primary"
-                    class="mt-1"
-                  ></v-progress-circular>
-                  <v-icon
-                    v-if="row.status === 'saved'"
-                    color="success"
-                    size="14"
-                    class="mt-1"
-                    >mdi-check-circle</v-icon
-                  >
-                  <v-icon
-                    v-if="row.status === 'error'"
-                    color="error"
-                    size="14"
-                    class="mt-1"
-                    >mdi-alert-circle</v-icon
-                  >
-                </div>
-              </td>
-              <td>
-                <textarea
-                  v-model="row.requisitos"
-                  class="cell-textarea"
-                  placeholder="..."
-                  @input="adjustHeight"
-                ></textarea>
-              </td>
-              <td class="bg-grey-lighten-4">
-                <textarea
-                  v-model="row.actividad"
-                  class="cell-textarea font-weight-bold"
-                  placeholder="..."
-                  @input="adjustHeight"
-                ></textarea>
-              </td>
-              <td>
-                <textarea
-                  v-model="row.tarea"
-                  class="cell-textarea font-weight-medium"
-                  placeholder="Descripción de la tarea..."
-                  @input="adjustHeight"
-                ></textarea>
-              </td>
-              <td>
-                <textarea
-                  v-model="row.referencia"
-                  class="cell-textarea"
-                  placeholder="..."
-                  @input="adjustHeight"
-                ></textarea>
-              </td>
-              <td>
-                <textarea
-                  v-model="row.riesgo"
-                  class="cell-textarea"
-                  placeholder="..."
-                  @input="adjustHeight"
-                ></textarea>
-              </td>
-              <td>
-                <textarea
-                  v-model="row.control"
-                  class="cell-textarea"
-                  placeholder="..."
-                  @input="adjustHeight"
-                ></textarea>
-              </td>
-              <td>
-                <textarea
-                  v-model="row.salida"
-                  class="cell-textarea"
-                  placeholder="..."
-                  @input="adjustHeight"
-                ></textarea>
-              </td>
-              <td>
-                <input
-                  type="number"
-                  v-model.number="row.plazo"
-                  class="cell-input-number text-center"
-                />
-              </td>
-              <td class="bg-blue-lighten-5">
-                <textarea
-                  v-model="row.solicitante"
-                  class="cell-textarea"
-                  placeholder="..."
-                  @input="adjustHeight"
-                ></textarea>
-              </td>
+            <th class="sub-header accion-sub text-center border-left-bold">
+              Verbo
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(row, index) in rows" :key="row.id">
+            <td
+              class="text-center font-weight-bold sticky-col nro-col"
+              style="vertical-align: middle"
+            >
+              <div class="d-flex flex-column align-center">
+                <span>{{ row.nro }}</span>
+                <v-progress-circular
+                  v-if="row.status === 'saving'"
+                  indeterminate
+                  size="12"
+                  width="2"
+                  color="primary"
+                  class="mt-1"
+                ></v-progress-circular>
+                <v-icon
+                  v-if="row.status === 'saved'"
+                  color="success"
+                  size="14"
+                  class="mt-1"
+                  >mdi-check-circle</v-icon
+                >
+                <v-icon
+                  v-if="row.status === 'error'"
+                  color="error"
+                  size="14"
+                  class="mt-1"
+                  >mdi-alert-circle</v-icon
+                >
+              </div>
+            </td>
+            <td>
+              <textarea
+                v-model="row.requisitos"
+                class="cell-textarea"
+                placeholder="..."
+                @input="adjustHeight"
+              ></textarea>
+            </td>
+            <td class="bg-grey-lighten-4">
+              <textarea
+                v-model="row.actividad"
+                class="cell-textarea font-weight-bold"
+                placeholder="..."
+                @input="adjustHeight"
+              ></textarea>
+            </td>
+            <td>
+              <textarea
+                v-model="row.tarea"
+                class="cell-textarea font-weight-medium"
+                placeholder="Descripción de la tarea..."
+                @input="adjustHeight"
+              ></textarea>
+            </td>
+            <td>
+              <textarea
+                v-model="row.referencia"
+                class="cell-textarea"
+                placeholder="..."
+                @input="adjustHeight"
+              ></textarea>
+            </td>
+            <td>
+              <textarea
+                v-model="row.riesgo"
+                class="cell-textarea"
+                placeholder="..."
+                @input="adjustHeight"
+              ></textarea>
+            </td>
+            <td>
+              <textarea
+                v-model="row.control"
+                class="cell-textarea"
+                placeholder="..."
+                @input="adjustHeight"
+              ></textarea>
+            </td>
+            <td>
+              <textarea
+                v-model="row.salida"
+                class="cell-textarea"
+                placeholder="..."
+                @input="adjustHeight"
+              ></textarea>
+            </td>
+            <td>
+              <input
+                type="number"
+                v-model.number="row.plazo"
+                class="cell-input-number text-center"
+              />
+            </td>
+            <td class="bg-blue-lighten-5">
+              <textarea
+                v-model="row.solicitante"
+                class="cell-textarea"
+                placeholder="..."
+                @input="adjustHeight"
+              ></textarea>
+            </td>
 
-              <td
-                v-for="cargo in allDisplayCargos"
-                :key="cargo.id_cargo"
-                class="text-center diagram-cell"
-                @click="handleCellClick(row, cargo.id_cargo)"
+            <td
+              v-for="(cargo, cargoIdx) in allDisplayCargos"
+              :key="cargoColumnKey(cargo, cargoIdx)"
+              class="text-center diagram-cell"
+              @click="handleCellClick(row, cargo.id_cargo)"
+            >
+              <div
+                v-if="shouldShowFlowNode(row, cargo, cargoIdx)"
+                class="cell-flow-node-wrap"
               >
                 <div
-                  v-if="row.responsableCargoId == cargo.id_cargo"
                   class="cell-flow-node"
                   :data-row-nro="row.nro"
                   :class="getActionVisuals(row.accionId).codigoFigura"
-                  :style="{
-                    backgroundColor: getActionVisuals(row.accionId).colorHex,
-                  }"
-                  @click.stop="openCondicionPanel(row)"
+                  :style="{ backgroundColor: getActionVisuals(row.accionId).colorHex }"
                 >
                   <div class="cell-flow-text-wrapper">
                     <textarea
@@ -1696,160 +1881,177 @@ watch(
                     ></textarea>
                   </div>
                 </div>
-              </td>
-              <td
-                class="bg-indigo-lighten-5 border-left-bold"
-                style="vertical-align: middle"
-              >
-                <v-select
-                  v-model="row.accionId"
-                  :items="mppStore.acciones"
-                  item-title="nombre_accion"
-                  item-value="id_accion"
-                  density="compact"
-                  variant="plain"
-                  hide-details
-                  placeholder="Verbo"
-                  class="px-2"
+
+                <!-- Botón visible solo en rombos: abre el popup de rutas IF/ELSE -->
+                <v-tooltip
+                  v-if="getActionVisuals(row.accionId).codigoFigura === 'rombo'"
+                  text="Configurar rutas IF / ELSE"
+                  location="top"
                 >
-                  <template v-slot:item="{ props, item }">
-                    <v-list-item v-bind="props">
-                      <template v-slot:prepend>
-                        <v-icon
-                          :color="getActionVisuals(item.raw.id_accion).color"
-                          size="18"
-                          class="mr-2"
-                        >
-                          {{ getActionVisuals(item.raw.id_accion).icon }}
-                        </v-icon>
-                      </template>
-                    </v-list-item>
+                  <template #activator="{ props: tipProps }">
+                    <v-btn
+                      v-bind="tipProps"
+                      class="condicion-open-btn"
+                      size="x-small"
+                      :color="hasCondicionConfigured(row) ? 'success' : 'orange-darken-2'"
+                      variant="flat"
+                      icon="mdi-source-branch"
+                      @click.stop="openCondicionPanel(row)"
+                    ></v-btn>
                   </template>
-                  <template v-slot:selection="{ item }">
-                    <div class="d-flex align-center">
-                      <v-icon
-                        :color="getActionVisuals(item.raw.id_accion).color"
-                        size="14"
-                        class="mr-1"
-                      >
+                </v-tooltip>
+
+                <v-chip
+                  v-if="hasCondicionConfigured(row)"
+                  class="condicion-cell-badge"
+                  size="x-small"
+                  color="success"
+                  variant="flat"
+                >
+                  IF
+                </v-chip>
+              </div>
+            </td>
+            <td
+              class="bg-indigo-lighten-5 border-left-bold"
+              style="vertical-align: middle"
+            >
+              <v-select
+                v-model="row.accionId"
+                :items="mppStore.acciones"
+                item-title="nombre_accion"
+                item-value="id_accion"
+                density="compact"
+                variant="plain"
+                hide-details
+                placeholder="Verbo"
+                class="px-2"
+              >
+                <template v-slot:item="{ props, item }">
+                  <v-list-item v-bind="props">
+                    <template v-slot:prepend>
+                      <v-icon :color="getActionVisuals(item.raw.id_accion).color" size="18" class="mr-2">
                         {{ getActionVisuals(item.raw.id_accion).icon }}
                       </v-icon>
-                      <span class="text-caption font-weight-bold">{{
-                        item.raw.nombre_accion
-                      }}</span>
-                    </div>
-                  </template>
-                </v-select>
-              </td>
+                    </template>
+                  </v-list-item>
+                </template>
+                <template v-slot:selection="{ item }">
+                  <div class="d-flex align-center">
+                    <v-icon :color="getActionVisuals(item.raw.id_accion).color" size="14" class="mr-1">
+                      {{ getActionVisuals(item.raw.id_accion).icon }}
+                    </v-icon>
+                    <span class="text-caption font-weight-bold">{{ item.raw.nombre_accion }}</span>
+                  </div>
+                </template>
+              </v-select>
+            </td>
 
-              <td class="text-center" style="vertical-align: middle">
-                <v-btn
-                  icon="mdi-delete-outline"
-                  variant="text"
-                  color="error"
-                  size="x-small"
-                  @click="removeRow(index)"
-                  :disabled="rows.length === 1"
-                ></v-btn>
-              </td>
-            </tr>
-          </tbody>
-          <tfoot>
-            <tr>
-              <td
-                :colspan="12 + allDisplayCargos.length"
-                class="pa-3 bg-slate-50 border-0"
+            <td class="text-center" style="vertical-align: middle">
+              <v-btn
+                icon="mdi-delete-outline"
+                variant="text"
+                color="error"
+                size="x-small"
+                @click="removeRow(index)"
+                :disabled="rows.length === 1"
+              ></v-btn>
+            </td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td :colspan="12 + allDisplayCargos.length" class="pa-3 bg-slate-50 border-0">
+              <v-btn
+                color="secondary"
+                block
+                variant="tonal"
+                @click="addRow"
+                prepend-icon="mdi-plus"
+                height="44"
+                class="border-dashed font-weight-bold rounded-lg"
               >
-                <v-btn
-                  color="secondary"
-                  block
-                  variant="tonal"
-                  @click="addRow"
-                  prepend-icon="mdi-plus"
-                  height="44"
-                  class="border-dashed font-weight-bold rounded-lg"
-                >
-                  Añadir Nueva Fila de Operación
-                </v-btn>
-              </td>
-            </tr>
-          </tfoot>
-        </table>
+                Añadir Nueva Fila de Operación
+              </v-btn>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
 
-        <!-- SVG para conectar nodos en el editor directo (Sólido y Elegante) -->
-        <svg
-          v-if="allDisplayCargos.length > 0"
-          style="
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 5;
+      <!-- SVG para conectar nodos en el editor directo (Sólido y Elegante) -->
+      <svg
+        v-if="allDisplayCargos.length > 0"
+        style="
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          pointer-events: none;
+          z-index: 5;
+        "
+      >
+        <defs>
+          <marker
+            id="editor-arrow"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#4f46e5" />
+          </marker>
+          <marker
+            id="editor-arrow-return"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#ef4444" />
+          </marker>
+          <marker
+            id="editor-arrow-if"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#16a34a" />
+          </marker>
+          <marker
+            id="editor-arrow-else"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#dc2626" />
+          </marker>
+        </defs>
+        <path
+          v-for="(path, i) in editorConnectionPaths"
+          :key="i"
+          :d="path.path"
+          :stroke="path.color"
+          stroke-width="2"
+          fill="none"
+          :marker-end="
+            path.markerEnd ||
+            (path.isReturn
+              ? 'url(#editor-arrow-return)'
+              : 'url(#editor-arrow)')
           "
-        >
-          <defs>
-            <marker
-              id="editor-arrow"
-              viewBox="0 0 10 10"
-              refX="8"
-              refY="5"
-              markerWidth="6"
-              markerHeight="6"
-              orient="auto-start-reverse"
-            >
-              <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#4f46e5" />
-            </marker>
-            <marker
-              id="editor-arrow-return"
-              viewBox="0 0 10 10"
-              refX="8"
-              refY="5"
-              markerWidth="6"
-              markerHeight="6"
-              orient="auto-start-reverse"
-            >
-              <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#ef4444" />
-            </marker>
-            <marker
-              id="editor-arrow-if"
-              viewBox="0 0 10 10"
-              refX="8"
-              refY="5"
-              markerWidth="6"
-              markerHeight="6"
-              orient="auto-start-reverse"
-            >
-              <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#16a34a" />
-            </marker>
-            <marker
-              id="editor-arrow-else"
-              viewBox="0 0 10 10"
-              refX="8"
-              refY="5"
-              markerWidth="6"
-              markerHeight="6"
-              orient="auto-start-reverse"
-            >
-              <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#dc2626" />
-            </marker>
-          </defs>
-          <path
-            v-for="(path, i) in editorConnectionPaths"
-            :key="i"
-            :d="path.path"
-            :stroke="path.color"
-            stroke-width="2"
-            fill="none"
-            :marker-end="
-              path.markerEnd ||
-              (path.isReturn
-                ? 'url(#editor-arrow-return)'
-                : 'url(#editor-arrow)')
-            "
-          />
-        </svg>
+        />
+      </svg>
       </div>
     </div>
 
@@ -1899,9 +2101,7 @@ watch(
                   <v-badge
                     v-if="
                       u.cargos?.some((c) =>
-                        selectedCargoIds.some(
-                          (id) => Number(id) === Number(c.id_cargo),
-                        ),
+                        selectedCargoIds.some((id) => Number(id) === Number(c.id_cargo)),
                       )
                     "
                     color="info"
@@ -1929,11 +2129,7 @@ watch(
                 >
                   <template v-slot:prepend>
                     <v-checkbox-btn
-                      :model-value="
-                        selectedCargoIds.some(
-                          (id) => Number(id) === Number(c.id_cargo),
-                        )
-                      "
+                      :model-value="selectedCargoIds.some((id) => Number(id) === Number(c.id_cargo))"
                       color="primary"
                     ></v-checkbox-btn>
                   </template>
@@ -1974,8 +2170,8 @@ watch(
             </div>
             <v-list density="compact" class="flex-grow-1 overflow-y-auto">
               <v-list-item
-                v-for="cargo in allDisplayCargos"
-                :key="cargo.id_cargo"
+                v-for="(cargo, cargoIdx) in allDisplayCargos"
+                :key="cargoColumnKey(cargo, cargoIdx)"
                 class="px-2 border-bottom"
               >
                 <v-list-item-title
@@ -2048,96 +2244,301 @@ watch(
         <v-divider></v-divider>
         <v-card-actions class="pa-3">
           <v-spacer></v-spacer>
-          <v-btn
-            color="primary"
-            variant="outlined"
-            class="rounded-lg font-weight-bold text-uppercase text-caption mr-2"
-            @click="showCreateAction = false"
-            >Cancelar</v-btn
-          >
-          <v-btn
-            color="primary"
-            variant="flat"
-            class="rounded-lg font-weight-bold text-uppercase text-caption px-4"
-            @click="createQuickAction"
-            :loading="isSavingAction"
-            >Guardar Acción</v-btn
-          >
+          <v-btn color="primary" variant="outlined" class="rounded-lg font-weight-bold text-uppercase text-caption mr-2" @click="showCreateAction = false">Cancelar</v-btn>
+          <v-btn color="primary" variant="flat" class="rounded-lg font-weight-bold text-uppercase text-caption px-4" @click="createQuickAction" :loading="isSavingAction">Guardar Acción</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
 
-    <!-- MODAL CONDICIÓN IF/ELSE (Rombo) -->
-    <v-dialog v-model="showCondicionPanel" max-width="520">
+    <!-- MODAL CONDICIÓN IF/ELSE (Rombo) — popup visual -->
+    <v-dialog v-model="showCondicionPanel" max-width="960" scrollable>
       <v-card class="rounded-xl overflow-hidden">
         <v-toolbar color="orange-darken-2" dark density="compact">
           <v-toolbar-title class="text-subtitle-1 font-weight-bold">
             CONDICIÓN IF/ELSE
-            <span
-              v-if="condicionRow"
-              class="text-caption font-weight-regular ml-2"
-            >
+            <span v-if="condicionRow" class="text-caption font-weight-regular ml-2">
               — Paso {{ condicionRow.nro }}
             </span>
           </v-toolbar-title>
           <v-spacer></v-spacer>
           <v-btn icon="mdi-close" @click="showCondicionPanel = false"></v-btn>
         </v-toolbar>
-        <v-card-text class="pa-4" :class="{ 'opacity-50': isLoadingCondicion }">
-          <v-select
-            v-model="condicionForm.tipo_condicion"
-            :items="tipoCondicionOptions"
-            item-title="title"
-            item-value="value"
-            label="Tipo de condición"
-            variant="outlined"
-            density="compact"
-            class="mb-3"
-            hide-details
-          ></v-select>
-          <v-textarea
-            v-model="condicionForm.expresion_condicion"
-            label="Expresión de la condición"
-            placeholder="Ej: ¿Documento aprobado?"
-            variant="outlined"
-            density="compact"
-            rows="2"
-            class="mb-3"
-            hide-details
-          ></v-textarea>
-          <v-select
-            v-model="condicionForm.id_tarea_siguiente_if"
-            :items="tareaOptionsForCondicion"
-            item-title="title"
-            item-value="value"
-            label="Tarea siguiente si IF (verdadero)"
-            variant="outlined"
-            density="compact"
-            class="mb-3"
-            clearable
-            hide-details
-          ></v-select>
-          <v-select
-            v-model="condicionForm.id_tarea_siguiente_else"
-            :items="tareaOptionsForCondicion"
-            item-title="title"
-            item-value="value"
-            label="Tarea siguiente si ELSE (falso)"
-            variant="outlined"
-            density="compact"
-            class="mb-3"
-            clearable
-            hide-details
-          ></v-select>
-          <v-text-field
-            v-model.number="condicionForm.orden"
-            label="Orden"
-            type="number"
-            variant="outlined"
-            density="compact"
-            hide-details
-          ></v-text-field>
+
+        <v-card-text class="pa-0" :class="{ 'opacity-50': isLoadingCondicion }">
+          <div class="condicion-dialog-grid">
+            <!-- Panel izquierdo: expresión / tipo -->
+            <div class="condicion-panel-left pa-4">
+              <v-select
+                v-model="condicionForm.tipo_condicion"
+                :items="tipoCondicionOptions"
+                item-title="title"
+                item-value="value"
+                label="Tipo de condición"
+                variant="outlined"
+                density="compact"
+                class="mb-3"
+                hide-details
+              ></v-select>
+              <v-textarea
+                v-model="condicionForm.expresion_condicion"
+                label="Expresión de la condición"
+                placeholder="Ej: ¿Documento aprobado?"
+                variant="outlined"
+                density="compact"
+                rows="3"
+                class="mb-3"
+                hide-details
+              ></v-textarea>
+              <v-text-field
+                v-model.number="condicionForm.orden"
+                label="Orden"
+                type="number"
+                variant="outlined"
+                density="compact"
+                class="mb-4"
+                hide-details
+              ></v-text-field>
+
+              <div class="text-caption font-weight-bold text-medium-emphasis mb-2">
+                Destinos (cualquier paso)
+              </div>
+              <v-select
+                :model-value="condicionForm.id_tarea_siguiente_if"
+                :items="condicionDestinoOptions"
+                item-title="title"
+                item-value="value"
+                label="IF (SÍ) → figura destino"
+                variant="outlined"
+                density="compact"
+                class="mb-2"
+                clearable
+                hide-details
+                prepend-inner-icon="mdi-check-circle"
+                @update:model-value="(v) => onSelectCondicionDestino('if', v)"
+              ></v-select>
+              <v-select
+                :model-value="condicionForm.id_tarea_siguiente_else"
+                :items="condicionDestinoOptions"
+                item-title="title"
+                item-value="value"
+                label="ELSE (NO) → figura destino"
+                variant="outlined"
+                density="compact"
+                class="mb-3"
+                clearable
+                hide-details
+                prepend-inner-icon="mdi-close-circle"
+                @update:model-value="(v) => onSelectCondicionDestino('else', v)"
+              ></v-select>
+
+              <div class="d-flex flex-column ga-2 mb-2">
+                <v-chip
+                  v-if="condicionForm.id_tarea_siguiente_if"
+                  color="success"
+                  variant="tonal"
+                  closable
+                  class="align-self-start"
+                  @click:close="clearCondicionRoute('if')"
+                >
+                  <v-icon start size="16">mdi-check-circle</v-icon>
+                  IF: {{ getTareaLabelById(condicionForm.id_tarea_siguiente_if) }}
+                </v-chip>
+                <v-chip
+                  v-if="condicionForm.id_tarea_siguiente_else"
+                  color="error"
+                  variant="tonal"
+                  closable
+                  class="align-self-start"
+                  @click:close="clearCondicionRoute('else')"
+                >
+                  <v-icon start size="16">mdi-close-circle</v-icon>
+                  ELSE: {{ getTareaLabelById(condicionForm.id_tarea_siguiente_else) }}
+                </v-chip>
+              </div>
+
+              <v-alert
+                type="info"
+                variant="tonal"
+                density="compact"
+                class="mt-2 text-caption"
+              >
+                Puedes apuntar IF/ELSE a <strong>cualquier</strong> figura del flujo:
+                anteriores (↑ −1, −2…), siguientes (+1, +2…) o saltos. Usa el select
+                o haz clic en el nodo del diagrama.
+              </v-alert>
+            </div>
+
+            <!-- Panel derecho: mini diagrama -->
+            <div class="condicion-panel-right pa-4">
+              <div class="d-flex align-center flex-wrap ga-2 mb-3">
+                <span class="text-caption font-weight-bold text-medium-emphasis mr-1">
+                  Ruta activa:
+                </span>
+                <v-btn-toggle
+                  v-model="rutaActiva"
+                  mandatory
+                  density="compact"
+                  color="primary"
+                  divided
+                  class="condicion-ruta-toggle"
+                >
+                  <v-btn value="if" color="success" variant="flat" size="small">
+                    <v-icon start size="16">mdi-arrow-right-bold</v-icon>
+                    IF (verde)
+                  </v-btn>
+                  <v-btn value="else" color="error" variant="flat" size="small">
+                    <v-icon start size="16">mdi-arrow-right-bold</v-icon>
+                    ELSE (rojo)
+                  </v-btn>
+                </v-btn-toggle>
+              </div>
+
+              <div
+                ref="condicionDiagramRef"
+                class="condicion-diagram"
+                @scroll="recalculateCondicionConnections"
+              >
+                <svg class="condicion-diagram-svg" aria-hidden="true">
+                  <defs>
+                    <marker
+                      id="arrow-if"
+                      markerWidth="8"
+                      markerHeight="8"
+                      refX="6"
+                      refY="3"
+                      orient="auto"
+                    >
+                      <path d="M0,0 L6,3 L0,6 Z" fill="#2e7d32" />
+                    </marker>
+                    <marker
+                      id="arrow-else"
+                      markerWidth="8"
+                      markerHeight="8"
+                      refX="6"
+                      refY="3"
+                      orient="auto"
+                    >
+                      <path d="M0,0 L6,3 L0,6 Z" fill="#c62828" />
+                    </marker>
+                  </defs>
+                  <path
+                    v-for="(p, i) in condicionConnectionPaths"
+                    :key="'cpath-' + i"
+                    :d="p.path"
+                    fill="none"
+                    :stroke="p.color"
+                    stroke-width="2.5"
+                    :marker-end="p.color === '#2e7d32' ? 'url(#arrow-if)' : 'url(#arrow-else)'"
+                  />
+                  <text
+                    v-for="(p, i) in condicionConnectionPaths"
+                    :key="'clabel-' + i"
+                    :x="p.labelX"
+                    :y="p.labelY"
+                    :fill="p.color"
+                    font-size="11"
+                    font-weight="700"
+                    text-anchor="middle"
+                    dy="-4"
+                  >
+                    {{ p.label }}
+                  </text>
+                </svg>
+
+                <div
+                  v-for="node in condicionDiagramNodes"
+                  :key="node.tareaId || `row-${node.nro}`"
+                  class="condicion-node-row"
+                >
+                  <div class="condicion-node-nro text-caption font-weight-bold">
+                    {{ node.nro }}
+                  </div>
+
+                  <div
+                    class="cell-flow-node-wrap condicion-node"
+                    :class="{
+                      'is-origin': node.isOrigin,
+                      'is-if-target': node.isIfTarget,
+                      'is-else-target': node.isElseTarget,
+                      'is-selectable': node.isSelectable,
+                      'is-unsaved': node.isUnsaved,
+                    }"
+                    :data-tarea-id="node.tareaId"
+                    @click="node.isSelectable && assignCondicionNode(node.tareaId)"
+                  >
+                    <div
+                      class="cell-flow-node"
+                      :class="node.codigoFigura"
+                      :style="{
+                        backgroundColor: node.isUnsaved ? '#94a3b8' : node.colorHex,
+                      }"
+                    >
+                      <div class="cell-flow-text-wrapper">
+                        <span class="condicion-node-label font-weight-bold">
+                          {{ node.label }}
+                        </span>
+                      </div>
+                    </div>
+
+                    <v-chip
+                      v-if="node.isOrigin"
+                      class="condicion-node-badge"
+                      size="x-small"
+                      color="orange-darken-2"
+                      variant="flat"
+                    >
+                      Origen
+                    </v-chip>
+                    <v-chip
+                      v-else-if="node.isIfTarget"
+                      class="condicion-node-badge"
+                      size="x-small"
+                      color="success"
+                      variant="flat"
+                    >
+                      IF
+                    </v-chip>
+                    <v-chip
+                      v-else-if="node.isElseTarget"
+                      class="condicion-node-badge"
+                      size="x-small"
+                      color="error"
+                      variant="flat"
+                    >
+                      ELSE
+                    </v-chip>
+                    <v-chip
+                      v-else-if="node.isUnsaved"
+                      class="condicion-node-badge"
+                      size="x-small"
+                      color="grey"
+                      variant="flat"
+                    >
+                      Sin guardar
+                    </v-chip>
+                    <v-chip
+                      v-else
+                      class="condicion-node-rel"
+                      size="x-small"
+                      variant="tonal"
+                      color="primary"
+                    >
+                      {{ node.relativeHint }}
+                    </v-chip>
+                  </div>
+                </div>
+
+                <div
+                  v-if="!condicionDiagramNodes.length"
+                  class="text-center text-grey pa-8 text-caption"
+                >
+                  No hay figuras en la matriz para conectar.
+                </div>
+              </div>
+            </div>
+          </div>
         </v-card-text>
+
         <v-divider></v-divider>
         <v-card-actions class="pa-3">
           <v-btn
@@ -2173,23 +2574,14 @@ watch(
     </v-dialog>
 
     <!-- DIÁLOGO DE PREVISUALIZACIÓN -->
-    <v-dialog
-      v-model="showPreview"
-      max-width="950"
-      @after-enter="
-        () => {
-          updatePreviewObserver();
-          calculateConnections();
-        }
-      "
-    >
+    <v-dialog v-model="showPreview" max-width="950">
       <v-card class="rounded-xl overflow-hidden">
         <v-toolbar color="primary" dark density="compact">
           <v-toolbar-title class="text-subtitle-1 font-weight-bold"
-            >VISTA PREVIA DEL DIAGRAMA DE FLUJO
-          </v-toolbar-title>
+            >VISTA PREVIA DEL DIAGRAMA DE FLUJO (SWIMLANES)</v-toolbar-title
+          >
           <v-spacer></v-spacer>
-
+          
           <v-btn
             variant="flat"
             color="white"
@@ -2201,7 +2593,7 @@ watch(
           >
             PNG
           </v-btn>
-
+          
           <v-btn
             variant="flat"
             color="white"
@@ -2218,58 +2610,30 @@ watch(
         </v-toolbar>
 
         <div class="pa-8 bg-slate-50 overflow-y-auto" style="max-height: 75vh">
-          <div
+          <div 
             ref="diagramContainer"
             class="pa-8 bg-surface rounded-lg border overflow-x-auto"
-            style="min-height: 400px; min-width: 100%"
+            style="min-height: 400px; min-width: 100%;"
           >
             <!-- TÍTULO DEL DIAGRAMA -->
             <div class="text-center mb-6">
-              <h2
-                class="text-h6 font-weight-black uppercase text-primary-darken-3 mb-1"
-              >
-                {{ procedimientoNombre }}
-              </h2>
+              <h2 class="text-h6 font-weight-black uppercase text-primary-darken-3 mb-1">{{ procedimientoNombre }}</h2>
               <div class="d-flex justify-center align-center">
-                <v-chip
-                  size="x-small"
-                  color="primary"
-                  variant="tonal"
-                  class="font-weight-bold uppercase"
-                  >{{ procesoNombre }}</v-chip
-                >
+                <v-chip size="x-small" color="primary" variant="tonal" class="font-weight-bold uppercase">{{ procesoNombre }}</v-chip>
               </div>
             </div>
 
             <!-- ADVERTENCIA DE CARRIL VACÍO -->
-            <div
-              v-if="allDisplayCargos.length === 0"
-              class="text-center pa-10 text-grey-darken-1"
-            >
-              <v-icon size="48" color="warning" class="mb-2"
-                >mdi-alert-circle-outline</v-icon
-              >
-              <p class="font-weight-bold">
-                No has asignado ningún carril (Cargo) en la matriz todavía.
-              </p>
-              <p class="text-caption">
-                Cierra esta ventana, gestiona las unidades y selecciona cargos
-                para poder generar el diagrama.
-              </p>
+            <div v-if="allDisplayCargos.length === 0" class="text-center pa-10 text-grey-darken-1">
+              <v-icon size="48" color="warning" class="mb-2">mdi-alert-circle-outline</v-icon>
+              <p class="font-weight-bold">No has asignado ningún carril (Cargo) en la matriz todavía.</p>
+              <p class="text-caption">Cierra esta ventana, gestiona las unidades y selecciona cargos para poder generar el diagrama.</p>
             </div>
 
             <!-- Contenedor alineable para SVG y Tabla -->
-            <div
-              v-else
-              ref="scrollWrapper"
-              class="diagram-scroll-wrapper"
-              style="position: relative; display: inline-block; min-width: 100%"
-            >
+            <div v-else ref="scrollWrapper" class="diagram-scroll-wrapper" style="position: relative; display: inline-block; min-width: 100%;">
               <!-- TABLA DE SWIMLANES -->
-              <table
-                class="preview-swimlane-table"
-                style="position: relative; z-index: 2"
-              >
+              <table class="preview-swimlane-table" style="position: relative; z-index: 2;">
                 <thead>
                   <!-- Fila de Unidades -->
                   <tr>
@@ -2287,8 +2651,8 @@ watch(
                   <tr>
                     <th class="preview-step-subheader"></th>
                     <th
-                      v-for="cargo in allDisplayCargos"
-                      :key="cargo.id_cargo"
+                      v-for="(cargo, cargoIdx) in allDisplayCargos"
+                      :key="cargoColumnKey(cargo, cargoIdx)"
                       class="preview-cargo-header text-center"
                     >
                       {{ cargo.nombre }}
@@ -2301,26 +2665,23 @@ watch(
                     <td class="text-center font-weight-bold preview-step-cell">
                       <span class="step-badge">{{ row.nro }}</span>
                     </td>
-
+                    
                     <!-- Celdas de los carriles -->
                     <td
-                      v-for="cargo in allDisplayCargos"
-                      :key="cargo.id_cargo"
+                      v-for="(cargo, cargoIdx) in allDisplayCargos"
+                      :key="cargoColumnKey(cargo, cargoIdx)"
                       class="preview-lane-cell text-center"
                     >
-                      <!-- Si este cargo es responsable, renderizar la figura -->
-                      <div
-                        v-if="row.responsableCargoId == cargo.id_cargo"
+                      <!-- Si este cargo es responsable, renderizar la figura (solo 1ª columna si el cargo se repite) -->
+                      <div 
+                        v-if="shouldShowFlowNode(row, cargo, cargoIdx)"
                         class="preview-node d-flex align-center justify-center text-center pa-4 mx-auto"
                         :data-row-nro="row.nro"
                         :class="getActionVisuals(row.accionId).codigoFigura"
-                        :style="{
-                          backgroundColor: getActionVisuals(row.accionId)
-                            .colorHex,
-                        }"
+                        :style="{ backgroundColor: getActionVisuals(row.accionId).colorHex }"
                       >
                         <span class="preview-text font-weight-bold">
-                          {{ row.texto_figura || row.tarea || "Sin texto" }}
+                          {{ row.texto_figura || row.tarea || 'Sin texto' }}
                         </span>
                       </div>
                     </td>
@@ -2402,17 +2763,11 @@ watch(
             </div>
           </div>
         </div>
-
+        
         <v-divider></v-divider>
         <v-card-actions class="pa-4 bg-grey-lighten-4">
           <v-spacer></v-spacer>
-          <v-btn
-            color="primary"
-            variant="outlined"
-            class="rounded-lg font-weight-bold text-uppercase text-caption px-6"
-            @click="showPreview = false"
-            >Cerrar</v-btn
-          >
+          <v-btn color="primary" variant="outlined" class="rounded-lg font-weight-bold text-uppercase text-caption px-6" @click="showPreview = false">Cerrar</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -2525,10 +2880,6 @@ watch(
   transition: background 0.2s;
   border-left: 1px dashed #cbd5e1 !important;
   border-right: 1px dashed #cbd5e1 !important;
-  padding: 24px 8px !important;
-  height: 110px !important;
-  min-height: 110px !important;
-  vertical-align: middle !important;
 }
 .diagram-cell:hover {
   background: #f5f3ff;
@@ -2713,7 +3064,7 @@ watch(
   justify-content: center;
   position: relative;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
   box-sizing: border-box;
 }
 
@@ -2866,7 +3217,7 @@ watch(
 .preview-swimlane-table th,
 .preview-swimlane-table td {
   border: 1px solid #e2e8f0;
-  padding: 32px 12px;
+  padding: 16px 8px;
   position: relative;
 }
 
@@ -2927,8 +3278,8 @@ watch(
 .preview-lane-cell {
   background: #ffffff;
   vertical-align: middle;
-  min-width: 150px;
-  height: 140px;
+  min-width: 125px;
+  height: 90px;
 }
 
 .preview-lane-cell:empty {
@@ -2937,5 +3288,179 @@ watch(
 
 .border-dashed {
   border: 2px dashed #94a3b8 !important;
+}
+
+/* --- Popup visual condición IF/ELSE --- */
+.condicion-dialog-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 38%) 1fr;
+  min-height: 420px;
+  max-height: 70vh;
+}
+
+.condicion-panel-left {
+  border-right: 1px solid #e2e8f0;
+  overflow-y: auto;
+}
+
+.condicion-panel-right {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: #f8fafc;
+}
+
+.condicion-diagram {
+  position: relative;
+  flex: 1;
+  overflow: auto;
+  min-height: 320px;
+  padding: 16px 56px 24px;
+  background: #fff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+}
+
+.condicion-diagram-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: visible;
+}
+
+.condicion-node-row {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 96px;
+  padding: 12px 0;
+  margin-bottom: 8px;
+}
+
+.condicion-node-nro {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #64748b;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Wrap axis-aligned (misma base que la matriz); estados van aquí, no en el rombo rotado */
+.condicion-node.cell-flow-node-wrap {
+  cursor: default;
+  min-width: 96px;
+  min-height: 96px;
+  padding: 8px;
+  margin: 0;
+  border-radius: 10px;
+  box-sizing: border-box;
+}
+
+.condicion-node .cell-flow-node {
+  margin: 0;
+}
+
+.condicion-node-label {
+  font-size: 0.55rem;
+  line-height: 1.1;
+  color: #fff;
+  text-align: center;
+  word-break: break-word;
+  max-width: 100%;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.condicion-node.is-selectable {
+  cursor: pointer;
+}
+
+.condicion-node.is-selectable:hover {
+  background: rgba(99, 102, 241, 0.08);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.35);
+}
+
+.condicion-node.is-unsaved {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.condicion-node.is-origin {
+  box-shadow: 0 0 0 3px #ea580c, 0 4px 12px rgba(234, 88, 12, 0.28);
+  background: rgba(234, 88, 12, 0.06);
+}
+
+.condicion-node.is-if-target {
+  box-shadow: 0 0 0 3px #2e7d32, 0 4px 12px rgba(46, 125, 50, 0.28);
+  background: rgba(46, 125, 50, 0.06);
+}
+
+.condicion-node.is-else-target {
+  box-shadow: 0 0 0 3px #c62828, 0 4px 12px rgba(198, 40, 40, 0.28);
+  background: rgba(198, 40, 40, 0.06);
+}
+
+.condicion-node-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  z-index: 3;
+}
+
+.condicion-node-rel {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  font-weight: 800 !important;
+}
+
+.cell-flow-node-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 70px;
+  min-width: 70px;
+}
+
+.condicion-open-btn {
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+}
+
+.condicion-cell-badge {
+  position: absolute;
+  top: -6px;
+  right: -10px;
+  z-index: 5;
+  font-weight: 800 !important;
+  pointer-events: none;
+}
+
+@media (max-width: 800px) {
+  .condicion-dialog-grid {
+    grid-template-columns: 1fr;
+    max-height: none;
+  }
+  .condicion-panel-left {
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+  }
 }
 </style>
