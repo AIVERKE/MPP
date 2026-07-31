@@ -489,29 +489,59 @@ const tareaOptionsForCondicion = computed(() => {
     .map((r) => ({
       title: `${r.nro}. ${r.texto_figura || r.tarea || `Tarea #${r.savedIds.tarea}`}`,
       value: Number(r.savedIds.tarea),
+      nro: Number(r.nro),
     }));
+});
+
+/** Destinos posibles: cualquier figura guardada excepto el rombo origen (anteriores y posteriores). */
+const condicionDestinoOptions = computed(() => {
+  const originTareaId = condicionRow.value?.savedIds?.tarea
+    ? Number(condicionRow.value.savedIds.tarea)
+    : null;
+  const originNro = Number(condicionRow.value?.nro) || 0;
+  return tareaOptionsForCondicion.value
+    .filter((o) => Number(o.value) !== originTareaId)
+    .map((o) => {
+      const delta = Number(o.nro) - originNro;
+      const rel =
+        delta === 0
+          ? ""
+          : delta > 0
+            ? ` (↓ +${delta})`
+            : ` (↑ ${delta})`;
+      return {
+        ...o,
+        title: `${o.title}${rel}`,
+      };
+    });
 });
 
 const condicionDiagramNodes = computed(() => {
   const originTareaId = condicionRow.value?.savedIds?.tarea
     ? Number(condicionRow.value.savedIds.tarea)
     : null;
-  return rows.value
-    .filter((r) => r.savedIds?.tarea)
-    .map((r) => {
-      const tareaId = Number(r.savedIds.tarea);
-      const visuals = getActionVisuals(r.accionId);
-      return {
-        nro: r.nro,
-        tareaId,
-        label: r.texto_figura || r.tarea || `Tarea #${tareaId}`,
-        isOrigin: originTareaId === tareaId,
-        isIfTarget: Number(condicionForm.value.id_tarea_siguiente_if) === tareaId,
-        isElseTarget: Number(condicionForm.value.id_tarea_siguiente_else) === tareaId,
-        colorHex: visuals.colorHex,
-        codigoFigura: visuals.codigoFigura,
-      };
-    });
+  const originNro = Number(condicionRow.value?.nro) || 0;
+
+  return rows.value.map((r) => {
+    const tareaId = r.savedIds?.tarea ? Number(r.savedIds.tarea) : null;
+    const visuals = getActionVisuals(r.accionId);
+    const delta = Number(r.nro) - originNro;
+    const isOrigin = originTareaId != null && tareaId === originTareaId;
+    return {
+      nro: r.nro,
+      tareaId,
+      label: r.texto_figura || r.tarea || (tareaId ? `Tarea #${tareaId}` : "Sin guardar"),
+      isOrigin,
+      isSelectable: !!tareaId && !isOrigin,
+      isUnsaved: !tareaId,
+      isIfTarget: tareaId != null && Number(condicionForm.value.id_tarea_siguiente_if) === tareaId,
+      isElseTarget: tareaId != null && Number(condicionForm.value.id_tarea_siguiente_else) === tareaId,
+      colorHex: visuals.colorHex,
+      codigoFigura: visuals.codigoFigura,
+      relativeHint:
+        delta === 0 ? "Origen" : delta > 0 ? `+${delta}` : `${delta}`,
+    };
+  });
 });
 
 const getTareaLabelById = (tareaId) => {
@@ -554,18 +584,37 @@ const recalculateCondicionConnections = () => {
       const toLocal = (rect) => ({
         x: rect.left - containerRect.left + container.scrollLeft + rect.width / 2,
         y: rect.top - containerRect.top + container.scrollTop + rect.height / 2,
+        top: rect.top - containerRect.top + container.scrollTop,
+        bottom: rect.bottom - containerRect.top + container.scrollTop,
+        left: rect.left - containerRect.left + container.scrollLeft,
+        right: rect.right - containerRect.left + container.scrollLeft,
+        w: rect.width,
+        h: rect.height,
       });
 
-      const originRect = originEl.getBoundingClientRect();
-      const origin = toLocal(originRect);
+      const origin = toLocal(originEl.getBoundingClientRect());
 
       const buildPath = (targetSelector, color, label, side) => {
         const targetEl = container.querySelector(targetSelector);
         if (!targetEl) return null;
         const target = toLocal(targetEl.getBoundingClientRect());
-        const offsetX = side === "left" ? -48 : 48;
-        const midX = Math.max(origin.x, target.x) + offsetX;
-        const path = `M ${origin.x} ${origin.y} L ${midX} ${origin.y} L ${midX} ${target.y} L ${target.x} ${target.y}`;
+        const goingUp = target.y < origin.y - 8;
+        const offsetX = side === "left" ? -52 : 52;
+        const midX = (side === "left" ? Math.min(origin.x, target.x) : Math.max(origin.x, target.x)) + offsetX;
+
+        let path;
+        if (goingUp) {
+          // Destino anterior (hacia arriba): sale por el costado y entra por abajo del destino
+          const yStart = origin.y;
+          const yEnd = target.bottom;
+          path = `M ${origin.x} ${yStart} L ${midX} ${yStart} L ${midX} ${yEnd} L ${target.x} ${yEnd}`;
+        } else {
+          // Destino posterior (hacia abajo) o misma altura
+          const yStart = origin.y;
+          const yEnd = target.top;
+          path = `M ${origin.x} ${yStart} L ${midX} ${yStart} L ${midX} ${yEnd} L ${target.x} ${yEnd}`;
+        }
+
         return {
           path,
           color,
@@ -619,6 +668,28 @@ const assignCondicionNode = (tareaId) => {
       if (Number(condicionForm.value.id_tarea_siguiente_if) === id) {
         condicionForm.value.id_tarea_siguiente_if = null;
       }
+    }
+  }
+  recalculateCondicionConnections();
+};
+
+const onSelectCondicionDestino = (route, tareaId) => {
+  rutaActiva.value = route;
+  const id = tareaId ? Number(tareaId) : null;
+  if (!id) {
+    clearCondicionRoute(route);
+    return;
+  }
+  // Reutilizar la misma lógica de asignación (toggle no aplica desde select)
+  if (route === "if") {
+    condicionForm.value.id_tarea_siguiente_if = id;
+    if (Number(condicionForm.value.id_tarea_siguiente_else) === id) {
+      condicionForm.value.id_tarea_siguiente_else = null;
+    }
+  } else {
+    condicionForm.value.id_tarea_siguiente_else = id;
+    if (Number(condicionForm.value.id_tarea_siguiente_if) === id) {
+      condicionForm.value.id_tarea_siguiente_if = null;
     }
   }
   recalculateCondicionConnections();
@@ -2102,8 +2173,37 @@ watch(
               ></v-text-field>
 
               <div class="text-caption font-weight-bold text-medium-emphasis mb-2">
-                Destinos asignados
+                Destinos (cualquier paso)
               </div>
+              <v-select
+                :model-value="condicionForm.id_tarea_siguiente_if"
+                :items="condicionDestinoOptions"
+                item-title="title"
+                item-value="value"
+                label="IF (SÍ) → figura destino"
+                variant="outlined"
+                density="compact"
+                class="mb-2"
+                clearable
+                hide-details
+                prepend-inner-icon="mdi-check-circle"
+                @update:model-value="(v) => onSelectCondicionDestino('if', v)"
+              ></v-select>
+              <v-select
+                :model-value="condicionForm.id_tarea_siguiente_else"
+                :items="condicionDestinoOptions"
+                item-title="title"
+                item-value="value"
+                label="ELSE (NO) → figura destino"
+                variant="outlined"
+                density="compact"
+                class="mb-3"
+                clearable
+                hide-details
+                prepend-inner-icon="mdi-close-circle"
+                @update:model-value="(v) => onSelectCondicionDestino('else', v)"
+              ></v-select>
+
               <div class="d-flex flex-column ga-2 mb-2">
                 <v-chip
                   v-if="condicionForm.id_tarea_siguiente_if"
@@ -2114,10 +2214,8 @@ watch(
                   @click:close="clearCondicionRoute('if')"
                 >
                   <v-icon start size="16">mdi-check-circle</v-icon>
-                  IF (SÍ): {{ getTareaLabelById(condicionForm.id_tarea_siguiente_if) }}
+                  IF: {{ getTareaLabelById(condicionForm.id_tarea_siguiente_if) }}
                 </v-chip>
-                <span v-else class="text-caption text-grey">IF (SÍ): sin asignar</span>
-
                 <v-chip
                   v-if="condicionForm.id_tarea_siguiente_else"
                   color="error"
@@ -2127,18 +2225,19 @@ watch(
                   @click:close="clearCondicionRoute('else')"
                 >
                   <v-icon start size="16">mdi-close-circle</v-icon>
-                  ELSE (NO): {{ getTareaLabelById(condicionForm.id_tarea_siguiente_else) }}
+                  ELSE: {{ getTareaLabelById(condicionForm.id_tarea_siguiente_else) }}
                 </v-chip>
-                <span v-else class="text-caption text-grey">ELSE (NO): sin asignar</span>
               </div>
 
               <v-alert
                 type="info"
                 variant="tonal"
                 density="compact"
-                class="mt-4 text-caption"
+                class="mt-2 text-caption"
               >
-                Elige la ruta IF o ELSE y haz clic en un nodo del diagrama para asignar el destino.
+                Puedes apuntar IF/ELSE a <strong>cualquier</strong> figura del flujo:
+                anteriores (↑ −1, −2…), siguientes (+1, +2…) o saltos. Usa el select
+                o haz clic en el nodo del diagrama.
               </v-alert>
             </div>
 
@@ -2221,30 +2320,39 @@ watch(
 
                 <div
                   v-for="node in condicionDiagramNodes"
-                  :key="node.tareaId"
+                  :key="node.tareaId || `row-${node.nro}`"
                   class="condicion-node-row"
                 >
                   <div class="condicion-node-nro text-caption font-weight-bold">
                     {{ node.nro }}
                   </div>
+
                   <div
-                    class="condicion-node preview-node"
-                    :class="[
-                      node.codigoFigura,
-                      {
-                        'is-origin': node.isOrigin,
-                        'is-if-target': node.isIfTarget,
-                        'is-else-target': node.isElseTarget,
-                        'is-selectable': !node.isOrigin,
-                      },
-                    ]"
+                    class="cell-flow-node-wrap condicion-node"
+                    :class="{
+                      'is-origin': node.isOrigin,
+                      'is-if-target': node.isIfTarget,
+                      'is-else-target': node.isElseTarget,
+                      'is-selectable': node.isSelectable,
+                      'is-unsaved': node.isUnsaved,
+                    }"
                     :data-tarea-id="node.tareaId"
-                    :style="{ backgroundColor: node.colorHex }"
-                    @click="!node.isOrigin && assignCondicionNode(node.tareaId)"
+                    @click="node.isSelectable && assignCondicionNode(node.tareaId)"
                   >
-                    <span class="preview-text text-center font-weight-bold">
-                      {{ node.label }}
-                    </span>
+                    <div
+                      class="cell-flow-node"
+                      :class="node.codigoFigura"
+                      :style="{
+                        backgroundColor: node.isUnsaved ? '#94a3b8' : node.colorHex,
+                      }"
+                    >
+                      <div class="cell-flow-text-wrapper">
+                        <span class="condicion-node-label font-weight-bold">
+                          {{ node.label }}
+                        </span>
+                      </div>
+                    </div>
+
                     <v-chip
                       v-if="node.isOrigin"
                       class="condicion-node-badge"
@@ -2272,6 +2380,24 @@ watch(
                     >
                       ELSE
                     </v-chip>
+                    <v-chip
+                      v-else-if="node.isUnsaved"
+                      class="condicion-node-badge"
+                      size="x-small"
+                      color="grey"
+                      variant="flat"
+                    >
+                      Sin guardar
+                    </v-chip>
+                    <v-chip
+                      v-else
+                      class="condicion-node-rel"
+                      size="x-small"
+                      variant="tonal"
+                      color="primary"
+                    >
+                      {{ node.relativeHint }}
+                    </v-chip>
                   </div>
                 </div>
 
@@ -2279,7 +2405,7 @@ watch(
                   v-if="!condicionDiagramNodes.length"
                   class="text-center text-grey pa-8 text-caption"
                 >
-                  No hay tareas guardadas en la matriz para conectar.
+                  No hay figuras en la matriz para conectar.
                 </div>
               </div>
             </div>
@@ -3079,8 +3205,10 @@ watch(
   z-index: 2;
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 16px;
+  min-height: 96px;
+  padding: 12px 0;
+  margin-bottom: 8px;
 }
 
 .condicion-node-nro {
@@ -3095,12 +3223,32 @@ watch(
   flex-shrink: 0;
 }
 
-.condicion-node {
+/* Wrap axis-aligned (misma base que la matriz); estados van aquí, no en el rombo rotado */
+.condicion-node.cell-flow-node-wrap {
   cursor: default;
-  min-width: 160px !important;
-  max-width: 220px;
-  padding: 8px 12px;
-  margin: 8px 0;
+  min-width: 96px;
+  min-height: 96px;
+  padding: 8px;
+  margin: 0;
+  border-radius: 10px;
+  box-sizing: border-box;
+}
+
+.condicion-node .cell-flow-node {
+  margin: 0;
+}
+
+.condicion-node-label {
+  font-size: 0.55rem;
+  line-height: 1.1;
+  color: #fff;
+  text-align: center;
+  word-break: break-word;
+  max-width: 100%;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 
 .condicion-node.is-selectable {
@@ -3108,33 +3256,44 @@ watch(
 }
 
 .condicion-node.is-selectable:hover {
-  filter: brightness(1.08);
+  background: rgba(99, 102, 241, 0.08);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.35);
 }
 
+.condicion-node.is-unsaved {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .condicion-node.is-origin {
-  box-shadow: 0 0 0 3px #ea580c, 0 4px 12px rgba(234, 88, 12, 0.35);
+  box-shadow: 0 0 0 3px #ea580c, 0 4px 12px rgba(234, 88, 12, 0.28);
+  background: rgba(234, 88, 12, 0.06);
 }
 
 .condicion-node.is-if-target {
-  box-shadow: 0 0 0 3px #2e7d32, 0 4px 12px rgba(46, 125, 50, 0.35);
+  box-shadow: 0 0 0 3px #2e7d32, 0 4px 12px rgba(46, 125, 50, 0.28);
+  background: rgba(46, 125, 50, 0.06);
 }
 
 .condicion-node.is-else-target {
-  box-shadow: 0 0 0 3px #c62828, 0 4px 12px rgba(198, 40, 40, 0.35);
+  box-shadow: 0 0 0 3px #c62828, 0 4px 12px rgba(198, 40, 40, 0.28);
+  background: rgba(198, 40, 40, 0.06);
 }
 
 .condicion-node-badge {
   position: absolute;
-  top: -10px;
-  right: -10px;
+  top: -4px;
+  right: -4px;
   z-index: 3;
 }
 
-.condicion-node.rombo .condicion-node-badge {
-  transform: rotate(-45deg);
-  top: -14px;
-  right: -14px;
+.condicion-node-rel {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  font-weight: 800 !important;
 }
 
 .cell-flow-node-wrap {
