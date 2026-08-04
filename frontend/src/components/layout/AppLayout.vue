@@ -7,11 +7,12 @@
 import { ref, computed, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
-import { useTheme } from "vuetify";
+import { useTheme, useDisplay } from "vuetify";
 
 const route = useRoute();
 const router = useRouter();
 const theme = useTheme();
+const { smAndDown } = useDisplay();
 const drawer = ref(true);
 const authStore = useAuthStore();
 
@@ -86,6 +87,8 @@ onUnmounted(() => {
 // ------------------------------------
 
 const isLoginPage = computed(() => route.path === "/login");
+const isMofActive = computed(() => route.path.startsWith("/mof"));
+const isMppActive = computed(() => route.path.startsWith("/mpp") || route.path === "/configuracion");
 const userName = computed(() => authStore.user?.nombre || "Usuario");
 const userInitials = computed(() => {
   const name = authStore.user?.nombre || "U";
@@ -106,12 +109,12 @@ const handleLogout = async () => {
   <v-app style="height: 100vh; overflow: hidden;">
     <!-- Barra superior -->
     <v-app-bar v-if="!isLoginPage" height="70" style="position: fixed; top: 0; z-index: 1005;">
-      <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
+      <v-app-bar-nav-icon v-if="!smAndDown" @click="drawer = !drawer"></v-app-bar-nav-icon>
       <v-app-bar-title>
         <v-icon color="primary" size="32" class="mr-2"
-          >mdi-view-dashboard</v-icon
+          >mdi-file-document-multiple</v-icon
         >
-        S-MAU
+        MPP
       </v-app-bar-title>
       <v-spacer></v-spacer>
 
@@ -126,14 +129,6 @@ const handleLogout = async () => {
           Cambiar a modo
           {{ theme.global.current.value.dark ? "claro" : "oscuro" }}
         </v-tooltip>
-      </v-btn>
-
-      <!-- Notificaciones (Sin contador hardcodeado) -->
-      <v-btn icon variant="text" class="mr-2">
-        <v-icon>mdi-bell-outline</v-icon>
-        <v-tooltip activator="parent" location="bottom"
-          >Notificaciones</v-tooltip
-        >
       </v-btn>
 
       <!-- Menú de usuario con iniciales -->
@@ -158,6 +153,7 @@ const handleLogout = async () => {
             prepend-icon="mdi-cog"
             title="Configuración"
             value="settings"
+            to="/configuracion"
           ></v-list-item>
           <v-divider></v-divider>
           <v-list-item
@@ -170,9 +166,9 @@ const handleLogout = async () => {
       </v-menu>
     </v-app-bar>
 
-    <!-- Sidebar de navegación Fijo -->
+    <!-- Sidebar de navegación Fijo (solo en desktop) -->
     <v-navigation-drawer
-      v-if="!isLoginPage"
+      v-if="!isLoginPage && !smAndDown"
       v-model="drawer"
       app
       :width="actualDrawerWidth"
@@ -236,31 +232,12 @@ const handleLogout = async () => {
               title="HISTORIAL Y RELACIONES"
               to="/mpp/historial-mpp"
             ></v-list-item>
-          </v-list-group>
-          <v-list-group prepend-icon="mdi-chart-bar" value="Reportes">
-            <template #activator="{ props }">
-              <v-list-item v-bind="props" title="Reportes"></v-list-item>
-            </template>
-
             <v-list-item
-              prepend-icon="mdi-view-dashboard-outline"
-              title="DASHBOARD EJECUTIVO"
-              to="/reportes/ejecutivo"
-            >
-            </v-list-item>
-
-            <v-list-item
-              prepend-icon="mdi-domain"
-              title="DASHBOARD FACULTATIVO"
-              to="/reportes/facultativo"
-            >
-            </v-list-item>
+              prepend-icon="mdi-cog"
+              title="CONFIGURACIÓN DE FIGURAS"
+              to="/configuracion"
+            ></v-list-item>
           </v-list-group>
-          <v-list-item
-            prepend-icon="mdi-cog"
-            title="Configuración"
-            to="/configuracion"
-          ></v-list-item>
           <v-list-item
             prepend-icon="mdi-shield-account-outline"
             title="Auditoría del Sistema"
@@ -305,7 +282,15 @@ const handleLogout = async () => {
     </v-navigation-drawer>
 
     <!-- Contenido principal con Scroll Independiente -->
-    <v-main style="padding-top: 70px; height: 100vh; overflow-y: auto; overflow-x: hidden;">
+    <v-main
+      :style="{
+        paddingTop: '70px',
+        paddingBottom: smAndDown ? '64px' : '0px',
+        height: '100vh',
+        overflowY: 'auto',
+        overflowX: 'hidden'
+      }"
+    >
       <v-container
         fluid
         :class="isLoginPage ? 'pa-0' : 'pa-6'"
@@ -314,6 +299,91 @@ const handleLogout = async () => {
         <router-view />
       </v-container>
     </v-main>
+
+    <!-- Bottom Navigation Mobile (Estilo Instagram con Submenús Flotantes) -->
+    <v-bottom-navigation
+      v-if="!isLoginPage && smAndDown"
+      active
+      grow
+      color="primary"
+      class="instagram-bottom-nav"
+      elevation="6"
+    >
+      <v-btn to="/" value="dashboard">
+        <v-icon size="24">mdi-view-dashboard</v-icon>
+        <span class="text-caption font-weight-medium">Dashboard</span>
+      </v-btn>
+
+      <v-btn to="/usuarios" value="usuarios">
+        <v-icon size="24">mdi-account-multiple</v-icon>
+        <span class="text-caption font-weight-medium">Usuarios</span>
+      </v-btn>
+
+      <!-- Pop-up desplegable para MOF -->
+      <v-menu location="top" offset="12">
+        <template #activator="{ props }">
+          <v-btn v-bind="props" value="mof" :color="isMofActive ? 'primary' : undefined">
+            <v-icon size="24">mdi-package-variant</v-icon>
+            <span class="text-caption font-weight-medium">MOF</span>
+          </v-btn>
+        </template>
+        <v-list density="compact" rounded="lg" class="elevation-8 py-2" min-width="230">
+          <v-list-subheader class="font-weight-bold text-uppercase text-primary text-caption px-4">
+            Módulo MOF
+          </v-list-subheader>
+          <v-list-item
+            prepend-icon="mdi-sitemap"
+            title="Estructura Organizacional"
+            to="/mof/organigrama-unidades"
+          ></v-list-item>
+          <v-list-item
+            prepend-icon="mdi-list-box"
+            title="Listar Unidades"
+            to="/mof/listar-unidades"
+          ></v-list-item>
+          <v-list-item
+            prepend-icon="mdi-tree"
+            title="Árbol de Unidades"
+            to="/mof/arbol-unidades"
+          ></v-list-item>
+        </v-list>
+      </v-menu>
+
+      <!-- Pop-up desplegable para MPP -->
+      <v-menu location="top" offset="12">
+        <template #activator="{ props }">
+          <v-btn v-bind="props" value="mpp" :color="isMppActive ? 'primary' : undefined">
+            <v-icon size="24">mdi-file-document-multiple</v-icon>
+            <span class="text-caption font-weight-medium">MPP</span>
+          </v-btn>
+        </template>
+        <v-list density="compact" rounded="lg" class="elevation-8 py-2" min-width="250">
+          <v-list-subheader class="font-weight-bold text-uppercase text-primary text-caption px-4">
+            Módulo MPP
+          </v-list-subheader>
+          <v-list-item
+            prepend-icon="mdi-sitemap"
+            title="Generador de Procesos"
+            to="/mpp/gestion-mpp"
+          ></v-list-item>
+          <v-list-item
+            prepend-icon="mdi-history"
+            title="Historial y Relaciones"
+            to="/mpp/historial-mpp"
+          ></v-list-item>
+          <v-list-item
+            prepend-icon="mdi-cog"
+            title="Configuración de Figuras"
+            to="/configuracion"
+          ></v-list-item>
+        </v-list>
+      </v-menu>
+
+      <v-btn to="/auditoria" value="auditoria">
+        <v-icon size="24">mdi-shield-account-outline</v-icon>
+        <span class="text-caption font-weight-medium">Auditoría</span>
+      </v-btn>
+    </v-bottom-navigation>
   </v-app>
 </template>
 <style scoped>
@@ -344,5 +414,17 @@ const handleLogout = async () => {
 .resize-handle:active {
   background: rgba(var(--v-theme-primary), 0.3);
   width: 6px;
+}
+
+.instagram-bottom-nav {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 1005;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05) !important;
 }
 </style>
