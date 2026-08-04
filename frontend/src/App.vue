@@ -6,9 +6,7 @@ const authStore = useAuthStore();
 </script>
 
 <template>
-  <v-app v-if="authStore.isAuthenticated">
-    <app-layout />
-  </v-app>
+  <app-layout v-if="authStore.isAuthenticated" />
   <v-app v-else>
     <router-view />
   </v-app>
