@@ -22,6 +22,13 @@ export class CreateCargoProcesoDto {
   id_proceso: number;
 
   @ApiProperty({
+    description: 'ID de la unidad organizacional (opcional)',
+    example: 1,
+    required: false,
+  })
+  id_unidad?: number;
+
+  @ApiProperty({
     description: 'Indica si es el responsable principal del proceso',
     example: true,
     examples: {

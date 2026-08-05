@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { Proceso } from './proceso.entity';
 import { Cargo } from '../../estructura-organizacional/entities/cargo.entity';
+import { Unidad } from '../../estructura-organizacional/entities/unidad.entity';
 
 @Entity('cargo_proceso')
 export class CargoProceso {
@@ -22,6 +23,9 @@ export class CargoProceso {
   @Column({ name: 'id_proceso' })
   id_proceso: number;
 
+  @Column({ name: 'id_unidad', nullable: true })
+  id_unidad?: number;
+
   @Column({ default: false })
   es_responsable_principal: boolean;
 
@@ -32,6 +36,10 @@ export class CargoProceso {
   @ManyToOne(() => Proceso)
   @JoinColumn({ name: 'id_proceso' })
   proceso: Proceso;
+
+  @ManyToOne(() => Unidad, { nullable: true })
+  @JoinColumn({ name: 'id_unidad' })
+  unidad?: Unidad;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
