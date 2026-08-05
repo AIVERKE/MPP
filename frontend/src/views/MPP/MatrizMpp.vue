@@ -254,21 +254,23 @@ const adjustHeight = (e) => {
   el.style.height = el.scrollHeight + "px";
 };
 
-// --- CÁLCULO DE COLUMNAS DINÁMICAS (Swimlanes Agrupados) ---
-const selectedCargoIds = ref([]);
+// --- CÁLCULO DE COLUMNAS DINÁMICAS (Swimlanes Agrupados por Unidad + Cargo) ---
+const selectedCargoKeys = ref([]); // Formato: "id_unidad:id_cargo"
 
 const swimlaneGroups = computed(() => {
-  const groups = [];
-  const cargosData = mppStore.unidades.flatMap((u) =>
-    (u.cargos || []).map((c) => ({
+  const cargosData = mppStore.unidades.flatMap((u) => {
+    const uId = u.id_unidad || u.id;
+    const uName = u.nombre || u.nombre_unidad;
+    return (u.cargos || []).map((c) => ({
       ...c,
-      unitId: u.id_unidad || u.id,
-      unitName: u.nombre || u.nombre_unidad,
-    })),
-  );
+      unitId: Number(uId),
+      unitName: uName,
+      laneKey: `${Number(uId)}:${Number(c.id_cargo)}`,
+    }));
+  });
 
   const selectedCargos = cargosData.filter((c) =>
-    selectedCargoIds.value.some((id) => Number(id) === Number(c.id_cargo)),
+    selectedCargoKeys.value.includes(c.laneKey),
   );
 
   const map = new Map();
@@ -285,19 +287,25 @@ const allDisplayCargos = computed(() =>
   swimlaneGroups.value.flatMap((g) => g.cargos),
 );
 
-/** Índice de la primera columna que muestra un cargo (evita duplicar figura si el mismo id_cargo está en varias unidades). */
-const primaryCargoColumnIndex = (cargoId) => {
-  const id = Number(cargoId);
-  return allDisplayCargos.value.findIndex((c) => Number(c.id_cargo) === id);
+/** Índice de la primera columna que muestra un cargo para su unidad correspondiente. */
+const primaryCargoColumnIndex = (cargoId, unitId) => {
+  const cId = Number(cargoId);
+  const uId = unitId ? Number(unitId) : null;
+  return allDisplayCargos.value.findIndex((c) => {
+    const matchCargo = Number(c.id_cargo) === cId;
+    const matchUnit = uId ? Number(c.unitId) === uId : true;
+    return matchCargo && matchUnit;
+  });
 };
 
 const shouldShowFlowNode = (row, cargo, cargoIndex) => {
   if (Number(row.responsableCargoId) !== Number(cargo.id_cargo)) return false;
-  return primaryCargoColumnIndex(cargo.id_cargo) === cargoIndex;
+  const firstIndex = primaryCargoColumnIndex(cargo.id_cargo, cargo.unitId);
+  return firstIndex === cargoIndex;
 };
 
 const cargoColumnKey = (cargo, index) =>
-  `${cargo.unitId ?? "u"}-${cargo.id_cargo}-${index}`;
+  `lane-${cargo.unitId}-${cargo.id_cargo}-${index}`;
 
 const getReturnTarget = (text) => {
   if (!text) return null;
@@ -1101,18 +1109,31 @@ const exportDiagramPdf = async () => {
   }
 };
 
-const toggleCargo = async (cId) => {
-  const numId = Number(cId);
-  const index = selectedCargoIds.value.findIndex((id) => Number(id) === numId);
+const toggleCargo = async (cId, targetUnitId = null) => {
+  const numCargoId = Number(cId);
+  const numUnitId = targetUnitId
+    ? Number(targetUnitId)
+    : selectedUnitId.value
+    ? Number(selectedUnitId.value)
+    : null;
+
+  if (!numUnitId) {
+    console.warn("[MatrixUI] No hay unidad seleccionada para el cargo:", cId);
+    return;
+  }
+
+  const laneKey = `${numUnitId}:${numCargoId}`;
+  const index = selectedCargoKeys.value.indexOf(laneKey);
   const wasChecked = index !== -1;
 
   if (!wasChecked) {
     // Agregar localmente
-    selectedCargoIds.value.push(numId);
+    selectedCargoKeys.value.push(laneKey);
     if (props.procesoId) {
       try {
         await mppStore.saveCargoProceso({
-          id_cargo: numId,
+          id_cargo: numCargoId,
+          id_unidad: numUnitId,
           id_proceso: Number(props.procesoId),
           es_responsable_principal: false,
         });
@@ -1120,8 +1141,8 @@ const toggleCargo = async (cId) => {
       } catch (e) {
         console.error("[MatrixUI] Error al guardar relación cargo-proceso:", e);
         // Revertir
-        const revIdx = selectedCargoIds.value.findIndex((id) => Number(id) === numId);
-        if (revIdx !== -1) selectedCargoIds.value.splice(revIdx, 1);
+        const revIdx = selectedCargoKeys.value.indexOf(laneKey);
+        if (revIdx !== -1) selectedCargoKeys.value.splice(revIdx, 1);
         snackbar.value = {
           show: true,
           text: "Error al guardar la columna de unidad en el servidor",
@@ -1131,12 +1152,15 @@ const toggleCargo = async (cId) => {
     }
   } else {
     // Quitar localmente
-    selectedCargoIds.value.splice(index, 1);
+    selectedCargoKeys.value.splice(index, 1);
     if (props.procesoId) {
       try {
         const relationship = mppStore.cargoProcesos.find((cp) => {
           const cpCargoId = cp.cargo?.id_cargo || cp.id_cargo;
-          return Number(cpCargoId) === numId;
+          const cpUnidadId = cp.unidad?.id_unidad || cp.id_unidad;
+          const matchCargo = Number(cpCargoId) === numCargoId;
+          const matchUnit = cpUnidadId ? Number(cpUnidadId) === numUnitId : true;
+          return matchCargo && matchUnit;
         });
         if (relationship) {
           await mppStore.deleteCargoProceso(relationship.id);
@@ -1145,8 +1169,8 @@ const toggleCargo = async (cId) => {
       } catch (e) {
         console.error("[MatrixUI] Error al eliminar relación cargo-proceso:", e);
         // Revertir
-        if (!selectedCargoIds.value.some((id) => Number(id) === numId)) {
-          selectedCargoIds.value.push(numId);
+        if (!selectedCargoKeys.value.includes(laneKey)) {
+          selectedCargoKeys.value.push(laneKey);
         }
         snackbar.value = {
           show: true,
@@ -1172,16 +1196,30 @@ onMounted(async () => {
     }
     if (!mppStore.procesos.length) await mppStore.fetchProcesos();
 
-    // Cargar cargos ya asociados al proceso (columnas persistidas)
+    // Cargar cargos ya asociados al proceso (columnas persistidas por unidad)
     if (props.procesoId) {
       console.log("👉 [Matriz-UI] Cargando cargos asociados al proceso ID:", props.procesoId);
       await mppStore.fetchCargoProcesos(props.procesoId);
       mppStore.cargoProcesos.forEach((cp) => {
         const cId = cp.cargo?.id_cargo || cp.id_cargo;
+        const uId = cp.unidad?.id_unidad || cp.id_unidad;
         if (cId) {
-          const numId = Number(cId);
-          if (!selectedCargoIds.value.some((id) => Number(id) === numId)) {
-            selectedCargoIds.value.push(numId);
+          const numCargoId = Number(cId);
+          if (uId) {
+            const laneKey = `${Number(uId)}:${numCargoId}`;
+            if (!selectedCargoKeys.value.includes(laneKey)) {
+              selectedCargoKeys.value.push(laneKey);
+            }
+          } else {
+            // Fallback para registros antiguos sin id_unidad: asociar con las unidades que tengan dicho cargo
+            mppStore.unidades.forEach((u) => {
+              if ((u.cargos || []).some((c) => Number(c.id_cargo) === numCargoId)) {
+                const laneKey = `${Number(u.id_unidad || u.id)}:${numCargoId}`;
+                if (!selectedCargoKeys.value.includes(laneKey)) {
+                  selectedCargoKeys.value.push(laneKey);
+                }
+              }
+            });
           }
         }
       });
@@ -1199,10 +1237,15 @@ onMounted(async () => {
           ...new Set(existingRows.map((r) => r.responsableCargoId).filter(Boolean)),
         ];
         activeCargos.forEach((cId) => {
-          const numId = Number(cId);
-          if (!selectedCargoIds.value.some((id) => Number(id) === numId)) {
-            selectedCargoIds.value.push(numId);
-          }
+          const numCargoId = Number(cId);
+          mppStore.unidades.forEach((u) => {
+            if ((u.cargos || []).some((c) => Number(c.id_cargo) === numCargoId)) {
+              const laneKey = `${Number(u.id_unidad || u.id)}:${numCargoId}`;
+              if (!selectedCargoKeys.value.includes(laneKey)) {
+                selectedCargoKeys.value.push(laneKey);
+              }
+            }
+          });
         });
 
         await refreshCondicionesBadges();
@@ -1554,7 +1597,7 @@ const calculateEditorConnections = () => {
 watch(
   [
     matrixEditorContainer,
-    selectedCargoIds,
+    selectedCargoKeys,
     () => rows.value,
     () => condicionesPorTarea.value,
   ],
@@ -2066,15 +2109,8 @@ watch(
           <v-btn icon="mdi-close" @click="showLaneManager = false"></v-btn>
         </v-toolbar>
 
-        <div style="display: flex; height: 500px">
-          <div
-            style="
-              flex: 0 0 320px;
-              border-right: 1px solid #e0e0e0;
-              display: flex;
-              flex-direction: column;
-            "
-          >
+        <div class="lane-manager-container">
+          <div class="lane-manager-units">
             <div class="pa-4 bg-slate-50">
               <v-text-field
                 v-model="unitSearch"
@@ -2101,7 +2137,7 @@ watch(
                   <v-badge
                     v-if="
                       u.cargos?.some((c) =>
-                        selectedCargoIds.some((id) => Number(id) === Number(c.id_cargo)),
+                        selectedCargoKeys.includes(`${u.id_unidad || u.id}:${c.id_cargo}`),
                       )
                     "
                     color="info"
@@ -2113,10 +2149,7 @@ watch(
             </v-list>
           </div>
 
-          <div
-            style="flex: 1; display: flex; flex-direction: column"
-            class="bg-slate-50"
-          >
+          <div class="lane-manager-cargos bg-slate-50">
             <div v-if="selectedUnitId" class="pa-4">
               <div class="text-overline font-weight-black mb-2 text-primary">
                 Seleccionar Cargos
@@ -2125,11 +2158,11 @@ watch(
                 <v-list-item
                   v-for="c in activeUnitCargos"
                   :key="c.id_cargo"
-                  @click="toggleCargo(c.id_cargo)"
+                  @click="toggleCargo(c.id_cargo, selectedUnitId)"
                 >
                   <template v-slot:prepend>
                     <v-checkbox-btn
-                      :model-value="selectedCargoIds.some((id) => Number(id) === Number(c.id_cargo))"
+                      :model-value="selectedCargoKeys.includes(`${selectedUnitId}:${c.id_cargo}`)"
                       color="primary"
                     ></v-checkbox-btn>
                   </template>
@@ -2154,15 +2187,7 @@ watch(
             </div>
           </div>
 
-          <div
-            style="
-              flex: 0 0 250px;
-              border-left: 1px solid #e0e0e0;
-              display: flex;
-              flex-direction: column;
-            "
-            class="bg-surface"
-          >
+          <div class="lane-manager-active-cols bg-surface">
             <div
               class="pa-4 text-overline font-weight-black border-bottom bg-slate-50"
             >
@@ -2190,7 +2215,7 @@ watch(
                     variant="text"
                     size="x-small"
                     color="error"
-                    @click="toggleCargo(cargo.id_cargo)"
+                    @click="toggleCargo(cargo.id_cargo, cargo.unitId)"
                   ></v-btn>
                 </template>
               </v-list-item>
@@ -3451,6 +3476,58 @@ watch(
   z-index: 5;
   font-weight: 800 !important;
   pointer-events: none;
+}
+
+/* GESTOR DE CARRILES INSTITUCIONALES */
+.lane-manager-container {
+  display: flex;
+  height: 500px;
+  width: 100%;
+}
+
+.lane-manager-units {
+  flex: 0 0 320px;
+  border-right: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lane-manager-cargos {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.lane-manager-active-cols {
+  flex: 0 0 250px;
+  border-left: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 850px) {
+  .lane-manager-container {
+    flex-direction: column;
+    height: auto;
+    max-height: 75vh;
+    overflow-y: auto;
+  }
+  .lane-manager-units {
+    flex: 0 0 auto !important;
+    max-height: 180px;
+    border-right: none !important;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  .lane-manager-cargos {
+    flex: 1 1 auto !important;
+    min-height: 200px;
+  }
+  .lane-manager-active-cols {
+    flex: 0 0 auto !important;
+    max-height: 180px;
+    border-left: none !important;
+    border-top: 1px solid #e0e0e0;
+  }
 }
 
 @media (max-width: 800px) {

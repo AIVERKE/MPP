@@ -105,14 +105,14 @@ export class ProcesosService {
 
   async findAllProcesos(): Promise<Proceso[]> {
     return await this.procesoRepository.find({
-      relations: ['unidades', 'cargoProcesos', 'cargoProcesos.cargo'],
+      relations: ['unidades', 'cargoProcesos', 'cargoProcesos.cargo', 'cargoProcesos.unidad'],
     });
   }
 
   async findOneProceso(id: number): Promise<Proceso> {
     const proceso = await this.procesoRepository.findOne({
       where: { id_proceso: id },
-      relations: ['unidades', 'cargoProcesos', 'cargoProcesos.cargo'],
+      relations: ['unidades', 'cargoProcesos', 'cargoProcesos.cargo', 'cargoProcesos.unidad'],
     });
     if (!proceso)
       throw new NotFoundException(`Proceso con ID ${id} no encontrado`);
@@ -456,7 +456,7 @@ export class ProcesosService {
     createDto: CreateCargoProcesoDto,
     idUsuario?: number,
   ): Promise<CargoProceso> {
-    const { id_cargo, id_proceso } = createDto;
+    const { id_cargo, id_proceso, id_unidad } = createDto;
 
     // Validar que el cargo exista
     const cargo = await this.cargoRepository.findOne({ where: { id_cargo } });
@@ -472,6 +472,18 @@ export class ProcesosService {
       throw new BadRequestException(
         `El proceso con ID ${id_proceso} no existe.`,
       );
+    }
+
+    // Validar que la unidad exista (si se especificó)
+    if (id_unidad) {
+      const unidad = await this.unidadRepository.findOne({
+        where: { id_unidad },
+      });
+      if (!unidad) {
+        throw new BadRequestException(
+          `La unidad con ID ${id_unidad} no existe.`,
+        );
+      }
     }
 
     const cargoProceso = this.cargoProcesoRepository.create(createDto);
@@ -490,14 +502,14 @@ export class ProcesosService {
 
   async findAllCargoProcesos(): Promise<CargoProceso[]> {
     return await this.cargoProcesoRepository.find({
-      relations: ['cargo', 'proceso'],
+      relations: ['cargo', 'proceso', 'unidad'],
     });
   }
 
   async findOneCargoProceso(id: number): Promise<CargoProceso> {
     const cargoProceso = await this.cargoProcesoRepository.findOne({
       where: { id },
-      relations: ['cargo', 'proceso'],
+      relations: ['cargo', 'proceso', 'unidad'],
     });
     if (!cargoProceso)
       throw new NotFoundException(
@@ -514,7 +526,7 @@ export class ProcesosService {
     const cargoProceso = await this.findOneCargoProceso(id);
     const preSnapshot = cloneEntity(cargoProceso);
 
-    const { id_cargo, id_proceso } = updateDto;
+    const { id_cargo, id_proceso, id_unidad } = updateDto;
 
     if (id_cargo) {
       const cargo = await this.cargoRepository.findOne({ where: { id_cargo } });
@@ -530,6 +542,17 @@ export class ProcesosService {
       if (!proceso) {
         throw new BadRequestException(
           `El proceso con ID ${id_proceso} no existe.`,
+        );
+      }
+    }
+
+    if (id_unidad) {
+      const unidad = await this.unidadRepository.findOne({
+        where: { id_unidad },
+      });
+      if (!unidad) {
+        throw new BadRequestException(
+          `La unidad con ID ${id_unidad} no existe.`,
         );
       }
     }
