@@ -26,6 +26,9 @@ export class Proceso {
   @Column({ type: 'text', nullable: true })
   descripcion: string;
 
+  @Column({ name: 'tipo_proceso', type: 'varchar', nullable: true })
+  tipo_proceso: 'Sustantivo' | 'Apoyo' | 'Estratégico' | null;
+
   @ManyToMany(() => Unidad)
   @JoinTable({
     name: 'proceso_unidad',

@@ -25,10 +25,15 @@ import { AuditoriaService } from '../versiones/auditoria.service';
 import { VersionesService } from '../versiones/versiones.service';
 import { SeguridadService } from '../seguridad/seguridad.service';
 import {
-  ESTADOS_PUBLICADOS,
   ROLES_MPP,
+  esEstadoPublicado,
 } from '../seguridad/roles.constants';
 
+export type ProcedimientosListFilters = {
+  q?: string;
+  id_unidad?: number;
+  tipo_proceso?: string;
+};
 function cloneEntity<T>(entity: T): T {
   return JSON.parse(JSON.stringify(entity));
 }
@@ -151,6 +156,7 @@ export class ProcesosService {
     createDto: CreateProcesoDto,
     idUsuario?: number,
   ): Promise<Proceso> {
+    await this.seguridadService.assertNoSoloConsultor(idUsuario);
     const { id_unidades, ...procesoData } = createDto;
 
     // Verificar unicidad de código
@@ -223,6 +229,7 @@ export class ProcesosService {
     updateDto: UpdateProcesoDto,
     idUsuario?: number,
   ): Promise<Proceso> {
+    await this.seguridadService.assertNoSoloConsultor(idUsuario);
     const proceso = await this.findOneProceso(id);
     const preSnapshot = cloneEntity(proceso);
     const { id_unidades, ...procesoData } = updateDto;
@@ -278,6 +285,7 @@ export class ProcesosService {
   }
 
   async removeProceso(id: number, idUsuario?: number): Promise<void> {
+    await this.seguridadService.assertNoSoloConsultor(idUsuario);
     const proceso = await this.findOneProceso(id);
     const preSnapshot = cloneEntity(proceso);
     await this.procesoRepository.softRemove(proceso);
@@ -393,18 +401,63 @@ export class ProcesosService {
     }
   }
 
-  async findAllProcedimientos(idUsuario?: number): Promise<Procedimiento[]> {
+  async findAllProcedimientos(
+    idUsuario?: number,
+    filters?: ProcedimientosListFilters,
+  ): Promise<Procedimiento[]> {
     const all = await this.procedimientoRepository.find({
-      relations: ['proceso', 'instalaciones'],
+      relations: [
+        'proceso',
+        'proceso.unidades',
+        'proceso.cargoProcesos',
+        'proceso.cargoProcesos.cargo',
+        'instalaciones',
+      ],
     });
-    if (!idUsuario) return all;
-    const roleNames = await this.seguridadService.getNombresRoles(idUsuario);
-    if (this.seguridadService.esSoloConsultor(roleNames)) {
-      return all.filter((p) =>
-        (ESTADOS_PUBLICADOS as readonly string[]).includes(p.estado_version),
+
+    let result = all;
+    if (idUsuario) {
+      const roleNames = await this.seguridadService.getNombresRoles(idUsuario);
+      if (this.seguridadService.esSoloConsultor(roleNames)) {
+        result = result.filter((p) => esEstadoPublicado(p.estado_version));
+      }
+    }
+
+    const q = filters?.q?.trim().toLowerCase();
+    if (q) {
+      result = result.filter((p) => {
+        const haystack = [
+          p.nombre,
+          p.codigo,
+          p.proceso?.nombre,
+          p.proceso?.codigo,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(q);
+      });
+    }
+
+    if (filters?.id_unidad != null) {
+      const idUnidad = Number(filters.id_unidad);
+      result = result.filter((p) => {
+        const procUnidades = p.proceso?.unidades || [];
+        const instalaciones = p.instalaciones || [];
+        return (
+          procUnidades.some((u) => u.id_unidad === idUnidad) ||
+          instalaciones.some((u) => u.id_unidad === idUnidad)
+        );
+      });
+    }
+
+    if (filters?.tipo_proceso) {
+      result = result.filter(
+        (p) => p.proceso?.tipo_proceso === filters.tipo_proceso,
       );
     }
-    return all;
+
+    return result;
   }
 
   async findOneProcedimiento(
@@ -413,7 +466,13 @@ export class ProcesosService {
   ): Promise<Procedimiento> {
     const procedimiento = await this.procedimientoRepository.findOne({
       where: { id_procedimiento: id },
-      relations: ['proceso', 'instalaciones'],
+      relations: [
+        'proceso',
+        'proceso.unidades',
+        'proceso.cargoProcesos',
+        'proceso.cargoProcesos.cargo',
+        'instalaciones',
+      ],
     });
     if (!procedimiento)
       throw new NotFoundException(`Procedimiento con ID ${id} no encontrado`);
@@ -422,9 +481,7 @@ export class ProcesosService {
       const roleNames = await this.seguridadService.getNombresRoles(idUsuario);
       if (
         this.seguridadService.esSoloConsultor(roleNames) &&
-        !(ESTADOS_PUBLICADOS as readonly string[]).includes(
-          procedimiento.estado_version,
-        )
+        !esEstadoPublicado(procedimiento.estado_version)
       ) {
         throw new ForbiddenException(
           'El rol Consultor solo puede consultar procedimientos publicados',
@@ -438,8 +495,9 @@ export class ProcesosService {
   async findHistorialVersionesProcedimiento(
     id: number,
     query?: { page?: number; limit?: number },
+    idUsuario?: number,
   ) {
-    await this.findOneProcedimiento(id);
+    await this.findOneProcedimiento(id, idUsuario);
     return this.auditoriaService.findAll({
       tablaAfectada: 'Procedimiento',
       idRegistroOriginal: id,
@@ -633,6 +691,7 @@ export class ProcesosService {
     createDto: CreateCargoProcesoDto,
     idUsuario?: number,
   ): Promise<CargoProceso> {
+    await this.seguridadService.assertNoSoloConsultor(idUsuario);
     const { id_cargo, id_proceso, id_unidad } = createDto;
 
     // Validar que el cargo exista
@@ -700,6 +759,7 @@ export class ProcesosService {
     updateDto: UpdateCargoProcesoDto,
     idUsuario?: number,
   ): Promise<CargoProceso> {
+    await this.seguridadService.assertNoSoloConsultor(idUsuario);
     const cargoProceso = await this.findOneCargoProceso(id);
     const preSnapshot = cloneEntity(cargoProceso);
 
@@ -749,6 +809,7 @@ export class ProcesosService {
   }
 
   async removeCargoProceso(id: number, idUsuario?: number): Promise<void> {
+    await this.seguridadService.assertNoSoloConsultor(idUsuario);
     const cargoProceso = await this.findOneCargoProceso(id);
     const preSnapshot = cloneEntity(cargoProceso);
     await this.cargoProcesoRepository.softRemove(cargoProceso);

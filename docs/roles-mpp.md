@@ -12,19 +12,26 @@ Tener un rol no implica poder actuar sobre cualquier recurso: el alcance por uni
 
 | Rol | Capacidades (resumen) |
 |-----|------------------------|
-| **Consultor** | Consulta procedimientos publicados (`Aprobado` / `Renovado`). No crea, modifica, observa ni valida. |
-| **Elaborador** | Crea/modifica/envía borradores de sus unidades asignadas. No puede dar el visto bueno técnico del mismo procedimiento que elaboró. |
+| **Consultor** | Consulta universitaria de procedimientos publicados (`Aprobado` / `Renovado`): listar, buscar, detalle, diagrama, historial de versiones e imprimir/PDF. No crea, modifica, observa ni valida. Sin límite por unidad. |
+| **Elaborador** | Crea/modifica/envía borradores de procedimientos de sus unidades asignadas. No puede dar el visto bueno técnico del mismo procedimiento que elaboró. |
 | **Validador de Planificación** | Revisa metodología y forma; observa o envía a visto bueno técnico. No certifica contenido técnico. |
 | **Validador Técnico** | Revisa contenido técnico de sus unidades; observa o otorga VB técnico final (`Aprobado`). |
 | **Super admin** | Gestiona usuarios, roles, alcances, catálogos y parámetros. Intervenciones excepcionales quedan auditadas. |
+
+## Consultor (solo lectura)
+
+- UI: Historial MPP; sin Generador / Editar / Nueva Versión.
+- API: listado/detalle/versiones solo publicados; mutaciones (proceso, procedimiento, flujo, recursos, calidad) → 403.
+- Filtros: nombre/código, unidad responsable, categoría (`tipo_proceso`).
+- Alcance: toda la universidad (no usa `usuario_rol_unidad`).
+- Exportación: imprimir y PDF en cliente del detalle ± diagrama.
 
 ## Alcance por unidad
 
 Tabla `usuario_rol_unidad` (usuario + rol + unidad).
 
 - Obligatoria para **Elaborador** y **Validador Técnico**.
-- Opcional/extensión mínima para **Consultor**.
-- Un mismo usuario puede ser Elaborador de la unidad A y Validador Técnico de la unidad B.
+- **Consultor** no lleva alcance por unidad (consulta universitaria).
 
 Asignación: vista **Super admin → Usuarios**.
 
@@ -32,18 +39,7 @@ Asignación: vista **Super admin → Usuarios**.
 
 Una persona puede tener ambos roles (Elaborador y Validador Técnico), pero **no** puede elaborar y validar técnicamente el **mismo** procedimiento.
 
-Implementación actual: al transicionar `estado_version` → `Aprobado`, se rechaza si `idUsuario === procedimiento.id_elaborador`.
-
-## Motor de permisos (alcance de este ticket)
-
-Base enforceable mínima:
-
-1. Catálogo y asignación multi-rol.
-2. Alcance por unidad (Elaborador / Validador Técnico).
-3. Segregación Elaborador ↔ Validador Técnico en aprobación.
-4. Consultor solo lectura de publicados.
-
-**Fuera de este ticket:** matriz exhaustiva acción × estado (observaciones de Planificación/técnicas, estados intermedios del canvas) y mapeo de los 12 perfiles institucionales.
+Implementación: al transicionar `estado_version` → `Aprobado`, se rechaza si `idUsuario === procedimiento.id_elaborador`.
 
 ## Seed de seguridad
 

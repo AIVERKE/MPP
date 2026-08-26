@@ -15,6 +15,9 @@ const theme = useTheme();
 const { smAndDown } = useDisplay();
 const drawer = ref(true);
 const authStore = useAuthStore();
+const isSoloConsultor = computed(() => authStore.isSoloConsultor);
+const canEditMpp = computed(() => authStore.canEditMpp);
+const isSuperAdmin = computed(() => authStore.hasRole('Super admin'));
 
 const toggleTheme = () => {
   theme.global.name.value = theme.global.current.value.dark ? "light" : "dark";
@@ -150,6 +153,7 @@ const handleLogout = async () => {
             value="profile"
           ></v-list-item>
           <v-list-item
+            v-if="!isSoloConsultor"
             prepend-icon="mdi-cog"
             title="Configuración"
             value="settings"
@@ -183,11 +187,13 @@ const handleLogout = async () => {
             to="/"
           ></v-list-item>
           <v-list-item
+            v-if="isSuperAdmin"
             prepend-icon="mdi-account-multiple"
             title="Usuarios"
             to="/usuarios"
           ></v-list-item>
           <v-list-group
+            v-if="!isSoloConsultor"
             class="no-indent"
             prepend-icon="mdi-package-variant"
             value="MOF"
@@ -223,6 +229,7 @@ const handleLogout = async () => {
               <v-list-item v-bind="props" title="MPP"></v-list-item>
             </template>
             <v-list-item
+              v-if="canEditMpp"
               prepend-icon="mdi-sitemap"
               title="GENERADOR DE PROCESOS Y PROCEDIMIENTOS"
               to="/mpp/gestion-mpp"
@@ -233,12 +240,14 @@ const handleLogout = async () => {
               to="/mpp/historial-mpp"
             ></v-list-item>
             <v-list-item
+              v-if="!isSoloConsultor"
               prepend-icon="mdi-cog"
               title="CONFIGURACIÓN DE FIGURAS"
               to="/configuracion"
             ></v-list-item>
           </v-list-group>
           <v-list-item
+            v-if="!isSoloConsultor"
             prepend-icon="mdi-shield-account-outline"
             title="Auditoría del Sistema"
             to="/auditoria"
@@ -314,13 +323,13 @@ const handleLogout = async () => {
         <span class="text-caption font-weight-medium">Dashboard</span>
       </v-btn>
 
-      <v-btn to="/usuarios" value="usuarios">
+      <v-btn v-if="isSuperAdmin" to="/usuarios" value="usuarios">
         <v-icon size="24">mdi-account-multiple</v-icon>
         <span class="text-caption font-weight-medium">Usuarios</span>
       </v-btn>
 
       <!-- Pop-up desplegable para MOF -->
-      <v-menu location="top" offset="12">
+      <v-menu v-if="!isSoloConsultor" location="top" offset="12">
         <template #activator="{ props }">
           <v-btn v-bind="props" value="mof" :color="isMofActive ? 'primary' : undefined">
             <v-icon size="24">mdi-package-variant</v-icon>
@@ -362,6 +371,7 @@ const handleLogout = async () => {
             Módulo MPP
           </v-list-subheader>
           <v-list-item
+            v-if="canEditMpp"
             prepend-icon="mdi-sitemap"
             title="Generador de Procesos"
             to="/mpp/gestion-mpp"
@@ -372,6 +382,7 @@ const handleLogout = async () => {
             to="/mpp/historial-mpp"
           ></v-list-item>
           <v-list-item
+            v-if="!isSoloConsultor"
             prepend-icon="mdi-cog"
             title="Configuración de Figuras"
             to="/configuracion"
@@ -379,7 +390,7 @@ const handleLogout = async () => {
         </v-list>
       </v-menu>
 
-      <v-btn to="/auditoria" value="auditoria">
+      <v-btn v-if="!isSoloConsultor" to="/auditoria" value="auditoria">
         <v-icon size="24">mdi-shield-account-outline</v-icon>
         <span class="text-caption font-weight-medium">Auditoría</span>
       </v-btn>

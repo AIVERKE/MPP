@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -221,6 +222,22 @@ export class SeguridadService {
       roleNames.includes(ROLES_MPP.CONSULTOR) &&
       !roleNames.some((r) => operativosEscritura.has(r))
     );
+  }
+
+  async assertNoSoloConsultor(idUsuario?: number): Promise<void> {
+    if (!idUsuario) return;
+    const roleNames = await this.getNombresRoles(idUsuario);
+    if (this.esSoloConsultor(roleNames)) {
+      throw new ForbiddenException(
+        'El rol Consultor es de solo lectura; no puede crear, modificar ni eliminar recursos',
+      );
+    }
+  }
+
+  async esUsuarioSoloConsultor(idUsuario?: number): Promise<boolean> {
+    if (!idUsuario) return false;
+    const roleNames = await this.getNombresRoles(idUsuario);
+    return this.esSoloConsultor(roleNames);
   }
 
   async createUsuario(dto: CreateUsuarioDto) {

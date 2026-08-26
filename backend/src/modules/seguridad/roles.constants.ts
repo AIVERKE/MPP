@@ -43,9 +43,8 @@ export const ROLES_MPP_CATALOG: ReadonlyArray<{
   },
 ];
 
-/** Roles que requieren alcance por unidad organizativa. */
+/** Roles que pueden llevar alcance por unidad organizativa. */
 export const ROLES_CON_ALCANCE_UNIDAD: ReadonlyArray<RolMppNombre> = [
-  ROLES_MPP.CONSULTOR,
   ROLES_MPP.ELABORADOR,
   ROLES_MPP.VALIDADOR_TECNICO,
 ];
@@ -56,10 +55,21 @@ export const ROLES_ALCANCE_OBLIGATORIO: ReadonlyArray<RolMppNombre> = [
   ROLES_MPP.VALIDADOR_TECNICO,
 ];
 
+export const TIPOS_PROCESO = [
+  'Sustantivo',
+  'Apoyo',
+  'Estratégico',
+] as const;
+
+export type TipoProceso = (typeof TIPOS_PROCESO)[number];
+
 export const ESTADOS_PUBLICADOS: ReadonlyArray<string> = [
   'Aprobado',
   'Renovado',
 ];
 
+export function esEstadoPublicado(estado?: string | null): boolean {
+  return !!estado && (ESTADOS_PUBLICADOS as readonly string[]).includes(estado);
+}
 /** Nombre legacy del Super admin en seeds anteriores. */
 export const ROL_ADMIN_LEGACY = 'Administrador';

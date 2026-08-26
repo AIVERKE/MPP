@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -28,6 +29,8 @@ import {
   UpdateCondicionTareaDto,
 } from './dto/condicion-tarea.dto';
 import { AuditoriaService } from '../versiones/auditoria.service';
+import { SeguridadService } from '../seguridad/seguridad.service';
+import { esEstadoPublicado } from '../seguridad/roles.constants';
 
 function cloneEntity<T>(entity: T): T {
   return JSON.parse(JSON.stringify(entity));
@@ -55,6 +58,7 @@ export class FlujoService {
     @InjectRepository(Cargo)
     private readonly cargoRepository: Repository<Cargo>,
     private readonly auditoriaService: AuditoriaService,
+    private readonly seguridadService: SeguridadService,
   ) {}
 
   // --- Figuras ---
@@ -353,10 +357,45 @@ export class FlujoService {
     return postSnapshot;
   }
 
-  async findAllOperaciones(): Promise<Operacion[]> {
-    return await this.operacionRepository.find({
+  async findAllOperaciones(
+    idUsuario?: number,
+    idProcedimiento?: number,
+  ): Promise<Operacion[]> {
+    const all = await this.operacionRepository.find({
       relations: ['procedimiento', 'operacionCargos', 'actividades'],
     });
+
+    let result = all;
+    if (idProcedimiento != null) {
+      result = result.filter(
+        (op) => Number(op.id_procedimiento) === Number(idProcedimiento),
+      );
+
+      if (idUsuario) {
+        const soloConsultor =
+          await this.seguridadService.esUsuarioSoloConsultor(idUsuario);
+        if (soloConsultor) {
+          const proc = await this.procedimientoRepository.findOne({
+            where: { id_procedimiento: idProcedimiento },
+          });
+          if (!proc || !esEstadoPublicado(proc.estado_version)) {
+            throw new ForbiddenException(
+              'El rol Consultor solo puede consultar el flujo de procedimientos publicados',
+            );
+          }
+        }
+      }
+    } else if (idUsuario) {
+      const soloConsultor =
+        await this.seguridadService.esUsuarioSoloConsultor(idUsuario);
+      if (soloConsultor) {
+        result = result.filter((op) =>
+          esEstadoPublicado(op.procedimiento?.estado_version),
+        );
+      }
+    }
+
+    return result;
   }
 
   async findOneOperacion(id: number): Promise<Operacion> {

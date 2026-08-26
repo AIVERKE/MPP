@@ -18,8 +18,10 @@ import {
   ApiResponse,
   ApiParam,
   ApiBearerAuth,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { DenySoloConsultorGuard } from '../auth/guards/deny-solo-consultor.guard';
 import { CreateProcesoDto, UpdateProcesoDto } from './dto/proceso.dto';
 import {
   CreateProcedimientoDto,
@@ -38,7 +40,7 @@ export class ProcesosController {
   // --- Procesos ---
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Post('procesos')
   @ApiOperation({ summary: 'Crear un nuevo proceso' })
   @ApiResponse({ status: 201, description: 'Proceso creado exitosamente.' })
@@ -70,7 +72,7 @@ export class ProcesosController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Patch('procesos/:id')
   @ApiOperation({ summary: 'Actualizar un proceso por ID' })
   @ApiParam({ name: 'id', description: 'ID del proceso' })
@@ -92,7 +94,7 @@ export class ProcesosController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Delete('procesos/:id')
   @ApiOperation({ summary: 'Eliminar un proceso (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID del proceso' })
@@ -108,7 +110,7 @@ export class ProcesosController {
   // --- Procedimientos ---
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Post('procedimientos')
   @ApiOperation({ summary: 'Crear un nuevo procedimiento' })
   @ApiResponse({
@@ -129,17 +131,28 @@ export class ProcesosController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Get('procedimientos')
-  @ApiOperation({ summary: 'Listar todos los procedimientos' })
+  @ApiOperation({ summary: 'Listar procedimientos (Consultor: solo publicados)' })
+  @ApiQuery({ name: 'q', required: false, type: String })
+  @ApiQuery({ name: 'id_unidad', required: false, type: Number })
+  @ApiQuery({ name: 'tipo_proceso', required: false, type: String })
   @ApiResponse({
     status: 200,
     description: 'Lista de procedimientos obtenida exitosamente.',
   })
-  findAllProcedimientos(@Req() req: any) {
+  findAllProcedimientos(
+    @Req() req: any,
+    @Query('q') q?: string,
+    @Query('id_unidad', new ParseIntPipe({ optional: true })) id_unidad?: number,
+    @Query('tipo_proceso') tipo_proceso?: string,
+  ) {
     return this.service.findAllProcedimientos(
       req.user?.userId ? Number(req.user.userId) : undefined,
+      { q, id_unidad, tipo_proceso },
     );
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Get('procedimientos/:id/versiones')
   @ApiOperation({ summary: 'Obtener historial de versiones de un procedimiento' })
   @ApiParam({ name: 'id', description: 'ID del procedimiento' })
@@ -150,10 +163,15 @@ export class ProcesosController {
   @ApiResponse({ status: 404, description: 'Procedimiento no encontrado.' })
   findHistorialVersionesProcedimiento(
     @Param('id', ParseIntPipe) id: number,
+    @Req() req: any,
     @Query('page', new ParseIntPipe({ optional: true })) page?: number,
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ) {
-    return this.service.findHistorialVersionesProcedimiento(id, { page, limit });
+    return this.service.findHistorialVersionesProcedimiento(
+      id,
+      { page, limit },
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   @ApiBearerAuth()
@@ -171,7 +189,7 @@ export class ProcesosController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Patch('procedimientos/:id')
   @ApiOperation({ summary: 'Actualizar un procedimiento por ID' })
   @ApiParam({ name: 'id', description: 'ID del procedimiento' })
@@ -193,7 +211,7 @@ export class ProcesosController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Delete('procedimientos/:id')
   @ApiOperation({ summary: 'Eliminar un procedimiento (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID del procedimiento' })
@@ -212,7 +230,7 @@ export class ProcesosController {
   // --- CargoProcesos (Relaciones) ---
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Post('cargo-procesos')
   @ApiOperation({ summary: 'Crear una nueva relación Cargo-Proceso' })
   @ApiResponse({ status: 201, description: 'Relación creada exitosamente.' })
@@ -240,7 +258,7 @@ export class ProcesosController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Patch('cargo-procesos/:id')
   @ApiOperation({ summary: 'Actualizar una relación Cargo-Proceso por ID' })
   @ApiParam({ name: 'id', description: 'ID de la relación' })
@@ -257,7 +275,7 @@ export class ProcesosController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Delete('cargo-procesos/:id')
   @ApiOperation({
     summary: 'Eliminar una relación Cargo-Proceso (Borrado lógico)',

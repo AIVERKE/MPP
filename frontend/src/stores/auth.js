@@ -138,5 +138,42 @@ export const useAuthStore = defineStore("auth", () => {
     return user.value?.rol === roleName;
   }
 
-  return { token, isLocalToken, isAuthenticated, user, login, logout, getAuthHeader, hasRole };
+  const roleList = computed(() => {
+    if (Array.isArray(user.value?.roles) && user.value.roles.length) {
+      return user.value.roles;
+    }
+    return user.value?.rol ? [user.value.rol] : [];
+  });
+
+  const MPP_WRITE_ROLES = [
+    "Elaborador",
+    "Validador de Planificación",
+    "Validador Técnico",
+    "Super admin",
+  ];
+
+  const canEditMpp = computed(() =>
+    roleList.value.some((r) => MPP_WRITE_ROLES.includes(r)),
+  );
+
+  const isSoloConsultor = computed(() => {
+    const roles = roleList.value;
+    return (
+      roles.includes("Consultor") &&
+      !roles.some((r) => MPP_WRITE_ROLES.includes(r))
+    );
+  });
+
+  return {
+    token,
+    isLocalToken,
+    isAuthenticated,
+    user,
+    login,
+    logout,
+    getAuthHeader,
+    hasRole,
+    canEditMpp,
+    isSoloConsultor,
+  };
 });

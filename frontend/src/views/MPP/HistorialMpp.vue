@@ -31,10 +31,9 @@
             <div
               class="d-flex align-center flex-wrap ga-3 w-100 w-md-auto justify-start justify-md-end"
             >
-              <!-- Filtro de estado -->
               <v-select
                 v-model="statusFilter"
-                :items="['Todos', 'Borrador', 'En Revisión', 'Aprobado', 'Obsoleto', 'Activo', 'Inactivo']"
+                :items="statusFilterItems"
                 label="Estado"
                 variant="solo-filled"
                 density="compact"
@@ -42,8 +41,30 @@
                 style="max-width: 170px; min-width: 140px"
                 class="rounded-lg flex-grow-1 flex-md-grow-0"
               ></v-select>
-
-              <!-- Buscador integrado -->
+              <v-select
+                v-model="unidadFilter"
+                :items="unidadFilterItems"
+                item-title="title"
+                item-value="value"
+                label="Unidad"
+                variant="solo-filled"
+                density="compact"
+                hide-details
+                clearable
+                style="max-width: 200px; min-width: 160px"
+                class="rounded-lg flex-grow-1 flex-md-grow-0"
+              ></v-select>
+              <v-select
+                v-model="categoriaFilter"
+                :items="categoriaFilterItems"
+                label="Categoría"
+                variant="solo-filled"
+                density="compact"
+                hide-details
+                clearable
+                style="max-width: 170px; min-width: 140px"
+                class="rounded-lg flex-grow-1 flex-md-grow-0"
+              ></v-select>
               <v-text-field
                 v-model="searchQuery"
                 label="Buscar proceso, procedimiento o código..."
@@ -335,6 +356,7 @@
                             Explorar
                           </v-btn>
                           <v-btn
+                            v-if="!isSoloConsultor"
                             size="small"
                             :color="
                               getProcedureStatus(grupo.selectedVersionId, grupo.versiones) === 'Aprobado' ||
@@ -411,6 +433,15 @@
                 Versión {{ selectedProcedure.version || "—" }}
               </v-chip>
               <v-chip
+                v-if="PUBLICADOS.includes(selectedProcedure.estado_version)"
+                size="x-small"
+                color="success"
+                variant="flat"
+                class="font-weight-black uppercase"
+              >
+                Vigente
+              </v-chip>
+              <v-chip
                 size="x-small"
                 color="secondary"
                 variant="tonal"
@@ -435,13 +466,30 @@
               {{ selectedProcedure.nombre }}
             </h2>
           </div>
-          <v-btn
-            icon="mdi-close"
-            variant="tonal"
-            size="small"
-            class="flex-shrink-0"
-            @click="drawerOpen = false"
-          ></v-btn>
+          <div class="d-flex align-center ga-1 flex-shrink-0">
+            <v-btn
+              icon="mdi-printer"
+              variant="tonal"
+              size="small"
+              title="Imprimir"
+              @click="printProcedure"
+            ></v-btn>
+            <v-btn
+              icon="mdi-file-pdf-box"
+              variant="tonal"
+              size="small"
+              color="error"
+              title="Descargar PDF"
+              :loading="exportingPdf"
+              @click="downloadProcedurePdf"
+            ></v-btn>
+            <v-btn
+              icon="mdi-close"
+              variant="tonal"
+              size="small"
+              @click="drawerOpen = false"
+            ></v-btn>
+          </div>
         </div>
 
         <!-- PESTAÑAS DENTRO DEL DRAWER -->
@@ -469,7 +517,7 @@
         </v-tabs>
 
         <!-- CONTENIDO DE LAS PESTAÑAS (SCROLLABLE) -->
-        <div class="pt-2 px-6 pb-6 bg-slate-50">
+        <div id="consultor-print-area" class="pt-2 px-6 pb-6 bg-slate-50">
           <!-- PESTAÑA 1: ESTRUCTURA Y RECURSOS -->
           <div v-show="drawerTab === 'general'" class="px-1 pb-1 pt-0">
             <!-- Información Técnica -->
@@ -1093,13 +1141,20 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
 import { useDisplay } from "vuetify";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { useMppCoreStore } from "@/stores/mpp_core";
+import { useAuthStore } from "@/stores/auth";
 import axios from "axios";
+import { toPng } from "html-to-image";
+import { jsPDF } from "jspdf";
 
 const router = useRouter();
+const route = useRoute();
 const mppStore = useMppCoreStore();
+const authStore = useAuthStore();
 const { smAndDown } = useDisplay();
+const isSoloConsultor = computed(() => authStore.isSoloConsultor);
+const PUBLICADOS = ["Aprobado", "Renovado"];
 
 const BASE_URL_MPP = mppStore.BASE_URL_MPP;
 const BASE_URL_FLUX = mppStore.BASE_URL_FLUX;
@@ -1107,7 +1162,23 @@ const BASE_URL_REC = mppStore.BASE_URL_REC;
 
 // --- ESTADOS DE UI ---
 const searchQuery = ref("");
-const statusFilter = ref("Todos");
+const statusFilter = ref(authStore.isSoloConsultor ? "Aprobado" : "Todos");
+const unidadFilter = ref(null);
+const categoriaFilter = ref(null);
+const exportingPdf = ref(false);
+const statusFilterItems = computed(() =>
+  isSoloConsultor.value
+    ? ["Aprobado", "Renovado"]
+    : ["Todos", "Borrador", "En revisión", "Aprobado", "Renovado", "Activo", "Inactivo"],
+);
+const unidadFilterItems = computed(() => {
+  const items = [{ title: "Todas las unidades", value: null }];
+  for (const u of mppStore.unidades || []) {
+    items.push({ title: u.nombre, value: u.id_unidad });
+  }
+  return items;
+});
+const categoriaFilterItems = ["Sustantivo", "Apoyo", "Estratégico"];
 const expandedProcessPanel = ref([]);
 const loadingGlobal = ref(true);
 const selectedVersionsMap = ref({});
@@ -1133,12 +1204,25 @@ const scrollWrapper = ref(null);
 // --- CARGA DE DATOS ---
 const fetchAllProcedimientos = async () => {
   try {
-    const response = await axios.get(`${BASE_URL_MPP}/procedimientos`);
-    allProcedimientos.value = response.data.data || response.data || [];
+    const params = {};
+    if (searchQuery.value?.trim()) params.q = searchQuery.value.trim();
+    if (unidadFilter.value != null) params.id_unidad = unidadFilter.value;
+    if (categoriaFilter.value) params.tipo_proceso = categoriaFilter.value;
+    const response = await axios.get(`${BASE_URL_MPP}/procedimientos`, { params });
+    let list = response.data.data || response.data || [];
+    if (isSoloConsultor.value) {
+      list = list.filter((p) => PUBLICADOS.includes(p.estado_version));
+    }
+    allProcedimientos.value = list;
   } catch (err) {
     console.error("Error al cargar todos los procedimientos:", err);
   }
 };
+
+watch([searchQuery, unidadFilter, categoriaFilter], async () => {
+  if (loadingGlobal.value) return;
+  await fetchAllProcedimientos();
+});
 
 const fetchAllCargoProcesos = async () => {
   try {
@@ -1176,7 +1260,7 @@ const loadProcedureFlow = async (procId) => {
   try {
     const [opRes, actRes, tarRes, cargoRes, riesgosRes, controlesRes, reqRes] =
       await Promise.all([
-        axios.get(`${BASE_URL_FLUX}/operaciones`).catch(() => ({ data: [] })),
+        axios.get(`${BASE_URL_FLUX}/operaciones`, { params: { id_procedimiento: procId } }).catch(() => ({ data: [] })),
         axios.get(`${BASE_URL_FLUX}/actividades`).catch(() => ({ data: [] })),
         axios.get(`${BASE_URL_FLUX}/tareas`).catch(() => ({ data: [] })),
         axios.get(`${BASE_URL_FLUX}/operacion-cargos`).catch(() => ({ data: [] })),
@@ -1567,9 +1651,31 @@ const getProcedimientosForProceso = (procesoId) => {
     return Number(parentId) === pId;
   });
 
-  if (statusFilter.value !== "Todos") {
+  if (isSoloConsultor.value) {
+    filtered = filtered.filter((p) => PUBLICADOS.includes(p.estado_version));
+  }
+
+  if (statusFilter.value && statusFilter.value !== "Todos") {
     filtered = filtered.filter(
       (p) => (p.estado_version || p.estado || "Borrador") === statusFilter.value,
+    );
+  }
+
+  if (unidadFilter.value != null) {
+    const idU = Number(unidadFilter.value);
+    filtered = filtered.filter((p) => {
+      const unidades = p.proceso?.unidades || [];
+      const instalaciones = p.instalaciones || [];
+      return (
+        unidades.some((u) => Number(u.id_unidad) === idU) ||
+        instalaciones.some((u) => Number(u.id_unidad) === idU)
+      );
+    });
+  }
+
+  if (categoriaFilter.value) {
+    filtered = filtered.filter(
+      (p) => p.proceso?.tipo_proceso === categoriaFilter.value,
     );
   }
 
@@ -1623,7 +1729,8 @@ const getProcedimientosForProceso = (procesoId) => {
 
     const key = `${procesoId}_${grupo.nombreBase}`;
     if (!selectedVersionsMap.value[key] || !grupo.versiones.some((v) => v.id_procedimiento === selectedVersionsMap.value[key])) {
-      selectedVersionsMap.value[key] = grupo.versiones[0]?.id_procedimiento || null;
+      const publicada = grupo.versiones.find((v) => PUBLICADOS.includes(v.estado_version || v.estado));
+      selectedVersionsMap.value[key] = (publicada || grupo.versiones[0])?.id_procedimiento || null;
     }
 
     Object.defineProperty(grupo, "selectedVersionId", {
@@ -1747,6 +1854,17 @@ const filteredProcesos = computed(() => {
   const filter = statusFilter.value;
 
   return mppStore.procesos.filter((proceso) => {
+    if (categoriaFilter.value && proceso.tipo_proceso !== categoriaFilter.value) {
+      return false;
+    }
+    if (unidadFilter.value != null) {
+      const idU = Number(unidadFilter.value);
+      const unidades = proceso.unidades || [];
+      if (!unidades.some((u) => Number(u.id_unidad) === idU)) {
+        // keep if has matching procedimientos via instalaciones later
+      }
+    }
+
     const matchProcessName = proceso.nombre?.toLowerCase().includes(query);
     const matchProcessCode = proceso.codigo?.toLowerCase().includes(query);
 
@@ -1755,8 +1873,34 @@ const filteredProcesos = computed(() => {
       return Number(parentId) === proceso.id_proceso;
     });
 
-    if (filter !== "Todos") {
-      procs = procs.filter((p) => (p.estado || "Activo") === filter);
+    if (isSoloConsultor.value) {
+      procs = procs.filter((p) => PUBLICADOS.includes(p.estado_version));
+    }
+
+    if (filter && filter !== "Todos") {
+      procs = procs.filter(
+        (p) => (p.estado_version || p.estado || "Borrador") === filter,
+      );
+    }
+
+    if (unidadFilter.value != null) {
+      const idU = Number(unidadFilter.value);
+      procs = procs.filter((p) => {
+        const unidades = p.proceso?.unidades || proceso.unidades || [];
+        const instalaciones = p.instalaciones || [];
+        return (
+          unidades.some((u) => Number(u.id_unidad) === idU) ||
+          instalaciones.some((u) => Number(u.id_unidad) === idU)
+        );
+      });
+    }
+
+    if (categoriaFilter.value) {
+      procs = procs.filter(
+        (p) =>
+          (p.proceso?.tipo_proceso || proceso.tipo_proceso) ===
+          categoriaFilter.value,
+      );
     }
 
     if (query) {
@@ -1769,7 +1913,14 @@ const filteredProcesos = computed(() => {
 
     const hasValidProcs = procs.length > 0;
 
-    if (!query && filter === "Todos") return true;
+    if (
+      !query &&
+      (!filter || filter === "Todos") &&
+      unidadFilter.value == null &&
+      !categoriaFilter.value
+    ) {
+      return isSoloConsultor.value ? hasValidProcs : true;
+    }
 
     return matchProcessName || matchProcessCode || hasValidProcs;
   });
@@ -1814,6 +1965,42 @@ const handleResize = () => {
   }
 };
 
+const printProcedure = () => {
+  window.print();
+};
+
+const downloadProcedurePdf = async () => {
+  const el = document.getElementById("consultor-print-area");
+  if (!el || !selectedProcedure.value) return;
+  exportingPdf.value = true;
+  try {
+    const dataUrl = await toPng(el, {
+      cacheBust: true,
+      pixelRatio: 2,
+      backgroundColor: "#ffffff",
+    });
+    const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const img = new Image();
+    img.src = dataUrl;
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+    });
+    const ratio = Math.min(pageWidth / img.width, (pageHeight - 40) / img.height);
+    const w = img.width * ratio;
+    const h = img.height * ratio;
+    pdf.addImage(dataUrl, "PNG", (pageWidth - w) / 2, 20, w, h);
+    const code = selectedProcedure.value.codigo || selectedProcedure.value.id_procedimiento;
+    pdf.save(`procedimiento-${code}-v${selectedProcedure.value.version || "1"}.pdf`);
+  } catch (err) {
+    console.error("Error al exportar PDF:", err);
+  } finally {
+    exportingPdf.value = false;
+  }
+};
+
 // --- INICIALIZACIÓN ---
 onMounted(async () => {
   window.addEventListener("resize", handleResize);
@@ -1833,6 +2020,16 @@ onMounted(async () => {
 
     if (filteredProcesos.value.length > 0) {
       expandedProcessPanel.value = [0];
+    }
+
+    const deepId = Number(route.query.procedimientoId);
+    if (deepId) {
+      const exists = allProcedimientos.value.some(
+        (p) => Number(p.id_procedimiento) === deepId,
+      );
+      if (exists) {
+        await openDetailsDrawer(deepId);
+      }
     }
   } catch (err) {
     console.error("Error al montar la vista de historial:", err);
@@ -2094,5 +2291,15 @@ onUnmounted(() => {
   min-width: 110px !important;
   min-height: 70px !important;
   border-radius: 0 !important;
+}
+
+@media print {
+  body * { visibility: hidden !important; }
+  #consultor-print-area, #consultor-print-area * { visibility: visible !important; }
+  #consultor-print-area {
+    position: absolute !important;
+    left: 0; top: 0; width: 100%;
+    background: white !important;
+  }
 }
 </style>
