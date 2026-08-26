@@ -106,16 +106,26 @@ El seeder genera 10 usuarios de prueba con el formato `user1`, `user2`, ... hast
 
 | Usuario | Rol Asignado | Correo |
 | :--- | :--- | :--- |
-| **user1** | Administrador | user1@mpp.com |
-| **user2** | Analista de Procesos | user2@mpp.com |
-| **user3** | Auditor | user3@mpp.com |
-| **user4** | Gerente | user4@mpp.com |
-| **user5** | Operador | user5@mpp.com |
-| **user6** | Soporte | user6@mpp.com |
-| **user7** | RRHH | user7@mpp.com |
-| **user8** | Calidad | user8@mpp.com |
-| **user9** | Invitado | user9@mpp.com |
-| **user10** | Coordinador | user10@mpp.com |
+| **user1** | Super admin | user1@mpp.com |
+| **user2** | Consultor | user2@mpp.com |
+| **user3** | Elaborador | user3@mpp.com |
+| **user4** | Validador de Planificación | user4@mpp.com |
+| **user5** | Validador Técnico | user5@mpp.com |
+| **user6** | Super admin | user6@mpp.com |
+| **user7** | Consultor | user7@mpp.com |
+| **user8** | Elaborador | user8@mpp.com |
+| **user9** | Validador de Planificación | user9@mpp.com |
+| **user10** | Validador Técnico | user10@mpp.com |
+
+> El catálogo operativo son 5 roles (Consultor, Elaborador, Validador de Planificación, Validador Técnico, Super admin). Los usuarios `user6`–`user10` ciclan el mismo catálogo.
+
+Para solo seguridad (idempotente, sin truncar):
+
+```bash
+npm run seed -- src/database/seed-3/admin-seguridad.seeder.ts
+```
+
+- **admin** / **Admin123!** → rol **Super admin**
 
 ## 🚀 Ejecución del Proyecto
 

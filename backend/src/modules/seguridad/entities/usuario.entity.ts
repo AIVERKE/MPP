@@ -6,8 +6,10 @@ import {
   DeleteDateColumn,
   ManyToMany,
   JoinTable,
+  OneToMany,
 } from 'typeorm';
 import { Rol } from './rol.entity';
+import { UsuarioRolUnidad } from './usuario-rol-unidad.entity';
 
 @Entity('Usuario')
 export class Usuario {
@@ -39,4 +41,9 @@ export class Usuario {
     inverseJoinColumn: { name: 'id_rol', referencedColumnName: 'id_rol' },
   })
   roles: Rol[];
+
+  @OneToMany(() => UsuarioRolUnidad, (alcance) => alcance.usuario, {
+    cascade: true,
+  })
+  alcances: UsuarioRolUnidad[];
 }

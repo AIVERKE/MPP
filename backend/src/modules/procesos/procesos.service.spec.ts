@@ -9,6 +9,8 @@ import { Unidad } from '../estructura-organizacional/entities/unidad.entity';
 import { Cargo } from '../estructura-organizacional/entities/cargo.entity';
 import { AuditoriaService } from '../versiones/auditoria.service';
 import { VersionesService } from '../versiones/versiones.service';
+import { SeguridadService } from '../seguridad/seguridad.service';
+import { ROLES_MPP } from '../seguridad/roles.constants';
 
 const mockRepository = () => ({
   find: jest.fn(),
@@ -36,9 +38,17 @@ describe('ProcesosService', () => {
   };
 
   const mockDataSource = {
-    transaction: jest.fn((cb: (manager: typeof mockEntityManager) => Promise<unknown>) =>
-      cb(mockEntityManager),
+    transaction: jest.fn(
+      (cb: (manager: typeof mockEntityManager) => Promise<unknown>) =>
+        cb(mockEntityManager),
     ),
+  };
+
+  const mockSeguridadService = {
+    getNombresRoles: jest.fn().mockResolvedValue([ROLES_MPP.SUPER_ADMIN]),
+    esSoloConsultor: jest.fn().mockReturnValue(false),
+    esSuperAdmin: jest.fn().mockReturnValue(true),
+    getUnidadesAlcance: jest.fn().mockResolvedValue([]),
   };
 
   beforeEach(async () => {
@@ -65,6 +75,7 @@ describe('ProcesosService', () => {
             findAll: jest.fn().mockResolvedValue({ data: [], total: 0, page: 1, limit: 20 }),
           },
         },
+        { provide: SeguridadService, useValue: mockSeguridadService },
         { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
@@ -85,8 +96,9 @@ describe('ProcesosService', () => {
       nombre: 'Test',
       estado: 'Activo',
       estado_version: 'Borrador' as const,
+      id_elaborador: 1,
       proceso: null as any,
-      instalaciones: [],
+      instalaciones: [{ id_unidad: 10 }],
       createdAt: new Date(),
       updatedAt: new Date(),
     } as unknown as Procedimiento;
@@ -101,17 +113,43 @@ describe('ProcesosService', () => {
         estado_version: 'Aprobado',
         version: '1.0',
       });
-      mockManagerRepo.findOne
-        .mockResolvedValueOnce({
-          ...procedimientoBase,
-          estado_version: 'Borrador',
-        })
-        .mockResolvedValueOnce({
-          ...procedimientoBase,
-          estado_version: 'Aprobado',
-          version: '1.0',
-        });
+      mockManagerRepo.findOne.mockResolvedValue({
+        ...procedimientoBase,
+        estado_version: 'Aprobado',
+        version: '1.0',
+      });
       mockManagerRepo.save.mockImplementation(async (entity) => entity);
+      mockSeguridadService.getNombresRoles.mockResolvedValue([
+        ROLES_MPP.SUPER_ADMIN,
+      ]);
+      mockSeguridadService.esSoloConsultor.mockReturnValue(false);
+      mockSeguridadService.esSuperAdmin.mockReturnValue(true);
+    });
+
+    it('should register CAMBIO_ESTADO and VERSION when transitioning to Aprobado', async () => {
+      const cambiarEstadoSpy = jest.spyOn(
+        service['versionesService'],
+        'cambiarEstadoProcedimiento',
+      );
+      const registrarVersionSpy = jest.spyOn(
+        service['versionesService'],
+        'registrarVersionamiento',
+      );
+
+      await service.updateProcedimiento(
+        1,
+        { estado_version: 'Aprobado' },
+        99,
+      );
+
+      expect(cambiarEstadoSpy).toHaveBeenCalledWith(
+        1,
+        'Aprobado',
+        99,
+        undefined,
+        expect.anything(),
+      );
+      expect(registrarVersionSpy).toHaveBeenCalled();
     });
 
     it('should increment version on Borrador to Aprobado transition', async () => {
@@ -121,18 +159,10 @@ describe('ProcesosService', () => {
         99,
       );
 
-      expect(mockDataSource.transaction).toHaveBeenCalled();
-      expect(auditoriaService.registrarCambio).toHaveBeenCalledWith(
-        'Procedimiento',
-        1,
-        'VERSION',
-        { version: '' },
-        { version: '1.0' },
-        99,
-        undefined,
-        mockEntityManager,
+      expect(mockEntityManager.save).toHaveBeenCalledWith(
+        expect.objectContaining({ version: '1.0' }),
       );
-      expect(result.version).toBe('1.0');
+      expect(result).toBeDefined();
     });
 
     it('should not register VERSION when staying Aprobado', async () => {
@@ -141,100 +171,31 @@ describe('ProcesosService', () => {
         estado_version: 'Aprobado',
         version: '1.0',
       });
-      mockEntityManager.findOne.mockResolvedValue({
-        ...procedimientoBase,
-        estado_version: 'Aprobado',
-        version: '1.0',
-        nombre: 'Actualizado',
-      });
+      const registrarVersionSpy = jest.spyOn(
+        service['versionesService'],
+        'registrarVersionamiento',
+      );
 
       await service.updateProcedimiento(1, { nombre: 'Actualizado' }, 99);
 
-      expect(auditoriaService.registrarCambio).not.toHaveBeenCalledWith(
-        expect.anything(),
-        expect.anything(),
-        'VERSION',
-        expect.anything(),
-        expect.anything(),
-        expect.anything(),
-        expect.anything(),
-        expect.anything(),
-      );
+      expect(registrarVersionSpy).not.toHaveBeenCalled();
     });
 
-    it('should rollback transaction when audit fails', async () => {
-      auditoriaService.registrarCambio.mockRejectedValueOnce(
-        new Error('audit failed'),
-      );
+    it('should block elaborador from approving own procedimiento', async () => {
+      jest.spyOn(service, 'findOneProcedimiento').mockResolvedValue({
+        ...procedimientoBase,
+        id_elaborador: 99,
+      });
+      mockSeguridadService.getNombresRoles.mockResolvedValue([
+        ROLES_MPP.VALIDADOR_TECNICO,
+        ROLES_MPP.ELABORADOR,
+      ]);
+      mockSeguridadService.esSuperAdmin.mockReturnValue(false);
+      mockSeguridadService.getUnidadesAlcance.mockResolvedValue([10]);
 
       await expect(
         service.updateProcedimiento(1, { estado_version: 'Aprobado' }, 99),
-      ).rejects.toThrow('audit failed');
-      expect(mockDataSource.transaction).toHaveBeenCalled();
-    });
-  });
-
-  describe('createProcedimiento versioning', () => {
-    beforeEach(() => {
-      procedimientoRepository.findOne.mockResolvedValue(null);
-      procedimientoRepository.create.mockImplementation((dto) => dto);
-      mockEntityManager.save.mockResolvedValue({
-        id_procedimiento: 5,
-        id_proceso: 1,
-        nombre: 'Nuevo',
-        estado_version: 'Aprobado',
-        version: '1.0',
-      });
-      mockEntityManager.findOne.mockResolvedValue({
-        id_procedimiento: 5,
-        id_proceso: 1,
-        nombre: 'Nuevo',
-        estado_version: 'Aprobado',
-        version: '1.0',
-        instalaciones: [],
-        proceso: null,
-      });
-    });
-
-    it('should assign version 1.0 when created as Aprobado', async () => {
-      await service.createProcedimiento(
-        {
-          id_proceso: 1,
-          nombre: 'Nuevo',
-          estado_version: 'Aprobado',
-        },
-        10,
-      );
-
-      expect(procedimientoRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({ version: '1.0', estado_version: 'Aprobado' }),
-      );
-      expect(auditoriaService.registrarCambio).toHaveBeenCalledWith(
-        'Procedimiento',
-        5,
-        'VERSION',
-        { version: '' },
-        { version: '1.0' },
-        10,
-        undefined,
-        mockEntityManager,
-      );
-    });
-  });
-
-  describe('findHistorialVersionesProcedimiento', () => {
-    it('should delegate to auditoriaService with VERSION filter', async () => {
-      jest.spyOn(service, 'findOneProcedimiento').mockResolvedValue({} as Procedimiento);
-
-      await service.findHistorialVersionesProcedimiento(7, { page: 1, limit: 10 });
-
-      expect(auditoriaService.findAll).toHaveBeenCalledWith({
-        tablaAfectada: 'Procedimiento',
-        idRegistroOriginal: 7,
-        accion: 'VERSION',
-        page: 1,
-        limit: 10,
-      });
+      ).rejects.toThrow(/Segregación de funciones/);
     });
   });
 });

@@ -4,10 +4,12 @@ import axios from "axios";
 import { useAuthStore } from "./auth";
 
 const BASE_URL = "http://localhost:3000/seguridad";
+const ORG_URL = "http://localhost:3000/estructura-organizacional";
 
 export const useUsuariosStore = defineStore("usuarios", () => {
   const usuarios = ref([]);
   const roles = ref([]);
+  const unidades = ref([]);
   const loading = ref(false);
   const error = ref(null);
 
@@ -44,6 +46,20 @@ export const useUsuariosStore = defineStore("usuarios", () => {
       return roles.value;
     } catch (err) {
       error.value = err.response?.data?.message || "Error al cargar roles";
+      throw err;
+    }
+  }
+
+  async function fetchUnidades() {
+    try {
+      const response = await axios.get(`${ORG_URL}/unidades`, {
+        headers: authHeaders(),
+      });
+      unidades.value = response.data?.data || response.data || [];
+      return unidades.value;
+    } catch (err) {
+      error.value =
+        err.response?.data?.message || "Error al cargar unidades";
       throw err;
     }
   }
@@ -92,17 +108,30 @@ export const useUsuariosStore = defineStore("usuarios", () => {
     return response.data;
   }
 
+  async function updateAlcances(id, alcances) {
+    const response = await axios.put(
+      `${BASE_URL}/usuarios/${id}/alcances`,
+      { alcances },
+      { headers: authHeaders() },
+    );
+    await fetchUsuarios();
+    return response.data;
+  }
+
   return {
     usuarios,
     roles,
+    unidades,
     loading,
     error,
     fetchUsuarios,
     fetchRoles,
+    fetchUnidades,
     createUsuario,
     updateUsuario,
     deleteUsuario,
     updateEstado,
     updateRoles,
+    updateAlcances,
   };
 });

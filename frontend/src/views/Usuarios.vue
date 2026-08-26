@@ -1,8 +1,11 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useDisplay } from 'vuetify'
 import { useAuthStore } from '@/stores/auth'
 import { useUsuariosStore } from '@/stores/usuarios'
+
+const ROLES_CON_ALCANCE = ['Consultor', 'Elaborador', 'Validador Técnico']
+const ROLES_ALCANCE_OBLIGATORIO = ['Elaborador', 'Validador Técnico']
 
 const authStore = useAuthStore()
 const usuariosStore = useUsuariosStore()
@@ -16,7 +19,7 @@ const saving = ref(false)
 const togglingId = ref(null)
 const snackbar = ref({ show: false, text: '', color: 'success' })
 
-const isAdmin = computed(() => authStore.user?.rol === 'Administrador')
+const isAdmin = computed(() => authStore.hasRole('Super admin'))
 
 const headers = computed(() => {
   if (smAndDown.value) {
@@ -35,7 +38,7 @@ const headers = computed(() => {
   ]
 })
 
-const dialogMaxWidth = computed(() => (smAndDown.value ? '90vw' : '560px'))
+const dialogMaxWidth = computed(() => (smAndDown.value ? '90vw' : '640px'))
 
 const form = ref({
   username: '',
@@ -45,6 +48,68 @@ const form = ref({
   activo: true,
 })
 
+/** id_rol -> id_unidad[] (ref aparte para no recrear el objeto al abrir el menú) */
+const unidadesPorRol = ref(/** @type {Record<number, number[]>} */ ({}))
+
+const rolesConAlcanceSeleccionados = computed(() =>
+  (usuariosStore.roles || []).filter(
+    (r) =>
+      form.value.roles.includes(r.id_rol) &&
+      ROLES_CON_ALCANCE.includes(r.nombre),
+  ),
+)
+
+function unidadesDelRol(idRol) {
+  return unidadesPorRol.value[idRol] ?? []
+}
+
+function setUnidadesDelRol(idRol, ids) {
+  unidadesPorRol.value = {
+    ...unidadesPorRol.value,
+    [idRol]: Array.isArray(ids) ? [...ids] : [],
+  }
+}
+
+function syncUnidadesConRoles(roleIds) {
+  const ids = roleIds || []
+  const next = { ...unidadesPorRol.value }
+  let changed = false
+
+  for (const key of Object.keys(next)) {
+    const idRol = Number(key)
+    if (!ids.includes(idRol)) {
+      delete next[idRol]
+      changed = true
+    }
+  }
+
+  for (const rol of usuariosStore.roles || []) {
+    if (
+      ids.includes(rol.id_rol) &&
+      ROLES_CON_ALCANCE.includes(rol.nombre) &&
+      !Array.isArray(next[rol.id_rol])
+    ) {
+      next[rol.id_rol] = []
+      changed = true
+    }
+  }
+
+  if (changed) {
+    unidadesPorRol.value = next
+  }
+}
+
+function buildAlcancesPayload() {
+  const alcances = []
+  for (const rol of rolesConAlcanceSeleccionados.value) {
+    const unidades = unidadesPorRol.value[rol.id_rol] || []
+    for (const id_unidad of unidades) {
+      alcances.push({ id_rol: rol.id_rol, id_unidad })
+    }
+  }
+  return alcances
+}
+
 const formValid = computed(() => {
   if (!form.value.username?.trim() || !form.value.correo?.trim()) return false
   if (!form.value.roles?.length) return false
@@ -53,6 +118,11 @@ const formValid = computed(() => {
   }
   if (selectedUser.value && form.value.password && form.value.password.length < 6) {
     return false
+  }
+  for (const rol of rolesConAlcanceSeleccionados.value) {
+    if (!ROLES_ALCANCE_OBLIGATORIO.includes(rol.nombre)) continue
+    const unidades = unidadesPorRol.value[rol.id_rol] || []
+    if (!unidades.length) return false
   }
   return true
 })
@@ -66,9 +136,22 @@ function initials(username) {
   return username.slice(0, 2).toUpperCase()
 }
 
+function rolColor(nombre) {
+  if (nombre === 'Super admin') return 'deep-purple'
+  if (nombre === 'Validador Técnico') return 'teal'
+  if (nombre === 'Validador de Planificación') return 'indigo'
+  if (nombre === 'Elaborador') return 'orange'
+  return 'primary'
+}
+
 function openUserDialog(item = null) {
   if (item) {
     selectedUser.value = item
+    const map = {}
+    for (const a of item.alcances || []) {
+      if (!map[a.id_rol]) map[a.id_rol] = []
+      map[a.id_rol].push(a.id_unidad)
+    }
     form.value = {
       username: item.username,
       correo: item.correo,
@@ -76,6 +159,8 @@ function openUserDialog(item = null) {
       roles: (item.roles || []).map((r) => r.id_rol),
       activo: item.activo !== false,
     }
+    unidadesPorRol.value = map
+    syncUnidadesConRoles(form.value.roles)
   } else {
     selectedUser.value = null
     form.value = {
@@ -85,9 +170,17 @@ function openUserDialog(item = null) {
       roles: [],
       activo: true,
     }
+    unidadesPorRol.value = {}
   }
   dialog.value = true
 }
+
+watch(
+  () => form.value.roles.slice(),
+  (ids) => {
+    syncUnidadesConRoles(ids)
+  },
+)
 
 function confirmDelete(item) {
   selectedUser.value = item
@@ -102,6 +195,7 @@ async function handleSave() {
       username: form.value.username.trim(),
       correo: form.value.correo.trim(),
       roles: form.value.roles,
+      alcances: buildAlcancesPayload(),
       activo: form.value.activo,
     }
     if (form.value.password) {
@@ -169,6 +263,7 @@ onMounted(async () => {
     await Promise.all([
       usuariosStore.fetchUsuarios(),
       usuariosStore.fetchRoles(),
+      usuariosStore.fetchUnidades(),
     ])
   } catch (err) {
     showMessage(
@@ -188,7 +283,7 @@ onMounted(async () => {
       variant="tonal"
       class="rounded-lg"
       title="Acceso restringido"
-      text="Solo el rol Administrador puede gestionar usuarios del sistema."
+      text="Solo el rol Super admin puede gestionar usuarios del sistema."
     />
 
     <template v-else>
@@ -266,7 +361,7 @@ onMounted(async () => {
                   size="x-small"
                   label
                   variant="tonal"
-                  :color="rol.nombre === 'Administrador' ? 'deep-purple' : 'primary'"
+                  :color="rolColor(rol.nombre)"
                   class="font-weight-black"
                 >
                   {{ rol.nombre }}
@@ -330,13 +425,13 @@ onMounted(async () => {
       </v-card>
 
       <!-- Modal: Crear/Editar Usuario -->
-      <v-dialog v-model="dialog" :max-width="dialogMaxWidth" persistent>
+      <v-dialog v-model="dialog" :max-width="dialogMaxWidth" persistent scrollable>
         <v-card class="rounded-xl pa-2">
           <v-card-title class="text-h6 font-weight-black pa-4">
             {{ selectedUser ? 'Actualizar' : 'Registrar' }} Usuario
           </v-card-title>
           <v-divider />
-          <v-card-text class="pa-4 pt-6">
+          <v-card-text class="pa-4 pt-6 user-dialog-body">
             <v-row dense>
               <v-col cols="12">
                 <v-text-field
@@ -376,11 +471,14 @@ onMounted(async () => {
                   :items="usuariosStore.roles"
                   item-title="nombre"
                   item-value="id_rol"
-                  label="Roles de sistema"
+                  label="Roles operativos MPP"
                   variant="outlined"
                   multiple
                   chips
                   closable-chips
+                  hint="Puede asignar uno o más roles"
+                  persistent-hint
+                  :menu-props="{ maxHeight: 280 }"
                 />
               </v-col>
               <v-col cols="12" md="4">
@@ -392,6 +490,32 @@ onMounted(async () => {
                   ]"
                   label="Estado"
                   variant="outlined"
+                />
+              </v-col>
+              <v-col
+                v-for="rol in rolesConAlcanceSeleccionados"
+                :key="rol.id_rol"
+                cols="12"
+              >
+                <v-select
+                  :model-value="unidadesDelRol(rol.id_rol)"
+                  :items="usuariosStore.unidades"
+                  item-title="nombre"
+                  item-value="id_unidad"
+                  :label="`Unidades — ${rol.nombre}`"
+                  variant="outlined"
+                  multiple
+                  chips
+                  closable-chips
+                  density="comfortable"
+                  :hint="
+                    ROLES_ALCANCE_OBLIGATORIO.includes(rol.nombre)
+                      ? 'Obligatorio: al menos una unidad'
+                      : 'Opcional: limita el ámbito de consulta'
+                  "
+                  persistent-hint
+                  :menu-props="{ maxHeight: 240, offset: 4 }"
+                  @update:model-value="(ids) => setUnidadesDelRol(rol.id_rol, ids)"
                 />
               </v-col>
             </v-row>
@@ -472,5 +596,9 @@ onMounted(async () => {
 .table-scroll {
   width: 100%;
   overflow-x: auto;
+}
+.user-dialog-body {
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
 }
 </style>

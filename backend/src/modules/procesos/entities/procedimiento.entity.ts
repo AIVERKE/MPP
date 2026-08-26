@@ -12,6 +12,7 @@ import {
 } from 'typeorm';
 import { Proceso } from './proceso.entity';
 import { Unidad } from '../../estructura-organizacional/entities/unidad.entity';
+import { Usuario } from '../../seguridad/entities/usuario.entity';
 
 @Entity('Procedimiento')
 export class Procedimiento {
@@ -45,9 +46,16 @@ export class Procedimiento {
   @Column({ name: 'estado_version', type: 'varchar', default: 'Borrador' })
   estado_version: 'Borrador' | 'En revisión' | 'Aprobado' | 'Renovado';
 
+  @Column({ name: 'id_elaborador', nullable: true })
+  id_elaborador: number | null;
+
   @ManyToOne(() => Proceso)
   @JoinColumn({ name: 'id_proceso' })
   proceso: Proceso;
+
+  @ManyToOne(() => Usuario, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'id_elaborador' })
+  elaborador: Usuario | null;
 
   @ManyToMany(() => Unidad)
   @JoinTable({

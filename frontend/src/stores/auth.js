@@ -34,11 +34,13 @@ export const useAuthStore = defineStore("auth", () => {
         localStorage.setItem("token", token.value);
         localStorage.setItem("is_local_token", "true");
 
+        const roleNames = (data.user.roles || []).map((r) => r.nombre);
         user.value = {
           id: data.user.id,
           username: data.user.username,
           nombre: data.user.username,
-          rol: data.user.roles?.[0]?.nombre || "Usuario"
+          roles: roleNames,
+          rol: roleNames[0] || "Usuario",
         };
         localStorage.setItem("user", JSON.stringify(user.value));
 
@@ -93,6 +95,7 @@ export const useAuthStore = defineStore("auth", () => {
       user.value = {
         username: username,
         nombre: username,
+        roles: ["Usuario"],
         rol: "Usuario"
       };
       localStorage.setItem("user", JSON.stringify(user.value));
@@ -127,5 +130,13 @@ export const useAuthStore = defineStore("auth", () => {
     return token.value ? { "Authorization": `Bearer ${token.value}` } : {};
   }
 
-  return { token, isLocalToken, isAuthenticated, user, login, logout, getAuthHeader };
+  function hasRole(roleName) {
+    const roles = user.value?.roles;
+    if (Array.isArray(roles) && roles.length) {
+      return roles.includes(roleName);
+    }
+    return user.value?.rol === roleName;
+  }
+
+  return { token, isLocalToken, isAuthenticated, user, login, logout, getAuthHeader, hasRole };
 });
