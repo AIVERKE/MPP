@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Usuario } from '../../modules/seguridad/entities/usuario.entity';
 import { Rol } from '../../modules/seguridad/entities/rol.entity';
+import { ROLES_MPP_CATALOG } from '../../modules/seguridad/roles.constants';
 import { Unidad } from '../../modules/estructura-organizacional/entities/unidad.entity';
 import { Cargo } from '../../modules/estructura-organizacional/entities/cargo.entity';
 import { Proceso } from '../../modules/procesos/entities/proceso.entity';
@@ -35,24 +36,12 @@ export default class InitialSeeder implements Seeder {
     const passwordHash = await bcrypt.hash('password123', 10);
 
     // ==========================================
-    // 1. ROLES Y USUARIOS
+    // 1. ROLES Y USUARIOS (catálogo operativo MPP)
     // ==========================================
     const rolRepo = dataSource.getRepository(Rol);
-    const roles = await rolRepo.save([
-      { nombre: 'Administrador', descripcion: 'Acceso total al sistema' },
-      {
-        nombre: 'Analista de Procesos',
-        descripcion: 'Gestión de flujos y procedimientos',
-      },
-      { nombre: 'Auditor', descripcion: 'Consulta y verificación de calidad' },
-      { nombre: 'Gerente', descripcion: 'Aprobación y revisión estratégica' },
-      { nombre: 'Operador', descripcion: 'Ejecución de tareas' },
-      { nombre: 'Soporte', descripcion: 'Mantenimiento técnico' },
-      { nombre: 'RRHH', descripcion: 'Gestión de cargos y personal' },
-      { nombre: 'Calidad', descripcion: 'Gestión de normativas e indicadores' },
-      { nombre: 'Invitado', descripcion: 'Acceso de solo lectura' },
-      { nombre: 'Coordinador', descripcion: 'Gestión de equipos' },
-    ] as any[]);
+    const roles = await rolRepo.save(
+      ROLES_MPP_CATALOG.map((r) => ({ ...r })) as any[],
+    );
 
     const userRepo = dataSource.getRepository(Usuario);
     const usuarios = [];
@@ -62,7 +51,7 @@ export default class InitialSeeder implements Seeder {
         password: passwordHash,
         correo: `user${i}@mpp.com`,
         activo: true,
-        roles: [roles[i - 1]],
+        roles: [roles[(i - 1) % roles.length]],
       });
       usuarios.push(user);
     }

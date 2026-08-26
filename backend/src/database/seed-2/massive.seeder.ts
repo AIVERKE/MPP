@@ -3,6 +3,10 @@ import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Rol } from '../../modules/seguridad/entities/rol.entity';
 import { Usuario } from '../../modules/seguridad/entities/usuario.entity';
+import {
+  ROLES_MPP,
+  ROLES_MPP_CATALOG,
+} from '../../modules/seguridad/roles.constants';
 import { Cargo } from '../../modules/estructura-organizacional/entities/cargo.entity';
 import { Unidad } from '../../modules/estructura-organizacional/entities/unidad.entity';
 import { Instalacion } from '../../modules/estructura-organizacional/entities/instalacion.entity';
@@ -61,28 +65,11 @@ export default class MassiveSeeder implements Seeder {
     const passwordHash = await bcrypt.hash('password123', 10);
     const adminHash = await bcrypt.hash('admin123', 10);
 
-    // 3. ROLES (50)
+    // 3. ROLES (catálogo operativo MPP — 5 roles)
     const rolRepo = dataSource.getRepository(Rol);
-    const predefinedRoles = [
-      'Administrador',
-      'Analista de Procesos',
-      'Auditor',
-      'Gerente',
-      'Operador',
-      'Soporte',
-      'RRHH',
-      'Calidad',
-      'Invitado',
-      'Coordinador',
-    ];
-    const rolesData = Array.from({ length: 50 }, (_, i) => {
-      const nombre = i < predefinedRoles.length ? predefinedRoles[i] : `Rol Tecnico ${i + 1}`;
-      return {
-        nombre,
-        descripcion: `Descripcion del ${nombre}`,
-      };
-    });
-    const roles = await rolRepo.save(rolesData);
+    const roles = await rolRepo.save(
+      ROLES_MPP_CATALOG.map((r) => ({ ...r })),
+    );
 
     // 4. CARGOS (50)
     const cargoRepo = dataSource.getRepository(Cargo);
@@ -160,7 +147,7 @@ export default class MassiveSeeder implements Seeder {
           password: adminHash,
           correo: 'admin@mpp.com',
           activo: true,
-          roles: [roles[0]],
+          roles: [roles.find((r) => r.nombre === ROLES_MPP.SUPER_ADMIN) ?? roles[roles.length - 1]],
         };
       }
       const rol = roles[i % roles.length];

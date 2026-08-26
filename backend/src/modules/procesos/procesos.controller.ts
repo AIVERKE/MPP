@@ -126,14 +126,18 @@ export class ProcesosController {
     );
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Get('procedimientos')
   @ApiOperation({ summary: 'Listar todos los procedimientos' })
   @ApiResponse({
     status: 200,
     description: 'Lista de procedimientos obtenida exitosamente.',
   })
-  findAllProcedimientos() {
-    return this.service.findAllProcedimientos();
+  findAllProcedimientos(@Req() req: any) {
+    return this.service.findAllProcedimientos(
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   @Get('procedimientos/:id/versiones')
@@ -152,13 +156,18 @@ export class ProcesosController {
     return this.service.findHistorialVersionesProcedimiento(id, { page, limit });
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Get('procedimientos/:id')
   @ApiOperation({ summary: 'Obtener un procedimiento por ID' })
   @ApiParam({ name: 'id', description: 'ID del procedimiento' })
   @ApiResponse({ status: 200, description: 'Procedimiento encontrado.' })
   @ApiResponse({ status: 404, description: 'Procedimiento no encontrado.' })
-  findOneProcedimiento(@Param('id', ParseIntPipe) id: number) {
-    return this.service.findOneProcedimiento(id);
+  findOneProcedimiento(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.service.findOneProcedimiento(
+      id,
+      req.user?.userId ? Number(req.user.userId) : undefined,
+    );
   }
 
   @ApiBearerAuth()

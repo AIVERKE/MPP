@@ -9,6 +9,7 @@ import { CargoProceso } from './entities/cargo-proceso.entity';
 import { Unidad } from '../estructura-organizacional/entities/unidad.entity';
 import { VersionesModule } from '../versiones/versiones.module';
 import { AuthModule } from '../auth/auth.module';
+import { SeguridadModule } from '../seguridad/seguridad.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { AuthModule } from '../auth/auth.module';
     ]),
     VersionesModule,
     AuthModule,
+    SeguridadModule,
   ],
   controllers: [ProcesosController],
   providers: [ProcesosService],

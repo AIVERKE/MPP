@@ -9,8 +9,21 @@ import {
   IsString,
   MinLength,
   ArrayNotEmpty,
+  ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export class AlcanceUnidadDto {
+  @ApiProperty({ example: 2, description: 'ID del rol con alcance por unidad' })
+  @IsInt()
+  @Type(() => Number)
+  id_rol: number;
+
+  @ApiProperty({ example: 1, description: 'ID de la unidad autorizada' })
+  @IsInt()
+  @Type(() => Number)
+  id_unidad: number;
+}
 
 export class CreateUsuarioDto {
   @ApiProperty({ example: 'jperez', description: 'Nombre de usuario único' })
@@ -46,6 +59,17 @@ export class CreateUsuarioDto {
   roles: number[];
 
   @ApiPropertyOptional({
+    type: [AlcanceUnidadDto],
+    description:
+      'Alcances usuario–rol–unidad (Consultor, Elaborador, Validador Técnico)',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AlcanceUnidadDto)
+  alcances?: AlcanceUnidadDto[];
+
+  @ApiPropertyOptional({
     example: true,
     description: 'Estado activo del usuario',
     default: true,
@@ -68,6 +92,17 @@ export class UpdateUsuarioRolesDto {
   @IsInt({ each: true })
   @Type(() => Number)
   roles: number[];
+}
+
+export class UpdateUsuarioAlcancesDto {
+  @ApiProperty({
+    type: [AlcanceUnidadDto],
+    description: 'Reemplaza los alcances usuario–rol–unidad del usuario',
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AlcanceUnidadDto)
+  alcances: AlcanceUnidadDto[];
 }
 
 export class UpdateUsuarioEstadoDto {

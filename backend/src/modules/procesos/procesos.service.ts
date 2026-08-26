@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository, In } from 'typeorm';
@@ -22,6 +23,11 @@ import { Unidad } from '../estructura-organizacional/entities/unidad.entity';
 import { Cargo } from '../estructura-organizacional/entities/cargo.entity';
 import { AuditoriaService } from '../versiones/auditoria.service';
 import { VersionesService } from '../versiones/versiones.service';
+import { SeguridadService } from '../seguridad/seguridad.service';
+import {
+  ESTADOS_PUBLICADOS,
+  ROLES_MPP,
+} from '../seguridad/roles.constants';
 
 function cloneEntity<T>(entity: T): T {
   return JSON.parse(JSON.stringify(entity));
@@ -43,8 +49,101 @@ export class ProcesosService {
     private readonly cargoRepository: Repository<Cargo>,
     private readonly auditoriaService: AuditoriaService,
     private readonly versionesService: VersionesService,
+    private readonly seguridadService: SeguridadService,
     private readonly dataSource: DataSource,
   ) {}
+
+  private async resolveUnidadIdsProcedimiento(
+    procedimiento: Procedimiento,
+    idInstalacionesOverride?: number[],
+  ): Promise<number[]> {
+    if (idInstalacionesOverride !== undefined) {
+      return [...new Set(idInstalacionesOverride)];
+    }
+    const fromInst = (procedimiento.instalaciones || []).map(
+      (u) => u.id_unidad,
+    );
+    if (fromInst.length > 0) return [...new Set(fromInst)];
+
+    const proceso = await this.procesoRepository.findOne({
+      where: { id_proceso: procedimiento.id_proceso },
+      relations: ['unidades'],
+    });
+    return [...new Set((proceso?.unidades || []).map((u) => u.id_unidad))];
+  }
+
+  private intersecta(autorizadas: number[], delRecurso: number[]): boolean {
+    if (autorizadas.length === 0 || delRecurso.length === 0) return false;
+    const set = new Set(autorizadas);
+    return delRecurso.some((id) => set.has(id));
+  }
+
+  private async assertPuedeMutarProcedimiento(
+    idUsuario: number | undefined,
+  ): Promise<string[]> {
+    if (!idUsuario) {
+      throw new ForbiddenException(
+        'Se requiere autenticación para esta operación',
+      );
+    }
+    const roleNames = await this.seguridadService.getNombresRoles(idUsuario);
+    if (this.seguridadService.esSoloConsultor(roleNames)) {
+      throw new ForbiddenException(
+        'El rol Consultor solo puede consultar procedimientos publicados',
+      );
+    }
+    return roleNames;
+  }
+
+  private async assertAlcanceElaborador(
+    idUsuario: number,
+    roleNames: string[],
+    unidadIds: number[],
+  ): Promise<void> {
+    if (this.seguridadService.esSuperAdmin(roleNames)) return;
+    if (!roleNames.includes(ROLES_MPP.ELABORADOR)) {
+      if (
+        roleNames.includes(ROLES_MPP.VALIDADOR_PLANIFICACION) ||
+        roleNames.includes(ROLES_MPP.VALIDADOR_TECNICO)
+      ) {
+        return;
+      }
+      throw new ForbiddenException(
+        'No tiene un rol autorizado para elaborar o modificar procedimientos',
+      );
+    }
+    const autorizadas = await this.seguridadService.getUnidadesAlcance(
+      idUsuario,
+      ROLES_MPP.ELABORADOR,
+    );
+    if (!this.intersecta(autorizadas, unidadIds)) {
+      throw new ForbiddenException(
+        'No tiene alcance de Elaborador sobre las unidades del procedimiento',
+      );
+    }
+  }
+
+  private async assertAlcanceValidadorTecnico(
+    idUsuario: number,
+    roleNames: string[],
+    unidadIds: number[],
+  ): Promise<void> {
+    if (this.seguridadService.esSuperAdmin(roleNames)) return;
+    if (!roleNames.includes(ROLES_MPP.VALIDADOR_TECNICO)) {
+      throw new ForbiddenException(
+        'Se requiere el rol Validador Técnico para aprobar el procedimiento',
+      );
+    }
+    const autorizadas = await this.seguridadService.getUnidadesAlcance(
+      idUsuario,
+      ROLES_MPP.VALIDADOR_TECNICO,
+    );
+    if (!this.intersecta(autorizadas, unidadIds)) {
+      throw new ForbiddenException(
+        'No tiene alcance de Validador Técnico sobre las unidades del procedimiento',
+      );
+    }
+  }
 
   // --- Procesos ---
 
@@ -198,6 +297,7 @@ export class ProcesosService {
     createDto: CreateProcedimientoDto,
     idUsuario?: number,
   ): Promise<Procedimiento> {
+    const roleNames = await this.assertPuedeMutarProcedimiento(idUsuario);
     const { id_instalaciones, ...procedimientoData } = createDto;
 
     // Verificar unicidad de código
@@ -212,6 +312,22 @@ export class ProcesosService {
       }
     }
 
+    const unidadIds =
+      id_instalaciones && id_instalaciones.length > 0
+        ? id_instalaciones
+        : (
+            await this.procesoRepository.findOne({
+              where: { id_proceso: procedimientoData.id_proceso },
+              relations: ['unidades'],
+            })
+          )?.unidades?.map((u) => u.id_unidad) || [];
+
+    await this.assertAlcanceElaborador(
+      idUsuario as number,
+      roleNames,
+      unidadIds,
+    );
+
     const { versionNueva, debeRegistrar } =
       this.versionesService.resolverVersionamientoEnCreacion(
         procedimientoData.estado_version,
@@ -220,6 +336,7 @@ export class ProcesosService {
     const procedimiento = this.procedimientoRepository.create({
       ...procedimientoData,
       version: versionNueva ?? undefined,
+      id_elaborador: idUsuario ?? null,
     });
 
     if (id_instalaciones && id_instalaciones.length > 0) {
@@ -276,19 +393,45 @@ export class ProcesosService {
     }
   }
 
-  async findAllProcedimientos(): Promise<Procedimiento[]> {
-    return await this.procedimientoRepository.find({
+  async findAllProcedimientos(idUsuario?: number): Promise<Procedimiento[]> {
+    const all = await this.procedimientoRepository.find({
       relations: ['proceso', 'instalaciones'],
     });
+    if (!idUsuario) return all;
+    const roleNames = await this.seguridadService.getNombresRoles(idUsuario);
+    if (this.seguridadService.esSoloConsultor(roleNames)) {
+      return all.filter((p) =>
+        (ESTADOS_PUBLICADOS as readonly string[]).includes(p.estado_version),
+      );
+    }
+    return all;
   }
 
-  async findOneProcedimiento(id: number): Promise<Procedimiento> {
+  async findOneProcedimiento(
+    id: number,
+    idUsuario?: number,
+  ): Promise<Procedimiento> {
     const procedimiento = await this.procedimientoRepository.findOne({
       where: { id_procedimiento: id },
       relations: ['proceso', 'instalaciones'],
     });
     if (!procedimiento)
       throw new NotFoundException(`Procedimiento con ID ${id} no encontrado`);
+
+    if (idUsuario) {
+      const roleNames = await this.seguridadService.getNombresRoles(idUsuario);
+      if (
+        this.seguridadService.esSoloConsultor(roleNames) &&
+        !(ESTADOS_PUBLICADOS as readonly string[]).includes(
+          procedimiento.estado_version,
+        )
+      ) {
+        throw new ForbiddenException(
+          'El rol Consultor solo puede consultar procedimientos publicados',
+        );
+      }
+    }
+
     return procedimiento;
   }
 
@@ -324,6 +467,7 @@ export class ProcesosService {
     updateDto: UpdateProcedimientoDto,
     idUsuario?: number,
   ): Promise<Procedimiento> {
+    const roleNames = await this.assertPuedeMutarProcedimiento(idUsuario);
     const procedimiento = await this.findOneProcedimiento(id);
     const preSnapshot = cloneEntity(procedimiento);
     const {
@@ -332,6 +476,38 @@ export class ProcesosService {
       motivo_cambio: motivoCambio,
       ...procedimientoData
     } = updateDto;
+
+    const unidadIds = await this.resolveUnidadIdsProcedimiento(
+      procedimiento,
+      id_instalaciones,
+    );
+
+    const aprueba =
+      nuevoEstado !== undefined &&
+      nuevoEstado === 'Aprobado' &&
+      preSnapshot.estado_version !== 'Aprobado';
+
+    if (aprueba) {
+      if (
+        procedimiento.id_elaborador != null &&
+        idUsuario === procedimiento.id_elaborador
+      ) {
+        throw new ForbiddenException(
+          'Segregación de funciones: quien elaboró el procedimiento no puede otorgar el visto bueno técnico del mismo',
+        );
+      }
+      await this.assertAlcanceValidadorTecnico(
+        idUsuario as number,
+        roleNames,
+        unidadIds,
+      );
+    } else {
+      await this.assertAlcanceElaborador(
+        idUsuario as number,
+        roleNames,
+        unidadIds,
+      );
+    }
 
     // Verificar unicidad de código si está cambiando
     if (
@@ -437,6 +613,7 @@ export class ProcesosService {
   }
 
   async removeProcedimiento(id: number, idUsuario?: number): Promise<void> {
+    await this.assertPuedeMutarProcedimiento(idUsuario);
     const procedimiento = await this.findOneProcedimiento(id);
     const preSnapshot = cloneEntity(procedimiento);
     await this.procedimientoRepository.softRemove(procedimiento);
