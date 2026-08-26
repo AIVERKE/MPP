@@ -6,11 +6,13 @@ import { VersionesController } from './versiones.controller';
 import { AuthModule } from '../auth/auth.module';
 import { VersionesService } from './versiones.service';
 import { Procedimiento } from '../procesos/entities/procedimiento.entity';
+import { SeguridadModule } from '../seguridad/seguridad.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([AuditoriaCambios, Procedimiento]),
     AuthModule,
+    SeguridadModule,
   ],
   controllers: [VersionesController],
   providers: [AuditoriaService, VersionesService],

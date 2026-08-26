@@ -23,6 +23,7 @@ import { CreateIndicadorDto, UpdateIndicadorDto } from './dto/indicador.dto';
 import { Normativa } from './entities/normativa.entity';
 import { Indicador } from './entities/indicador.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { DenySoloConsultorGuard } from '../auth/guards/deny-solo-consultor.guard';
 
 @ApiTags('Marco Normativo y Calidad')
 @Controller('calidad')
@@ -34,7 +35,7 @@ export class CalidadController {
   // ============================
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Post('normativas')
   @ApiOperation({ summary: 'Crear una nueva normativa' })
   @ApiResponse({
@@ -76,7 +77,7 @@ export class CalidadController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Patch('normativas/:id')
   @ApiOperation({ summary: 'Actualizar una normativa por ID' })
   @ApiParam({ name: 'id', type: 'number', description: 'ID de la normativa' })
@@ -100,7 +101,7 @@ export class CalidadController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Delete('normativas/:id')
   @ApiOperation({ summary: 'Eliminar (soft delete) una normativa por ID' })
   @ApiParam({ name: 'id', type: 'number', description: 'ID de la normativa' })
@@ -122,7 +123,7 @@ export class CalidadController {
   // ============================
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Post('indicadores')
   @ApiOperation({ summary: 'Crear un nuevo indicador' })
   @ApiResponse({
@@ -164,7 +165,7 @@ export class CalidadController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Patch('indicadores/:id')
   @ApiOperation({ summary: 'Actualizar un indicador por ID' })
   @ApiParam({ name: 'id', type: 'number', description: 'ID del indicador' })
@@ -188,7 +189,7 @@ export class CalidadController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Delete('indicadores/:id')
   @ApiOperation({ summary: 'Eliminar (soft delete) un indicador por ID' })
   @ApiParam({ name: 'id', type: 'number', description: 'ID del indicador' })

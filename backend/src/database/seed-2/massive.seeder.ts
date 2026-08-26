@@ -172,7 +172,7 @@ export default class MassiveSeeder implements Seeder {
         codigo: `PROC-SEC-${100 + i}`,
         nombre: `Proceso Masivo de Negocio ${i + 1}`,
         descripcion: `Descripcion detallada para el proceso masivo ${i + 1}`,
-        tipo_proceso: tipo,
+        tipo_proceso: tipo as 'Sustantivo' | 'Apoyo' | 'Estratégico',
         unidades: [u1, u2],
       };
     });

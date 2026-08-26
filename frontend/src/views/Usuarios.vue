@@ -4,7 +4,7 @@ import { useDisplay } from 'vuetify'
 import { useAuthStore } from '@/stores/auth'
 import { useUsuariosStore } from '@/stores/usuarios'
 
-const ROLES_CON_ALCANCE = ['Consultor', 'Elaborador', 'Validador Técnico']
+const ROLES_CON_ALCANCE = ['Elaborador', 'Validador Técnico']
 const ROLES_ALCANCE_OBLIGATORIO = ['Elaborador', 'Validador Técnico']
 
 const authStore = useAuthStore()

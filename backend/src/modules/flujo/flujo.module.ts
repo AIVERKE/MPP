@@ -13,6 +13,7 @@ import { Procedimiento } from '../procesos/entities/procedimiento.entity';
 import { Cargo } from '../estructura-organizacional/entities/cargo.entity';
 import { VersionesModule } from '../versiones/versiones.module';
 import { AuthModule } from '../auth/auth.module';
+import { SeguridadModule } from '../seguridad/seguridad.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { AuthModule } from '../auth/auth.module';
     ]),
     VersionesModule,
     AuthModule,
+    SeguridadModule,
   ],
   controllers: [FlujoController],
   providers: [FlujoService],

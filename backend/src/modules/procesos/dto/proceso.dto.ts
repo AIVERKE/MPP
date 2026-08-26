@@ -1,13 +1,11 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { IsIn, IsOptional, IsString } from 'class-validator';
+import { TIPOS_PROCESO } from '../../seguridad/roles.constants';
 
 export class CreateProcesoDto {
   @ApiProperty({
     description: 'Código único del proceso',
     example: 'PROC-001',
-    examples: {
-      ejemplo1: { value: 'PROC-001' },
-      ejemplo2: { value: 'ADM-050' },
-    },
     required: false,
   })
   codigo?: string;
@@ -15,28 +13,24 @@ export class CreateProcesoDto {
   @ApiProperty({
     description: 'Nombre del proceso',
     example: 'Gestión de Talento Humano',
-    examples: {
-      ejemplo1: { value: 'Gestión de Talento Humano' },
-      ejemplo2: { value: 'Mantenimiento de Sistemas' },
-    },
   })
   nombre: string;
 
   @ApiProperty({
     description: 'Descripción detallada del proceso',
-    example: 'Proceso encargado de la selección y capacitación del personal.',
-    examples: {
-      ejemplo1: {
-        value: 'Proceso encargado de la selección y capacitación del personal.',
-      },
-      ejemplo2: {
-        value:
-          'Proceso para asegurar la disponibilidad de los servicios de TI.',
-      },
-    },
     required: false,
   })
   descripcion?: string;
+
+  @ApiPropertyOptional({
+    description: 'Categoría / tipo del proceso',
+    enum: TIPOS_PROCESO,
+    example: 'Sustantivo',
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn([...TIPOS_PROCESO])
+  tipo_proceso?: (typeof TIPOS_PROCESO)[number];
 
   @ApiProperty({
     description: 'IDs de las unidades asociadas al proceso',

@@ -21,7 +21,7 @@ const router = createRouter({
       path: '/usuarios',
       name: 'usuarios',
       component: () => import('../views/Usuarios.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true, requiresSuperAdmin: true }
     },
     {
       path: '/configuracion',
@@ -39,7 +39,7 @@ const router = createRouter({
         path:"/mpp/gestion-mpp",
         name:"cabecera_mpp",
         component: () => import('../views/MPP/CabeceraMpp.vue'),
-        meta: { requiresAuth: true }
+        meta: { requiresAuth: true, requiresMppWrite: true }
     },
     {
         path:"/mpp/historial-mpp",
@@ -94,6 +94,10 @@ router.beforeEach((to, from, next) => {
     next('/login')
   } else if (to.name === 'login' && authStore.isAuthenticated) {
     next('/')
+  } else if (to.meta.requiresSuperAdmin && !authStore.hasRole('Super admin')) {
+    next('/')
+  } else if (to.meta.requiresMppWrite && authStore.isSoloConsultor) {
+    next({ name: 'historial_mpp' })
   } else {
     next()
   }

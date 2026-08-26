@@ -12,6 +12,7 @@ import { Procedimiento } from '../procesos/entities/procedimiento.entity';
 import { Operacion } from '../flujo/entities/operacion.entity';
 import { VersionesModule } from '../versiones/versiones.module';
 import { AuthModule } from '../auth/auth.module';
+import { SeguridadModule } from '../seguridad/seguridad.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { AuthModule } from '../auth/auth.module';
     ]),
     VersionesModule,
     AuthModule,
+    SeguridadModule,
   ],
   controllers: [RecursosController],
   providers: [RecursosService],

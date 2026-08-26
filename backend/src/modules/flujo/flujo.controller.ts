@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   UseGuards,
   Req,
+  Query,
 } from '@nestjs/common';
 import { FlujoService } from './flujo.service';
 import {
@@ -25,6 +26,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { DenySoloConsultorGuard } from '../auth/guards/deny-solo-consultor.guard';
 import { CreateAccionDto, UpdateAccionDto } from './dto/accion.dto';
 import { AccionResponseDto } from './dto/accion-response.dto';
 import { CreateFiguraDto, UpdateFiguraDto } from './dto/figura.dto';
@@ -49,7 +51,7 @@ export class FlujoController {
   // --- Operaciones ---
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Post('operaciones')
   @ApiOperation({ summary: 'Crear una nueva operación' })
   @ApiResponse({ status: 201, description: 'Operación creada exitosamente.' })
@@ -61,14 +63,23 @@ export class FlujoController {
     );
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Get('operaciones')
-  @ApiOperation({ summary: 'Listar todas las operaciones' })
+  @ApiOperation({ summary: 'Listar operaciones (Consultor: solo de publicados)' })
   @ApiResponse({
     status: 200,
     description: 'Lista de operaciones obtenida exitosamente.',
   })
-  findAllOperaciones() {
-    return this.service.findAllOperaciones();
+  findAllOperaciones(
+    @Req() req: any,
+    @Query('id_procedimiento', new ParseIntPipe({ optional: true }))
+    id_procedimiento?: number,
+  ) {
+    return this.service.findAllOperaciones(
+      req.user?.userId ? Number(req.user.userId) : undefined,
+      id_procedimiento,
+    );
   }
 
   @Get('operaciones/:id')
@@ -81,7 +92,7 @@ export class FlujoController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Patch('operaciones/:id')
   @ApiOperation({ summary: 'Actualizar una operación por ID' })
   @ApiParam({ name: 'id', description: 'ID de la operación' })
@@ -103,7 +114,7 @@ export class FlujoController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Delete('operaciones/:id')
   @ApiOperation({ summary: 'Eliminar una operación (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID de la operación' })
@@ -122,7 +133,7 @@ export class FlujoController {
   // --- Actividades ---
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Post('actividades')
   @ApiOperation({ summary: 'Crear una nueva actividad' })
   @ApiResponse({ status: 201, description: 'Actividad creada exitosamente.' })
@@ -154,7 +165,7 @@ export class FlujoController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Patch('actividades/:id')
   @ApiOperation({ summary: 'Actualizar una actividad por ID' })
   @ApiParam({ name: 'id', description: 'ID de la actividad' })
@@ -176,7 +187,7 @@ export class FlujoController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Delete('actividades/:id')
   @ApiOperation({ summary: 'Eliminar una actividad (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID de la actividad' })
@@ -195,7 +206,7 @@ export class FlujoController {
   // --- Figuras ---
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Post('figuras')
   @ApiOperation({
     summary: 'Crear una nueva figura',
@@ -240,7 +251,7 @@ export class FlujoController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Patch('figuras/:id')
   @ApiOperation({ summary: 'Actualizar una figura por ID' })
   @ApiParam({ name: 'id', description: 'ID de la figura' })
@@ -264,7 +275,7 @@ export class FlujoController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Delete('figuras/:id')
   @ApiOperation({ summary: 'Eliminar una figura (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID de la figura' })
@@ -280,7 +291,7 @@ export class FlujoController {
   // --- Acciones ---
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Post('acciones')
   @ApiOperation({
     summary: 'Crear una nueva acción',
@@ -327,7 +338,7 @@ export class FlujoController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Patch('acciones/:id')
   @ApiOperation({ summary: 'Actualizar una acción por ID' })
   @ApiParam({ name: 'id', description: 'ID de la acción' })
@@ -353,7 +364,7 @@ export class FlujoController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Delete('acciones/:id')
   @ApiOperation({ summary: 'Eliminar una acción (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID de la acción' })
@@ -369,7 +380,7 @@ export class FlujoController {
   // --- Operación-Cargo ---
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Post('operacion-cargos')
   @ApiOperation({ summary: 'Crear una nueva relación Operación-Cargo' })
   @ApiResponse({ status: 201, description: 'Relación creada exitosamente.' })
@@ -404,7 +415,7 @@ export class FlujoController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Patch('operacion-cargos/:id')
   @ApiOperation({ summary: 'Actualizar una relación Operación-Cargo por ID' })
   @ApiParam({ name: 'id', description: 'ID de la relación' })
@@ -426,7 +437,7 @@ export class FlujoController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Delete('operacion-cargos/:id')
   @ApiOperation({
     summary: 'Eliminar una relación Operación-Cargo (Borrado lógico)',
@@ -444,7 +455,7 @@ export class FlujoController {
   // --- Tareas ---
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Post('tareas')
   @ApiOperation({ summary: 'Crear una nueva tarea' })
   @ApiResponse({ status: 201, description: 'Tarea creada exitosamente.' })
@@ -476,7 +487,7 @@ export class FlujoController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Patch('tareas/:id')
   @ApiOperation({ summary: 'Actualizar una tarea por ID' })
   @ApiParam({ name: 'id', description: 'ID de la tarea' })
@@ -495,7 +506,7 @@ export class FlujoController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Delete('tareas/:id')
   @ApiOperation({ summary: 'Eliminar una tarea (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID de la tarea' })
@@ -511,7 +522,7 @@ export class FlujoController {
   // --- Condiciones de Tarea ---
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Post('condiciones')
   @ApiOperation({ summary: 'Crear una condición IF/ELSE para una tarea' })
   @ApiResponse({ status: 201, description: 'Condición creada exitosamente.' })
@@ -550,7 +561,7 @@ export class FlujoController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Patch('condiciones/:id')
   @ApiOperation({ summary: 'Actualizar una condición por ID' })
   @ApiParam({ name: 'id', description: 'ID de la condición' })
@@ -572,7 +583,7 @@ export class FlujoController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Delete('condiciones/:id')
   @ApiOperation({ summary: 'Eliminar una condición (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID de la condición' })

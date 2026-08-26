@@ -5,6 +5,8 @@ import {
   Param,
   ParseIntPipe,
   UseGuards,
+  Req,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -18,18 +20,23 @@ import { AuditoriaService } from './auditoria.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuditoriaCambiosResponseDto } from './dto/auditoria-cambios-response.dto';
 import { PaginatedAuditoriaResponseDto } from './dto/paginated-auditoria.dto';
+import { SeguridadService } from '../seguridad/seguridad.service';
 
 @ApiTags('Auditoría de Cambios')
 @Controller('versiones')
 export class VersionesController {
-  constructor(private readonly auditoriaService: AuditoriaService) {}
+  constructor(
+    private readonly auditoriaService: AuditoriaService,
+    private readonly seguridadService: SeguridadService,
+  ) {}
 
   @Get()
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: 'Listar registros de auditoría',
-    description: 'Devuelve registros paginados con filtros opcionales.',
+    description:
+      'Consultor solo puede ver accion=VERSION de procedimientos publicados (vía endpoint de procedimiento). El listado general se deniega.',
   })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
@@ -73,6 +80,7 @@ export class VersionesController {
     description: 'Parámetros de consulta inválidos.',
   })
   async findAll(
+    @Req() req: any,
     @Query('page', new ParseIntPipe({ optional: true })) page?: number,
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
     @Query('tabla_afectada') tablaAfectada?: string,
@@ -84,6 +92,13 @@ export class VersionesController {
     @Query('id_registro_original', new ParseIntPipe({ optional: true }))
     idRegistroOriginal?: number,
   ) {
+    const userId = req.user?.userId ? Number(req.user.userId) : undefined;
+    if (await this.seguridadService.esUsuarioSoloConsultor(userId)) {
+      throw new ForbiddenException(
+        'El rol Consultor no puede consultar la auditoría interna; use el historial de versiones del procedimiento',
+      );
+    }
+
     return this.auditoriaService.findAll({
       page,
       limit,
@@ -114,7 +129,13 @@ export class VersionesController {
     status: 404,
     description: 'Registro de auditoría con ID {id} no encontrado.',
   })
-  async findOne(@Param('id', ParseIntPipe) id: number) {
+  async findOne(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    const userId = req.user?.userId ? Number(req.user.userId) : undefined;
+    if (await this.seguridadService.esUsuarioSoloConsultor(userId)) {
+      throw new ForbiddenException(
+        'El rol Consultor no puede consultar la auditoría interna',
+      );
+    }
     return this.auditoriaService.findOne(id);
   }
 }

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProcesosController } from './procesos.controller';
 import { ProcesosService } from './procesos.service';
+import { DenySoloConsultorGuard } from '../auth/guards/deny-solo-consultor.guard';
 
 const mockProcesosService = () => ({
   createProceso: jest.fn(),
@@ -29,8 +30,17 @@ describe('ProcesosController', () => {
     service = mockProcesosService();
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ProcesosController],
-      providers: [{ provide: ProcesosService, useValue: service }],
-    }).compile();
+      providers: [
+        { provide: ProcesosService, useValue: service },
+        {
+          provide: DenySoloConsultorGuard,
+          useValue: { canActivate: () => true },
+        },
+      ],
+    })
+      .overrideGuard(DenySoloConsultorGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<ProcesosController>(ProcesosController);
   });
@@ -40,10 +50,12 @@ describe('ProcesosController', () => {
   });
 
   it('should call findHistorialVersionesProcedimiento', async () => {
-    await controller.findHistorialVersionesProcedimiento(3, 1, 20);
-    expect(service.findHistorialVersionesProcedimiento).toHaveBeenCalledWith(3, {
-      page: 1,
-      limit: 20,
-    });
+    const req = { user: { userId: 9 } };
+    await controller.findHistorialVersionesProcedimiento(3, req, 1, 20);
+    expect(service.findHistorialVersionesProcedimiento).toHaveBeenCalledWith(
+      3,
+      { page: 1, limit: 20 },
+      9,
+    );
   });
 });

@@ -19,6 +19,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { DenySoloConsultorGuard } from '../auth/guards/deny-solo-consultor.guard';
 import { CreateRequisitosDto, UpdateRequisitosDto } from './dto/requisitos.dto';
 import { CreateRiesgoDto, UpdateRiesgoDto } from './dto/riesgo.dto';
 import { CreateControlDto, UpdateControlDto } from './dto/control.dto';
@@ -40,7 +41,7 @@ export class RecursosController {
   // --- Requisitos ---
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Post('requisitos')
   @ApiOperation({ summary: 'Crear un nuevo requisito' })
   @ApiResponse({ status: 201, description: 'Requisito creado exitosamente.' })
@@ -72,7 +73,7 @@ export class RecursosController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Patch('requisitos/:id')
   @ApiOperation({ summary: 'Actualizar un requisito por ID' })
   @ApiParam({ name: 'id', description: 'ID del requisito' })
@@ -94,7 +95,7 @@ export class RecursosController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Delete('requisitos/:id')
   @ApiOperation({ summary: 'Eliminar un requisito (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID del requisito' })
@@ -113,7 +114,7 @@ export class RecursosController {
   // --- Riesgos ---
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Post('riesgos')
   @ApiOperation({ summary: 'Crear un nuevo riesgo' })
   @ApiResponse({ status: 201, description: 'Riesgo creado exitosamente.' })
@@ -145,7 +146,7 @@ export class RecursosController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Patch('riesgos/:id')
   @ApiOperation({ summary: 'Actualizar un riesgo por ID' })
   @ApiParam({ name: 'id', description: 'ID del riesgo' })
@@ -164,7 +165,7 @@ export class RecursosController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Delete('riesgos/:id')
   @ApiOperation({ summary: 'Eliminar un riesgo (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID del riesgo' })
@@ -180,7 +181,7 @@ export class RecursosController {
   // --- Controles ---
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Post('controles')
   @ApiOperation({ summary: 'Crear un nuevo control' })
   @ApiResponse({ status: 201, description: 'Control creado exitosamente.' })
@@ -212,7 +213,7 @@ export class RecursosController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Patch('controles/:id')
   @ApiOperation({ summary: 'Actualizar un control por ID' })
   @ApiParam({ name: 'id', description: 'ID del control' })
@@ -234,7 +235,7 @@ export class RecursosController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Delete('controles/:id')
   @ApiOperation({ summary: 'Eliminar un control (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID del control' })
@@ -250,7 +251,7 @@ export class RecursosController {
   // --- Sistemas de Información ---
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Post('sistemas-informacion')
   @ApiOperation({ summary: 'Crear un nuevo sistema de información' })
   @ApiResponse({
@@ -294,7 +295,7 @@ export class RecursosController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Patch('sistemas-informacion/:id')
   @ApiOperation({ summary: 'Actualizar un sistema de información por ID' })
   @ApiParam({ name: 'id', description: 'ID del sistema de información' })
@@ -319,7 +320,7 @@ export class RecursosController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Delete('sistemas-informacion/:id')
   @ApiOperation({
     summary: 'Eliminar un sistema de información (Borrado lógico)',
@@ -346,7 +347,7 @@ export class RecursosController {
   // --- Equipos ---
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Post('equipos')
   @ApiOperation({ summary: 'Crear un nuevo equipo' })
   @ApiResponse({ status: 201, description: 'Equipo creado exitosamente.' })
@@ -378,7 +379,7 @@ export class RecursosController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Patch('equipos/:id')
   @ApiOperation({ summary: 'Actualizar un equipo por ID' })
   @ApiParam({ name: 'id', description: 'ID del equipo' })
@@ -397,7 +398,7 @@ export class RecursosController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Delete('equipos/:id')
   @ApiOperation({ summary: 'Eliminar un equipo (Borrado lógico)' })
   @ApiParam({ name: 'id', description: 'ID del equipo' })
@@ -413,7 +414,7 @@ export class RecursosController {
   // --- Documentos de Referencia ---
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Post('documentos-referencia')
   @ApiOperation({ summary: 'Crear un nuevo documento de referencia' })
   @ApiResponse({
@@ -457,7 +458,7 @@ export class RecursosController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Patch('documentos-referencia/:id')
   @ApiOperation({ summary: 'Actualizar un documento de referencia por ID' })
   @ApiParam({ name: 'id', description: 'ID del documento de referencia' })
@@ -482,7 +483,7 @@ export class RecursosController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, DenySoloConsultorGuard)
   @Delete('documentos-referencia/:id')
   @ApiOperation({
     summary: 'Eliminar un documento de referencia (Borrado lógico)',
