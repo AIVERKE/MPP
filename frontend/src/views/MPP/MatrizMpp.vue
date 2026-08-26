@@ -207,6 +207,7 @@ watch(
     
     newRows.forEach((row, index) => {
       const oldRow = oldRows ? oldRows[index] : null;
+      const originalRow = rows.value[index];
       
       if (!oldRow) {
         // Nueva fila
@@ -217,10 +218,19 @@ watch(
         if (!changedField) return;
         
         console.log(`🔔 [Matriz-UI] Detectado cambio en Fila ${row.nro} en campo [${changedField}]. Antes: "${oldRow[changedField]}", Ahora: "${row[changedField]}"`);
+
+        // Al salir del rombo: limpiar IF/ELSE de inmediato (no esperar debounce)
+        if (changedField === "accionId" && originalRow) {
+          clearCondicionAlSalirDeRombo(
+            originalRow,
+            oldRow.accionId,
+            row.accionId,
+          );
+        }
       }
 
       // Programar guardado usando el objeto reactivo original (no el clon del watch)
-      const originalRow = rows.value[index];
+      if (!originalRow) return;
       if (saveTimeouts[row.id]) clearTimeout(saveTimeouts[row.id]);
       saveTimeouts[row.id] = setTimeout(() => {
         saveMatrixRow(originalRow);
@@ -414,6 +424,13 @@ const rowSkipsSequentialOut = (row) => {
   const cond = getRowCondicion(row);
   if (!cond) return false;
   return !!(cond.id_tarea_siguiente_if || cond.id_tarea_siguiente_else);
+};
+
+/** IF/ELSE solo aplica mientras la figura actual sea rombo. */
+const rowHasActiveIfElse = (row) => {
+  if (!row) return false;
+  if (getActionVisuals(row.accionId).codigoFigura !== "rombo") return false;
+  return !!getRowCondicion(row);
 };
 
 const filteredUnits = computed(() => {
@@ -979,6 +996,66 @@ const deleteCondicionPanel = async () => {
   }
 };
 
+/**
+ * Al salir de figura rombo, elimina condiciones IF/ELSE (API + estado local)
+ * para no dejar rutas huérfanas.
+ */
+const clearCondicionAlSalirDeRombo = async (row, oldAccionId, newAccionId) => {
+  const wasRombo =
+    getActionVisuals(oldAccionId).codigoFigura === "rombo";
+  const isRombo =
+    getActionVisuals(newAccionId).codigoFigura === "rombo";
+  if (!wasRombo || isRombo) return;
+
+  const tareaId = row?.savedIds?.tarea ? Number(row.savedIds.tarea) : null;
+
+  // Cerrar panel si estaba abierto para esta fila
+  if (
+    showCondicionPanel.value &&
+    condicionRow.value &&
+    (condicionRow.value.id === row.id ||
+      Number(condicionRow.value.savedIds?.tarea) === tareaId)
+  ) {
+    showCondicionPanel.value = false;
+    condicionRow.value = null;
+  }
+
+  // Limpiar estado local de inmediato (las flechas dejan de dibujarse)
+  if (tareaId && condicionesPorTarea.value[tareaId]) {
+    const next = { ...condicionesPorTarea.value };
+    delete next[tareaId];
+    condicionesPorTarea.value = next;
+  }
+
+  // Persistencia: borrar todas las condiciones de la tarea en backend
+  if (tareaId) {
+    try {
+      const condiciones = await mppStore.fetchCondicionesByTarea(tareaId);
+      const list = Array.isArray(condiciones) ? condiciones : [];
+      await Promise.all(
+        list
+          .filter((c) => c?.id_condicion)
+          .map((c) => mppStore.deleteCondicion(c.id_condicion)),
+      );
+    } catch (e) {
+      console.error(
+        "Error al eliminar condiciones al salir del rombo:",
+        e,
+      );
+      snackbar.value = {
+        show: true,
+        text: "No se pudo eliminar la condición IF/ELSE al cambiar de figura",
+        color: "error",
+      };
+    }
+  }
+
+  nextTick(() => {
+    calculateEditorConnections();
+    if (showPreview.value) calculateConnections();
+  });
+};
+
 watch(
   () => [
     condicionForm.value.id_tarea_siguiente_if,
@@ -1396,10 +1473,10 @@ const calculateConnections = () => {
         }
       }
 
-      // 2. IF / ELSE desde condiciones guardadas en DB
+      // 2. IF / ELSE solo desde rombos con condición activa
       pts.forEach((start) => {
+        if (!rowHasActiveIfElse(start.row)) return;
         const cond = getRowCondicion(start.row);
-        if (!cond) return;
 
         const ifDest = cond.id_tarea_siguiente_if
           ? byTareaId.get(Number(cond.id_tarea_siguiente_if))
@@ -1542,10 +1619,10 @@ const calculateEditorConnections = () => {
         }
       }
 
-      // IF / ELSE desde condiciones guardadas
+      // IF / ELSE solo desde rombos con condición activa
       pts.forEach((start) => {
+        if (!rowHasActiveIfElse(start.row)) return;
         const cond = getRowCondicion(start.row);
-        if (!cond) return;
 
         const ifDest = cond.id_tarea_siguiente_if
           ? byTareaId.get(Number(cond.id_tarea_siguiente_if))
