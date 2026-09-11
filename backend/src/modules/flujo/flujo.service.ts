@@ -31,6 +31,7 @@ import {
 import { AuditoriaService } from '../versiones/auditoria.service';
 import { SeguridadService } from '../seguridad/seguridad.service';
 import { esEstadoPublicado } from '../seguridad/roles.constants';
+import { esFormaSoportada } from './figuras.constants';
 
 function cloneEntity<T>(entity: T): T {
   return JSON.parse(JSON.stringify(entity));
@@ -67,7 +68,15 @@ export class FlujoService {
     createDto: CreateFiguraDto,
     idUsuario?: number,
   ): Promise<Figura> {
-    const registro = this.figuraRepository.create(createDto);
+    if (!esFormaSoportada(createDto.codigo)) {
+      throw new BadRequestException(
+        `Forma no soportada: ${createDto.codigo}. Use una de las formas oficiales.`,
+      );
+    }
+    const registro = this.figuraRepository.create({
+      ...createDto,
+      es_oficial: false,
+    });
     const saved = await this.figuraRepository.save(registro);
     const postSnapshot = await this.findOneFigura(saved.id_figura);
     await this.auditoriaService.registrarCambio(
@@ -82,7 +91,9 @@ export class FlujoService {
   }
 
   async findAllFiguras(): Promise<Figura[]> {
-    return await this.figuraRepository.find();
+    return await this.figuraRepository.find({
+      order: { es_oficial: 'DESC', nombre: 'ASC' },
+    });
   }
 
   async findOneFigura(id: number): Promise<Figura> {
@@ -102,7 +113,26 @@ export class FlujoService {
   ): Promise<Figura> {
     const registro = await this.findOneFigura(id);
     const preSnapshot = cloneEntity(registro);
-    Object.assign(registro, updateDto);
+
+    if (registro.es_oficial) {
+      if (updateDto.codigo !== undefined && updateDto.codigo !== registro.codigo) {
+        throw new ForbiddenException(
+          'No se puede cambiar el tipo de forma de una figura oficial',
+        );
+      }
+      if (updateDto.nombre !== undefined) {
+        registro.nombre = updateDto.nombre;
+      }
+    } else {
+      if (updateDto.codigo !== undefined && !esFormaSoportada(updateDto.codigo)) {
+        throw new BadRequestException(
+          `Forma no soportada: ${updateDto.codigo}. Use una de las formas oficiales.`,
+        );
+      }
+      Object.assign(registro, updateDto);
+      registro.es_oficial = false;
+    }
+
     await this.figuraRepository.save(registro);
     const postSnapshot = await this.findOneFigura(id);
     await this.auditoriaService.registrarCambio(
@@ -118,6 +148,11 @@ export class FlujoService {
 
   async removeFigura(id: number, idUsuario?: number): Promise<void> {
     const registro = await this.findOneFigura(id);
+    if (registro.es_oficial) {
+      throw new ForbiddenException(
+        'Las figuras oficiales del catálogo base no se pueden eliminar',
+      );
+    }
     const preSnapshot = cloneEntity(registro);
     await this.figuraRepository.softRemove(registro);
     await this.auditoriaService.registrarCambio(

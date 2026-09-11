@@ -2,6 +2,8 @@
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from "vue";
 import { useDisplay } from "vuetify";
 import { useMppCoreStore } from "@/stores/mpp_core";
+import { getFiguraVisuals } from "@/utils/figuras";
+import FiguraSelect from "@/components/mpp/FiguraSelect.vue";
 import { toPng } from "html-to-image";
 import { jsPDF } from "jspdf";
 
@@ -547,34 +549,49 @@ const removeRow = async (index) => {
 // --- LÓGICA DE FIGURAS DINÁMICAS ---
 const getActionVisuals = (accionId) => {
   const accion = mppStore.acciones.find((a) => a.id_accion === accionId);
-  if (!accion || !accion.figura) return { icon: "mdi-checkbox-blank-circle", color: "primary", colorHex: "#6366f1", codigoFigura: "rectangulo" };
-
-  const codigoFigura = accion.figura.codigo;
-  const nombreAccion = (accion.nombre_accion || "").toLowerCase();
-
-  // Color basado en semántica del nombre
-  let color = "primary";
-  let colorHex = "#6366f1";
-  if (nombreAccion.includes("inicio") || nombreAccion.includes("empezar") || nombreAccion.includes("comenzar") || nombreAccion.includes("start")) { 
-    color = "success"; 
-    colorHex = "#10b981"; 
-  } else if (nombreAccion.includes("fin") || nombreAccion.includes("terminar") || nombreAccion.includes("concluir") || nombreAccion.includes("archivar") || nombreAccion.includes("end")) { 
-    color = "error"; 
-    colorHex = "#ef4444"; 
-  } else if (nombreAccion.includes("decisión") || nombreAccion.includes("validar") || nombreAccion.includes("aprob") || nombreAccion.includes("revisar") || nombreAccion.includes("control") || nombreAccion.includes("analiz") || nombreAccion.includes("decid")) { 
-    color = "orange-darken-2"; 
-    colorHex = "#f59e0b"; 
+  if (!accion || !accion.figura) {
+    return {
+      icon: "mdi-checkbox-blank-circle",
+      color: "primary",
+      colorHex: "#6366f1",
+      codigoFigura: "rectangulo",
+    };
   }
 
-  // Icono basado en el código de la figura del backend (extensible)
-  let icon = "mdi-circle";
-  if (codigoFigura === "circulo") icon = "mdi-circle";
-  else if (codigoFigura === "rectangulo") icon = "mdi-rectangle";
-  else if (codigoFigura === "rombo") icon = "mdi-rhombus";
-  else if (codigoFigura === "elipse") icon = "mdi-ellipse";
-  else if (codigoFigura === "paralelogramo") icon = "mdi-rhombus-split";
-  else if (codigoFigura === "triangulo") icon = "mdi-triangle";
-  else if (codigoFigura === "hexagono") icon = "mdi-hexagon";
+  const { icon, codigo: codigoFigura } = getFiguraVisuals(accion.figura.codigo);
+  const nombreAccion = (accion.nombre_accion || "").toLowerCase();
+
+  let color = "primary";
+  let colorHex = "#6366f1";
+  if (
+    nombreAccion.includes("inicio") ||
+    nombreAccion.includes("empezar") ||
+    nombreAccion.includes("comenzar") ||
+    nombreAccion.includes("start")
+  ) {
+    color = "success";
+    colorHex = "#10b981";
+  } else if (
+    nombreAccion.includes("fin") ||
+    nombreAccion.includes("terminar") ||
+    nombreAccion.includes("concluir") ||
+    nombreAccion.includes("archivar") ||
+    nombreAccion.includes("end")
+  ) {
+    color = "error";
+    colorHex = "#ef4444";
+  } else if (
+    nombreAccion.includes("decisión") ||
+    nombreAccion.includes("validar") ||
+    nombreAccion.includes("aprob") ||
+    nombreAccion.includes("revisar") ||
+    nombreAccion.includes("control") ||
+    nombreAccion.includes("analiz") ||
+    nombreAccion.includes("decid")
+  ) {
+    color = "orange-darken-2";
+    colorHex = "#f59e0b";
+  }
 
   return { icon, color, colorHex, codigoFigura };
 };
@@ -2332,16 +2349,13 @@ watch(
             class="mb-3"
             hide-details
           ></v-text-field>
-          <v-select
+          <FiguraSelect
             v-model="newActionFiguraId"
             :items="mppStore.figuras"
-            item-title="nombre"
-            item-value="id_figura"
             label="Figura Geométrica en Diagrama"
-            variant="outlined"
             density="compact"
             hide-details
-          ></v-select>
+          />
         </v-card-text>
         <v-divider></v-divider>
         <v-card-actions class="pa-3">

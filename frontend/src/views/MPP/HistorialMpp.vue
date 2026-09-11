@@ -1144,6 +1144,7 @@ import { useDisplay } from "vuetify";
 import { useRouter, useRoute } from "vue-router";
 import { useMppCoreStore } from "@/stores/mpp_core";
 import { useAuthStore } from "@/stores/auth";
+import { getFiguraVisuals } from "@/utils/figuras";
 import axios from "axios";
 import { toPng } from "html-to-image";
 import { jsPDF } from "jspdf";
@@ -1466,7 +1467,7 @@ const getActionVisuals = (accionId) => {
       codigoFigura: "rectangulo",
     };
 
-  const codigoFigura = accion.figura.codigo;
+  const { icon, codigo: codigoFigura } = getFiguraVisuals(accion.figura.codigo);
   const nombreAccion = (accion.nombre_accion || "").toLowerCase();
 
   let color = "primary";
@@ -1500,7 +1501,7 @@ const getActionVisuals = (accionId) => {
     colorHex = "#f59e0b";
   }
 
-  return { icon: "mdi-circle", color, colorHex, codigoFigura };
+  return { icon, color, colorHex, codigoFigura };
 };
 
 const textMatchAny = (text, list) => {

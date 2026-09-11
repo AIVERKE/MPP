@@ -15,8 +15,12 @@ export class Figura {
   @Column()
   nombre: string;
 
-  @Column({ unique: true })
+  /** Tipo de forma CSS soportado (puede repetirse en figuras adicionales). */
+  @Column()
   codigo: string;
+
+  @Column({ name: 'es_oficial', default: false })
+  es_oficial: boolean;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
