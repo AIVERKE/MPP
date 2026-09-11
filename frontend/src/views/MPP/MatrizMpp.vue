@@ -146,10 +146,32 @@ const rows = ref([
 
 // Lógica de Guardado por Fila (Persistencia Real con IDs y Bloqueo de Concurrencia)
 const savingRows = new Set();
+let isUnmounted = false;
+let saveTimeouts = {};
+
+const clearSaveTimeouts = () => {
+  Object.values(saveTimeouts).forEach(clearTimeout);
+  saveTimeouts = {};
+};
+
+const MATRIX_FIELDS_TO_WATCH = [
+  "actividad",
+  "tarea",
+  "texto_figura",
+  "accionId",
+  "responsableCargoId",
+  "riesgo",
+  "control",
+  "requisitos",
+  "referencia",
+  "solicitante",
+  "salida",
+  "plazo",
+];
 
 const saveMatrixRow = async (row) => {
+  if (isUnmounted) return;
   if (!props.procedimientoId || savingRows.has(row.id)) {
-    console.log(`⏳ [Matriz-UI] Guardado Fila ${row.nro} omitido (ya guardándose o sin procedimientoId)`);
     return;
   }
 
@@ -163,17 +185,15 @@ const saveMatrixRow = async (row) => {
     !row.control &&
     !row.requisitos
   ) {
-    console.log(`⏳ [Matriz-UI] Guardado Fila ${row.nro} omitido (sin contenido mínimo)`);
     return;
   }
 
   try {
     savingRows.add(row.id);
     row.status = "saving";
-    console.log(`💾 [Matriz-UI] Iniciando sincronización de Fila ${row.nro} en base de datos. Responsable ID: ${row.responsableCargoId}`);
 
     const ids = await mppStore.saveMatrixRow(row, props.procedimientoId);
-    console.log(`✅ [Matriz-UI] Fila ${row.nro} sincronizada exitosamente. Nuevos IDs de registros guardados:`, JSON.stringify(ids));
+    if (isUnmounted) return;
 
     // Actualización atómica de IDs y estado
     row.savedIds = ids;
@@ -183,10 +203,11 @@ const saveMatrixRow = async (row) => {
 
     // Limpiar el estado de éxito después de 3 segundos
     setTimeout(() => {
-      if (row.status === "saved") row.status = "idle";
+      if (!isUnmounted && row.status === "saved") row.status = "idle";
     }, 3000);
   } catch (e) {
-    console.error(`❌ [Matriz-UI] Error al sincronizar fila ${row.nro}:`, e);
+    if (isUnmounted) return;
+    console.error(`Error al sincronizar fila ${row.nro}:`, e);
     row.status = "error";
     snackbar.value = {
       show: true,
@@ -198,63 +219,62 @@ const saveMatrixRow = async (row) => {
   }
 };
 
-// Auto-guardado inteligente (Debounce mejorado)
-let saveTimeouts = {};
+// Auto-guardado: snapshot de campos concretos (sin JSON clone profundo)
 watch(
-  () => JSON.parse(JSON.stringify(rows.value)),
+  () =>
+    rows.value.map((row) => ({
+      id: row.id,
+      nro: row.nro,
+      ...Object.fromEntries(MATRIX_FIELDS_TO_WATCH.map((f) => [f, row[f]])),
+    })),
   (newRows, oldRows) => {
-    if (isHydrating.value) {
-      return;
-    }
-    
+    if (isHydrating.value || isUnmounted) return;
+
     newRows.forEach((row, index) => {
-      const oldRow = oldRows ? oldRows[index] : null;
-      const originalRow = rows.value[index];
-      
-      if (!oldRow) {
-        // Nueva fila
-      } else {
-        const fieldsToWatch = ['actividad', 'tarea', 'texto_figura', 'accionId', 'responsableCargoId', 'riesgo', 'control', 'requisitos', 'referencia', 'solicitante', 'salida', 'plazo'];
-        const changedField = fieldsToWatch.find(f => row[f] !== oldRow[f]);
+      const oldRow = oldRows?.find((r) => r.id === row.id);
+      const originalRow =
+        rows.value.find((r) => r.id === row.id) ?? rows.value[index];
+      if (!originalRow) return;
 
-        if (!changedField) return;
-        
-        console.log(`🔔 [Matriz-UI] Detectado cambio en Fila ${row.nro} en campo [${changedField}]. Antes: "${oldRow[changedField]}", Ahora: "${row[changedField]}"`);
+      const changedField = oldRow
+        ? MATRIX_FIELDS_TO_WATCH.find((f) => row[f] !== oldRow[f])
+        : null;
+      // Fila nueva o sin cambios en campos vigilados: solo nuevas programan save
+      if (oldRow && !changedField) return;
 
-        // Al salir del rombo: limpiar IF/ELSE de inmediato (no esperar debounce)
-        if (changedField === "accionId" && originalRow) {
-          clearCondicionAlSalirDeRombo(
-            originalRow,
-            oldRow.accionId,
-            row.accionId,
-          );
-        }
+      if (changedField === "accionId") {
+        clearCondicionAlSalirDeRombo(
+          originalRow,
+          oldRow.accionId,
+          row.accionId,
+        );
       }
 
-      // Programar guardado usando el objeto reactivo original (no el clon del watch)
-      if (!originalRow) return;
       if (saveTimeouts[row.id]) clearTimeout(saveTimeouts[row.id]);
       saveTimeouts[row.id] = setTimeout(() => {
+        if (isUnmounted) return;
         saveMatrixRow(originalRow);
       }, 2500);
     });
   },
-  { deep: true },
+);
+
+watch(
+  () => props.procedimientoId,
+  () => {
+    clearSaveTimeouts();
+  },
 );
 
 // Función para manejar el clic en la celda del carril (Asignar Responsable y Guardar)
 const handleCellClick = (row, cargoId) => {
   const cId = Number(cargoId);
-  const oldCargoId = row.responsableCargoId;
-  console.log(`🖱️ [Matriz-UI] Click en celda responsable - Fila: ${row.nro}, Cargo ID clicado: ${cId}, Responsable previo: ${oldCargoId}`);
 
   // Si ya es el responsable, lo quitamos (toggle)
   if (row.responsableCargoId && Number(row.responsableCargoId) === cId) {
     row.responsableCargoId = null;
-    console.log(`❌ [Matriz-UI] Click removió al responsable. Nuevo responsableCargoId: null`);
   } else {
     row.responsableCargoId = cId;
-    console.log(`✅ [Matriz-UI] Click asignó nuevo responsableCargoId: ${cId}`);
   }
   // El watch de rows detectará el cambio y disparará el auto-guardado
 };
@@ -1277,6 +1297,7 @@ const toggleCargo = async (cId, targetUnitId = null) => {
 };
 
 onMounted(async () => {
+  clearSaveTimeouts();
   isHydrating.value = true; // ACTIVAR ESCUDO
   try {
     if (!mppStore.unidades.length) await mppStore.fetchUnidades();
@@ -1292,7 +1313,6 @@ onMounted(async () => {
 
     // Cargar cargos ya asociados al proceso (columnas persistidas por unidad)
     if (props.procesoId) {
-      console.log("👉 [Matriz-UI] Cargando cargos asociados al proceso ID:", props.procesoId);
       await mppStore.fetchCargoProcesos(props.procesoId);
       mppStore.cargoProcesos.forEach((cp) => {
         const cId = cp.cargo?.id_cargo || cp.id_cargo;
@@ -1321,7 +1341,6 @@ onMounted(async () => {
 
     // Hidratación de la Matriz: Cargar datos existentes si hay procedimientoId
     if (props.procedimientoId) {
-      console.log("👉 [Matriz-UI] Solicitando hidratación de matriz para procedimiento ID:", props.procedimientoId);
       const existingRows = await mppStore.fetchMatrixData(props.procedimientoId);
       if (existingRows && existingRows.length > 0) {
         rows.value = existingRows;
@@ -1346,7 +1365,7 @@ onMounted(async () => {
       }
     }
   } catch (e) {
-    console.error("❌ [Matriz-UI] Error cargando matriz inicial:", e);
+    console.error("Error cargando matriz inicial:", e);
     snackbar.value = {
       show: true,
       text: "Error al cargar datos previos de la matriz",
@@ -1356,7 +1375,6 @@ onMounted(async () => {
     // IMPORTANTE: Esperar al siguiente ciclo de renderizado para apagar el escudo
     nextTick(() => {
       isHydrating.value = false; // APAGAR ESCUDO
-      console.log("👉 [Matriz-UI] Escudo de hidratación apagado. Auto-guardado de matriz activo.");
       calculateEditorConnections();
     });
   }
@@ -1422,6 +1440,8 @@ const updatePreviewObserver = () => {
 };
 
 onUnmounted(() => {
+  isUnmounted = true;
+  clearSaveTimeouts();
   window.removeEventListener("resize", handleResize);
   if (editorResizeObserver) editorResizeObserver.disconnect();
   if (previewResizeObserver) previewResizeObserver.disconnect();
