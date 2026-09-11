@@ -29,6 +29,8 @@ Este sistema es un cliente que consume datos. **Debes tener el Backend corriendo
     Por defecto, el sistema apunta a `http://localhost:3000`. Si tu backend usa otro puerto, debes actualizar las constantes `BASE_URL` en el archivo:
     `src/stores/mpp_core.js`
 
+    Autenticación (`src/stores/auth.js`): variable opcional `VITE_AUTH_MODE=local|umsa|auto` (default `auto`). Con `local` solo usa el backend MPP; con `umsa` solo UMSA Core; con `auto` intenta local y solo cae a UMSA si el backend local no responde por red (un 401 local de credenciales no llama a UMSA).
+
 4.  **Iniciar el sistema:**
     ```bash
     npm run dev
