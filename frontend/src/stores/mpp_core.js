@@ -295,6 +295,10 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
     const updateAccion = (id, data) => axios.patch(`${BASE_URL_FLUX}/acciones/${id}`, data);
     const deleteAccion = (id) => axios.delete(`${BASE_URL_FLUX}/acciones/${id}`);
 
+    const saveFigura = (data) => axios.post(`${BASE_URL_FLUX}/figuras`, data);
+    const updateFigura = (id, data) => axios.patch(`${BASE_URL_FLUX}/figuras/${id}`, data);
+    const deleteFigura = (id) => axios.delete(`${BASE_URL_FLUX}/figuras/${id}`);
+
     const fetchCondicionesByTarea = async (idTarea) => {
         const response = await axios.get(`${BASE_URL_FLUX}/condiciones/tarea/${idTarea}`);
         return response.data?.data || response.data || [];
@@ -576,6 +580,7 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
         saveEquipo, updateEquipo, deleteEquipo,
         saveSistemaInformacion, updateSistemaInformacion, deleteSistemaInformacion,
         saveAccion, updateAccion, deleteAccion,
+        saveFigura, updateFigura, deleteFigura,
         fetchCondicionesByTarea, saveCondicion, updateCondicion, deleteCondicion,
         saveFlujoCompleto,
         saveMatrixRow, fetchMatrixData, deleteMatrixRow,

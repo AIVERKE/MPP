@@ -213,17 +213,17 @@ export default class MassiveSeeder implements Seeder {
     });
     await cargoProcesoRepo.save(cargoProcesosData);
 
-    // 11. FIGURAS (50)
+    // 11. FIGURAS (catálogo oficial)
     const figuraRepo = dataSource.getRepository(Figura);
-    const predefinedFiguras = ['circulo', 'rectangulo', 'rombo'];
-    const figurasData = Array.from({ length: 50 }, (_, i) => {
-      const codigo = i < predefinedFiguras.length ? predefinedFiguras[i] : `figura_custom_${i + 1}`;
-      const nombre = codigo.charAt(0).toUpperCase() + codigo.slice(1);
-      return {
-        nombre,
-        codigo,
-      };
-    });
+    const figurasData = [
+      { nombre: 'Círculo', codigo: 'circulo', es_oficial: true },
+      { nombre: 'Rectángulo', codigo: 'rectangulo', es_oficial: true },
+      { nombre: 'Rombo', codigo: 'rombo', es_oficial: true },
+      { nombre: 'Elipse', codigo: 'elipse', es_oficial: true },
+      { nombre: 'Paralelogramo', codigo: 'paralelogramo', es_oficial: true },
+      { nombre: 'Triángulo', codigo: 'triangulo', es_oficial: true },
+      { nombre: 'Hexágono', codigo: 'hexagono', es_oficial: true },
+    ];
     const figuras = await figuraRepo.save(figurasData);
 
     // 12. ACCIONES (50)

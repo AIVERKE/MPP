@@ -15,15 +15,16 @@ export class FiguraResponseDto {
 
   @ApiProperty({
     description:
-      'Código estable para mapear el componente visual en el frontend (no depende del nombre de la acción)',
+      'Tipo de forma CSS usado por el frontend (circulo, rectangulo, rombo, elipse, paralelogramo, triangulo, hexagono)',
     example: 'rectangulo',
-    examples: {
-      circulo: { value: 'circulo' },
-      rectangulo: { value: 'rectangulo' },
-      rombo: { value: 'rombo' },
-    },
   })
   codigo: string;
+
+  @ApiProperty({
+    description: 'true si pertenece al catálogo oficial (no eliminable)',
+    example: true,
+  })
+  es_oficial: boolean;
 
   @ApiProperty({
     description: 'Fecha de creación del registro',

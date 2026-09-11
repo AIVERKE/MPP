@@ -400,9 +400,13 @@ export default class InitialSeeder implements Seeder {
 
     const figuraRepo = dataSource.getRepository(Figura);
     const figuras = await figuraRepo.save([
-      { nombre: 'Círculo', codigo: 'circulo' },
-      { nombre: 'Rectángulo', codigo: 'rectangulo' },
-      { nombre: 'Rombo', codigo: 'rombo' },
+      { nombre: 'Círculo', codigo: 'circulo', es_oficial: true },
+      { nombre: 'Rectángulo', codigo: 'rectangulo', es_oficial: true },
+      { nombre: 'Rombo', codigo: 'rombo', es_oficial: true },
+      { nombre: 'Elipse', codigo: 'elipse', es_oficial: true },
+      { nombre: 'Paralelogramo', codigo: 'paralelogramo', es_oficial: true },
+      { nombre: 'Triángulo', codigo: 'triangulo', es_oficial: true },
+      { nombre: 'Hexágono', codigo: 'hexagono', es_oficial: true },
     ] as any[]);
 
     const figuraRectangulo = figuras.find(
