@@ -13,6 +13,14 @@ export default defineConfig({
     alias:{
       '@':path.resolve(__dirname, './src')
     }
-  }
-  
+  },
+  server: {
+    proxy: {
+      '/umsa-core': {
+        target: 'https://correspondencia.fcpn.edu.bo',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
+  },
 })

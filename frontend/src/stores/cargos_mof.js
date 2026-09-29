@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { UMSA_CORE } from "../config/umsaCore";
 
 /**
  * Store para la gestión de cargos del Manual de Organización y Funciones (MOF)
@@ -13,7 +14,7 @@ export const useAllCargosMofStore = defineStore(
         const error = ref(null);    // Almacena mensajes de error en caso de fallos
         
         // URL base para las peticiones de cargos
-        const API_URL = "https://correspondencia.fcpn.edu.bo/umsa-core/api/v1/unidades/cargos";
+        const API_URL = `${UMSA_CORE}/api/v1/unidades/cargos`;
 
         const getHeaders = () => {
           const isLocalToken = localStorage.getItem('is_local_token') === 'true';

@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import axios from "axios";
+import { UMSA_CORE } from "../config/umsaCore";
 
 /** VITE_AUTH_MODE=local|umsa|auto (default auto) */
 const AUTH_MODE = (import.meta.env.VITE_AUTH_MODE || "auto").toLowerCase();
@@ -8,8 +9,7 @@ const LOCAL_LOGIN_URL = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/auth/login`
   : "http://localhost:3000/auth/login";
 const UMSA_TOKEN_URL =
-  import.meta.env.VITE_UMSA_TOKEN_URL ||
-  "https://correspondencia.fcpn.edu.bo/umsa-core/oauth/token";
+  import.meta.env.VITE_UMSA_TOKEN_URL || `${UMSA_CORE}/oauth/token`;
 const AUTH_TIMEOUT_MS = 5000;
 
 const MSG_BAD_CREDENTIALS = "Usuario o contraseña incorrectos";

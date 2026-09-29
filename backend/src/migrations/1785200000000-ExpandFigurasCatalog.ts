@@ -35,10 +35,10 @@ export class ExpandFigurasCatalog1785200000000 implements MigrationInterface {
       await queryRunner.query(
         `
         INSERT INTO "Figura" ("nombre", "codigo", "es_oficial")
-        SELECT $1, $2, true
+        SELECT $1::character varying, $2::character varying, true
         WHERE NOT EXISTS (
           SELECT 1 FROM "Figura"
-          WHERE "codigo" = $2 AND "deleted_at" IS NULL
+          WHERE "codigo" = $2::character varying AND "deleted_at" IS NULL
         )
         `,
         [figura.nombre, figura.codigo],
@@ -47,8 +47,8 @@ export class ExpandFigurasCatalog1785200000000 implements MigrationInterface {
       await queryRunner.query(
         `
         UPDATE "Figura"
-        SET "es_oficial" = true, "nombre" = $1
-        WHERE "codigo" = $2 AND "deleted_at" IS NULL
+        SET "es_oficial" = true, "nombre" = $1::character varying
+        WHERE "codigo" = $2::character varying AND "deleted_at" IS NULL
         `,
         [figura.nombre, figura.codigo],
       );

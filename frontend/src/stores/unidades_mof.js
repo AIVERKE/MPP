@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { useAuthStore } from "./auth";
+import { UMSA_CORE } from "../config/umsaCore";
 
 export const useAllUnidadesMofStore = defineStore(
     "unidades_mof",
@@ -10,7 +11,7 @@ export const useAllUnidadesMofStore = defineStore(
         const error = ref(null);
         const authStore = useAuthStore();
 
-        const API_URL = "https://correspondencia.fcpn.edu.bo/umsa-core/api/v1/mof/unidades";
+        const API_URL = `${UMSA_CORE}/api/v1/mof/unidades`;
 
         const getHeaders = () => {
             const headers = {
@@ -321,7 +322,7 @@ export const useAllUnidadesMofStore = defineStore(
             }
         };
 
-        const API_PERSONAL_URL = "https://correspondencia.fcpn.edu.bo/umsa-core/api/v1/unidades";
+        const API_PERSONAL_URL = `${UMSA_CORE}/api/v1/unidades`;
 
         const getPersonalUnidad = async (unidadId) => {
             try {

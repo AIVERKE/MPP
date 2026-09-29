@@ -14,6 +14,7 @@ import { useAllNivelesMofStore } from "@/stores/niveles_mof";
 import { useAllRelacionesMofStore } from "@/stores/relaciones_mof";
 import { useAllCargosMofStore } from "@/stores/cargos_mof";
 import { useAllClasesMofStore } from "@/stores/clases_mof";
+import { UMSA_CORE } from "@/config/umsaCore";
 
 // --- PLUGINS & UTILS ---
 import {
@@ -457,7 +458,7 @@ async function cambiarDependencia() {
 
 async function verReporte(id) {
   window.open(
-    `https://correspondencia.fcpn.edu.bo/umsa-core/api/v1/mof/unidades/pdf/${id}`,
+    `${UMSA_CORE}/api/v1/mof/unidades/pdf/${id}`,
     "_blank",
   );
 }

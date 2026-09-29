@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { UMSA_CORE } from "../config/umsaCore";
 
 export const useAllRelacionesMofStore = defineStore(
     "relaciones_mof",
@@ -7,7 +8,7 @@ export const useAllRelacionesMofStore = defineStore(
         const relaciones = ref([]);
         const loading = ref(false);
         const error = ref(null);
-        const API_URL = "https://correspondencia.fcpn.edu.bo/umsa-core/api/v1/mof/relaciones";
+        const API_URL = `${UMSA_CORE}/api/v1/mof/relaciones`;
 
         const getHeaders = () => {
           const isLocalToken = localStorage.getItem('is_local_token') === 'true';

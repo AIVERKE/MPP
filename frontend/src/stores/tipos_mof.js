@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { UMSA_CORE } from "../config/umsaCore";
 
 export const useAllTiposMofStore = defineStore(
   "tipos_mof",
@@ -7,7 +8,7 @@ export const useAllTiposMofStore = defineStore(
     const tipos = ref([]);
     const loading = ref(false);
     const error = ref(null);
-    const API_URL = 'https://correspondencia.fcpn.edu.bo/umsa-core/api/v1/mof/tipos';
+    const API_URL = `${UMSA_CORE}/api/v1/mof/tipos`;
     
     const getHeaders = () => {
       const isLocalToken = localStorage.getItem('is_local_token') === 'true';
