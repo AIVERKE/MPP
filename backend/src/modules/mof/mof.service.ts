@@ -13,8 +13,7 @@ import { ConfigService } from '@nestjs/config';
 @Injectable()
 export class MofService implements OnModuleInit {
   private readonly logger = new Logger(MofService.name);
-  private readonly mofApiUrl =
-    'https://correspondencia.fcpn.edu.bo/umsa-core/api/v1/mof/unidades';
+  private readonly unidadesPath = '/api/v1/integraciones/mpp/unidades';
   private lastSync: Date | null = null;
   private syncStatus: string = 'Nunca sincronizado';
 
@@ -28,26 +27,34 @@ export class MofService implements OnModuleInit {
     private readonly configService: ConfigService,
   ) {}
 
-  async onModuleInit() {
+  onModuleInit() {
     const isProd = this.configService.get<string>('NODE_ENV') === 'production';
     if (isProd) {
       this.logger.log(
         'Entorno de producción detectado. Iniciando sincronización MOF automática...',
       );
-      await this.sync();
+      this.sync().catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(`Sync MOF inicial falló: ${message}`);
+      });
     }
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async handleCron() {
     this.logger.log('Iniciando sincronización MOF programada...');
-    await this.sync();
+    try {
+      await this.sync();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Sync MOF programado falló: ${message}`);
+    }
   }
 
   async fetchUnidades(): Promise<MofUnidadDto[]> {
     try {
       const response = await firstValueFrom(
-        this.httpService.get<{ data: MofUnidadDto[] }>(this.mofApiUrl),
+        this.httpService.get<{ data: MofUnidadDto[] }>(this.unidadesPath),
       );
       return response.data.data;
     } catch (error: unknown) {
@@ -146,12 +153,12 @@ export class MofService implements OnModuleInit {
     return {
       lastSync: this.lastSync,
       status: this.syncStatus,
-      apiUrl: this.mofApiUrl,
+      apiUrl: `${this.configService.get<string>('MOF_API_URL') ?? ''}${this.unidadesPath}`,
     };
   }
 
   async fetchPersonalByUnidad(id_unidad: number): Promise<MofPersonalDto[]> {
-    const url = `https://correspondencia.fcpn.edu.bo/umsa-core/api/v1/unidades/${id_unidad}/personal`;
+    const url = `${this.unidadesPath}/${id_unidad}/personal`;
     try {
       const response = await firstValueFrom(
         this.httpService.get<{ data: MofPersonalDto[] }>(url),

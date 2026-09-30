@@ -46,6 +46,7 @@ import UnidadDependencyDialog from "./unidades/UnidadDependencyDialog.vue";
 
 // --- COMPOSABLES ---
 import { useUnidadForm } from "@/composables/useUnidadForm";
+import { UMSA_CORE_URL } from "@/config/env";
 
 // --- VUE FLOW COMPOSABLES ---
 const { nodes, edges, setNodes, setEdges, fitView, onNodeClick } = useVueFlow();
@@ -457,7 +458,7 @@ async function cambiarDependencia() {
 
 async function verReporte(id) {
   window.open(
-    `https://correspondencia.fcpn.edu.bo/umsa-core/api/v1/mof/unidades/pdf/${id}`,
+    `${UMSA_CORE_URL}/api/v1/mof/unidades/pdf/${id}`,
     "_blank",
   );
 }

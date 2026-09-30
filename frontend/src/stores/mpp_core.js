@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import axios from "axios";
+import { API_URL } from "@/config/env";
 
 export const useMppCoreStore = defineStore("mpp_core", () => {
     const unidades = ref([]);
@@ -80,12 +81,12 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
     const loading = ref(false);
     const error = ref(null);
 
-    const BASE_URL_MPP = "http://localhost:3000/procesos";
-    const BASE_URL_FLUX = "http://localhost:3000/flujo";
-    const BASE_URL_ORG = "http://localhost:3000/estructura-organizacional";
-    const BASE_URL_REC = "http://localhost:3000/recursos";
-    const BASE_URL_CAL = "http://localhost:3000/calidad";
-    const BASE_URL_MOF = "http://localhost:3000/mof";
+    const BASE_URL_MPP = `${API_URL}/procesos`;
+    const BASE_URL_FLUX = `${API_URL}/flujo`;
+    const BASE_URL_ORG = `${API_URL}/estructura-organizacional`;
+    const BASE_URL_REC = `${API_URL}/recursos`;
+    const BASE_URL_CAL = `${API_URL}/calidad`;
+    const BASE_URL_MOF = `${API_URL}/mof`;
 
     // --- LECTURA ---
     const fetchAcciones = async () => {
