@@ -5,6 +5,7 @@ import axios from "axios";
 import { useAllUnidadesMofStore } from "@/stores/unidades_mof";
 import { useAuthStore } from "@/stores/auth";
 import { useMppCoreStore } from "@/stores/mpp_core";
+import { API_URL } from "@/config/env";
 
 const router = useRouter();
 const unidadesStore = useAllUnidadesMofStore();
@@ -73,7 +74,7 @@ function touchLastVisit() {
 
 const fetchStats = async () => {
   try {
-    const response = await axios.get("http://localhost:3000/dashboard/stats", {
+    const response = await axios.get(`${API_URL}/dashboard/stats`, {
       headers: authStore.getAuthHeader(),
     });
     if (response.data) {
@@ -92,7 +93,7 @@ const fetchPublicados = async () => {
     if (filterUnidad.value != null) params.id_unidad = filterUnidad.value;
     if (filterCategoria.value) params.tipo_proceso = filterCategoria.value;
     const response = await axios.get(
-      "http://localhost:3000/procesos/procedimientos",
+      `${API_URL}/procesos/procedimientos`,
       { headers: authStore.getAuthHeader(), params },
     );
     const list = response.data?.data || response.data || [];

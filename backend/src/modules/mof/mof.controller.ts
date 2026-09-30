@@ -97,7 +97,8 @@ export class MofController {
       example: {
         lastSync: '2026-05-06T14:30:00Z',
         status: 'Éxito',
-        apiUrl: 'https://correspondencia.fcpn.edu.bo/...',
+        apiUrl:
+          'https://mof-smau.fcpn.edu.bo:3000/api/v1/integraciones/mpp/unidades',
       },
     },
   })

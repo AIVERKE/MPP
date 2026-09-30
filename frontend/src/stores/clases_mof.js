@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { UMSA_CORE_URL } from "@/config/env";
 
 /**
  * Store para la gestión de Clases (Instancias) del MOF
@@ -11,7 +12,7 @@ export const useAllClasesMofStore = defineStore(
         const loading = ref(false);
         const error = ref(null);
         
-        const API_URL = "https://correspondencia.fcpn.edu.bo/umsa-core/api/v1/mof/clases";
+        const API_URL = `${UMSA_CORE_URL}/api/v1/mof/clases`;
 
         const getHeaders = () => {
           const isLocalToken = localStorage.getItem('is_local_token') === 'true';

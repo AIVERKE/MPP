@@ -2,8 +2,8 @@
 import { ref, computed, onMounted, watch } from "vue";
 import { useAuthStore } from "@/stores/auth";
 import axios from "axios";
+import { API_URL } from "@/config/env";
 
-const BASE_URL = "http://localhost:3000";
 const authStore = useAuthStore();
 
 // --- CONTROL DE ACCESO ---
@@ -67,7 +67,7 @@ const fetchAuditLogs = async () => {
     if (filters.value.fechaHasta) params.fecha_hasta = filters.value.fechaHasta;
     if (filters.value.idUsuario) params.id_usuario = Number(filters.value.idUsuario);
 
-    const response = await axios.get(`${BASE_URL}/versiones`, {
+    const response = await axios.get(`${API_URL}/versiones`, {
       params,
       headers: authStore.getAuthHeader(),
     });

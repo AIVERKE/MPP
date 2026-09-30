@@ -148,6 +148,77 @@ Una vez que el servidor esté corriendo, puedes acceder a la documentación inte
 
 Desde aquí podrás probar todos los endpoints disponibles, incluyendo los que requieren autenticación mediante JWT (usa el botón "Authorize" con tu token).
 
+## 🔗 Conexión con el MOF
+
+MPP obtiene las unidades y los cargos del organigrama desde el MOF desplegado en [https://mof-smau.fcpn.edu.bo/](https://mof-smau.fcpn.edu.bo/). Esa URL es el frontend del MOF; el backend de MPP se conecta a su API, que escucha en el puerto `3000` del mismo dominio.
+
+La conexión va de servidor a servidor: MPP no inicia sesión en el MOF, sino que envía un token de servicio en el header `X-Api-Key`. El token nunca debe llegar al navegador ni al frontend de MPP.
+
+### 1. Obtener el token
+
+El token lo define quien administra el MOF, en la variable `MPP_SERVICE_TOKEN` del `.env` de su backend. En producción debe tener al menos 32 caracteres; se puede generar con:
+
+```bash
+openssl rand -base64 48
+```
+
+MPP debe usar exactamente el mismo valor.
+
+### 2. Configurar el `.env` de MPP
+
+```env
+MOF_API_URL=https://mof-smau.fcpn.edu.bo:3000
+MOF_SERVICE_TOKEN=<mismo valor que MPP_SERVICE_TOKEN en el MOF>
+```
+
+- `MOF_API_URL` es la URL base de la API del MOF, **con** el puerto `:3000` y **sin** barra final. No usar `https://mof-smau.fcpn.edu.bo/` (sin puerto), porque ahí responde el frontend.
+- Después de cambiar estas variables hay que reiniciar el backend (con PM2: `sudo pm2 restart mpp-backend --update-env`).
+
+### 3. Verificar la conexión
+
+Desde la máquina donde corre MPP, comprobar que el MOF responde con el token:
+
+```bash
+curl -H "X-Api-Key: $MOF_SERVICE_TOKEN" \
+  https://mof-smau.fcpn.edu.bo:3000/api/v1/integraciones/mpp/unidades
+```
+
+Debe devolver `{ "data": [ ... ] }` con la lista de unidades. Un `401 UNAUTHORIZED` significa que el token falta o no coincide con el del MOF. Si no hay respuesta, el puerto `3000` del MOF no es accesible desde este servidor.
+
+Luego, con MPP en marcha:
+
+```bash
+# Estado de la conexión
+curl http://localhost:3000/mof/health
+
+# Sincronizar unidades (primero)
+curl -X POST http://localhost:3000/mof/sync
+
+# Sincronizar cargos (requiere unidades ya sincronizadas)
+curl -X POST http://localhost:3000/mof/cargos/sync
+
+# Última sincronización y URL usada (nunca muestra el token)
+curl http://localhost:3000/mof/status
+```
+
+Si el backend de MPP sirve HTTPS, cambiar `http://localhost:3000` por su URL real.
+
+### Rutas del MOF que usa MPP
+
+| Ruta | Uso |
+|------|-----|
+| `GET /api/v1/integraciones/mpp/unidades` | Unidades del organigrama (`id`, `nombre`, `codigo`, `nivel`, `tipo`) |
+| `GET /api/v1/integraciones/mpp/unidades/:id/personal` | Cargos de una unidad (`id` del cargo, `descripcion`, `detalle`) |
+
+El token solo abre estas dos rutas; el resto de la API del MOF exige JWT.
+
+### Sincronización automática
+
+- Con `NODE_ENV=production`, MPP sincroniza las unidades al arrancar. Si el MOF no responde, el error queda en el log (`sudo pm2 logs mpp-backend`) y el backend arranca igual.
+- Todos los días a medianoche se vuelven a sincronizar las unidades.
+- Los cargos se sincronizan solo a pedido, con `POST /mof/cargos/sync`.
+- Para rotar el token, cambiarlo en el MOF y en MPP y reiniciar los dos backends.
+
 ## 🧪 Pruebas (Testing)
 
 ```bash

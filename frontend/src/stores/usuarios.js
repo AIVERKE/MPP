@@ -2,9 +2,10 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import axios from "axios";
 import { useAuthStore } from "./auth";
+import { API_URL } from "@/config/env";
 
-const BASE_URL = "http://localhost:3000/seguridad";
-const ORG_URL = "http://localhost:3000/estructura-organizacional";
+const BASE_URL = `${API_URL}/seguridad`;
+const ORG_URL = `${API_URL}/estructura-organizacional`;
 
 export const useUsuariosStore = defineStore("usuarios", () => {
   const usuarios = ref([]);
