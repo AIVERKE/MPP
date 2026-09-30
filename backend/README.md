@@ -169,9 +169,11 @@ MPP debe usar exactamente el mismo valor.
 ```env
 MOF_API_URL=https://mof-smau.fcpn.edu.bo:3000
 MOF_SERVICE_TOKEN=<mismo valor que MPP_SERVICE_TOKEN en el MOF>
+MOF_TLS_REJECT_UNAUTHORIZED=false
 ```
 
 - `MOF_API_URL` es la URL base de la API del MOF, **con** el puerto `:3000` y **sin** barra final. No usar `https://mof-smau.fcpn.edu.bo/` (sin puerto), porque ahí responde el frontend.
+- `MOF_TLS_REJECT_UNAUTHORIZED=false` evita el error `UNABLE_TO_VERIFY_LEAF_SIGNATURE` cuando el MOF no envía el certificado intermedio. La solución correcta a medio plazo es que el MOF sirva el `fullchain`.
 - Después de cambiar estas variables hay que reiniciar el backend (con PM2: `sudo pm2 restart mpp-backend --update-env`).
 
 ### 3. Verificar la conexión

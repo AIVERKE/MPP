@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { getFiguraVisuals } from '@/utils/figuras';
+import FiguraShapePreview from '@/components/mpp/FiguraShapePreview.vue';
 
 const props = defineProps({
   modelValue: {
@@ -32,7 +33,7 @@ const selected = computed({
   set: (value) => emit('update:modelValue', value),
 });
 
-const iconFor = (figura) => getFiguraVisuals(figura?.codigo).icon;
+const codigoOf = (figura) => getFiguraVisuals(figura?.codigo).codigo;
 </script>
 
 <template>
@@ -47,21 +48,41 @@ const iconFor = (figura) => getFiguraVisuals(figura?.codigo).icon;
     :hide-details="hideDetails"
   >
     <template #item="{ props: itemProps, item }">
-      <v-list-item v-bind="itemProps">
+      <v-list-item v-bind="itemProps" class="figura-select-item">
         <template #prepend>
-          <v-icon class="mr-2" color="primary" size="20">
-            {{ iconFor(item.raw) }}
-          </v-icon>
+          <div class="preview-slot mr-3">
+            <FiguraShapePreview :codigo="codigoOf(item.raw)" size="sm" />
+          </div>
         </template>
       </v-list-item>
     </template>
     <template #selection="{ item }">
       <div class="d-flex align-center">
-        <v-icon class="mr-2" color="primary" size="18">
-          {{ iconFor(item.raw) }}
-        </v-icon>
+        <div class="preview-slot preview-slot--sm mr-2">
+          <FiguraShapePreview :codigo="codigoOf(item.raw)" size="sm" />
+        </div>
         <span>{{ item.title }}</span>
       </div>
     </template>
   </v-select>
 </template>
+
+<style scoped>
+.preview-slot {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.preview-slot--sm {
+  width: 36px;
+  height: 36px;
+}
+
+.figura-select-item {
+  min-height: 56px;
+}
+</style>

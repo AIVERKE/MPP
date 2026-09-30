@@ -2,7 +2,8 @@
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from "vue";
 import { useDisplay } from "vuetify";
 import { useMppCoreStore } from "@/stores/mpp_core";
-import { getFiguraVisuals } from "@/utils/figuras";
+import { resolveActionVisuals } from "@/utils/actionVisuals";
+import { buildOrthogonalPath } from "@/utils/flowGeometry";
 import FiguraSelect from "@/components/mpp/FiguraSelect.vue";
 import { toPng } from "html-to-image";
 import { jsPDF } from "jspdf";
@@ -347,92 +348,6 @@ const getReturnTarget = (text) => {
   return match ? parseInt(match[1], 10) : null;
 };
 
-const buildOrthogonalPath = (start, end, options = {}) => {
-  const { type = "sequential", isEditor = false } = options;
-  const prefix = isEditor ? "editor-" : "";
-
-  let color = "#4f46e5";
-  let markerEnd = `url(#${prefix}arrow)`;
-  let isReturn = false;
-
-  if (type === "return") {
-    color = "#ef4444";
-    markerEnd = `url(#${prefix}arrow-return)`;
-    isReturn = true;
-  } else if (type === "if") {
-    color = "#16a34a";
-    markerEnd = `url(#${prefix}arrow-if)`;
-  } else if (type === "else") {
-    color = "#dc2626";
-    markerEnd = `url(#${prefix}arrow-else)`;
-  }
-
-  const startYOffset = start.h / 2;
-  const endYOffset = end.h / 2;
-
-  if (type === "return") {
-    const xStart = start.cx + start.w / 2;
-    const yStart = start.cy;
-    const xEnd = end.cx + end.w / 2;
-    const yEnd = end.cy;
-    const xRight = Math.max(xStart, xEnd) + 40;
-    const path = `M ${xStart} ${yStart} L ${xRight} ${yStart} L ${xRight} ${yEnd} L ${xEnd} ${yEnd}`;
-    return { path, color, isReturn, markerEnd };
-  }
-
-  if (type === "if") {
-    const x1 = start.cx - start.w / 2;
-    const y1 = start.cy;
-    const x2 = end.cx;
-    const y2 = end.cy - endYOffset;
-    if (Math.abs(x1 - x2) < 8) {
-      return { path: `M ${x1} ${y1} L ${x2} ${y2}`, color, isReturn, markerEnd };
-    }
-    const xLeft = Math.min(x1, x2) - 30;
-    return {
-      path: `M ${x1} ${y1} L ${xLeft} ${y1} L ${xLeft} ${y2} L ${x2} ${y2}`,
-      color,
-      isReturn,
-      markerEnd,
-    };
-  }
-
-  if (type === "else") {
-    const x1 = start.cx + start.w / 2;
-    const y1 = start.cy;
-    const x2 = end.cx;
-    const y2 = end.cy - endYOffset;
-    if (Math.abs(x1 - x2) < 8) {
-      return { path: `M ${x1} ${y1} L ${x2} ${y2}`, color, isReturn, markerEnd };
-    }
-    const xRight = Math.max(x1, x2) + 30;
-    return {
-      path: `M ${x1} ${y1} L ${xRight} ${y1} L ${xRight} ${y2} L ${x2} ${y2}`,
-      color,
-      isReturn,
-      markerEnd,
-    };
-  }
-
-  const x1 = start.cx;
-  const y1 = start.cy + startYOffset;
-  const x2 = end.cx;
-  const y2 = end.cy - endYOffset;
-
-  let path = "";
-  if (Math.abs(x1 - x2) < 8) {
-    path = `M ${x1} ${y1} L ${x2} ${y2}`;
-  } else {
-    let yMid = y1 + (y2 - y1) / 2;
-    if (y2 - y1 < 30) {
-      yMid = Math.max(y1 + 15, y2 - 15);
-    }
-    path = `M ${x1} ${y1} L ${x1} ${yMid} L ${x2} ${yMid} L ${x2} ${y2}`;
-  }
-
-  return { path, color, isReturn, markerEnd };
-};
-
 const getRowCondicion = (row) => {
   const tareaId = row?.savedIds?.tarea ? Number(row.savedIds.tarea) : null;
   if (!tareaId) return null;
@@ -567,54 +482,8 @@ const removeRow = async (index) => {
 };
 
 // --- LÓGICA DE FIGURAS DINÁMICAS ---
-const getActionVisuals = (accionId) => {
-  const accion = mppStore.acciones.find((a) => a.id_accion === accionId);
-  if (!accion || !accion.figura) {
-    return {
-      icon: "mdi-checkbox-blank-circle",
-      color: "primary",
-      colorHex: "#6366f1",
-      codigoFigura: "rectangulo",
-    };
-  }
-
-  const { icon, codigo: codigoFigura } = getFiguraVisuals(accion.figura.codigo);
-  const nombreAccion = (accion.nombre_accion || "").toLowerCase();
-
-  let color = "primary";
-  let colorHex = "#6366f1";
-  if (
-    nombreAccion.includes("inicio") ||
-    nombreAccion.includes("empezar") ||
-    nombreAccion.includes("comenzar") ||
-    nombreAccion.includes("start")
-  ) {
-    color = "success";
-    colorHex = "#10b981";
-  } else if (
-    nombreAccion.includes("fin") ||
-    nombreAccion.includes("terminar") ||
-    nombreAccion.includes("concluir") ||
-    nombreAccion.includes("archivar") ||
-    nombreAccion.includes("end")
-  ) {
-    color = "error";
-    colorHex = "#ef4444";
-  } else if (
-    nombreAccion.includes("decisión") ||
-    nombreAccion.includes("validar") ||
-    nombreAccion.includes("aprob") ||
-    nombreAccion.includes("revisar") ||
-    nombreAccion.includes("control") ||
-    nombreAccion.includes("analiz") ||
-    nombreAccion.includes("decid")
-  ) {
-    color = "orange-darken-2";
-    colorHex = "#f59e0b";
-  }
-
-  return { icon, color, colorHex, codigoFigura };
-};
+const getActionVisuals = (accionId) =>
+  resolveActionVisuals(mppStore.acciones, accionId);
 
 const tareaOptionsForCondicion = computed(() => {
   return rows.value
@@ -2151,47 +2020,51 @@ watch(
         <defs>
           <marker
             id="editor-arrow"
-            viewBox="0 0 10 10"
-            refX="8"
-            refY="5"
-            markerWidth="6"
-            markerHeight="6"
-            orient="auto-start-reverse"
+            viewBox="0 0 12 12"
+            refX="11"
+            refY="6"
+            markerWidth="9"
+            markerHeight="9"
+            markerUnits="userSpaceOnUse"
+            orient="auto"
           >
-            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#4f46e5" />
+            <path d="M2 2 L11 6 L2 10 Z" fill="#4f46e5" />
           </marker>
           <marker
             id="editor-arrow-return"
-            viewBox="0 0 10 10"
-            refX="8"
-            refY="5"
-            markerWidth="6"
-            markerHeight="6"
-            orient="auto-start-reverse"
+            viewBox="0 0 12 12"
+            refX="11"
+            refY="6"
+            markerWidth="9"
+            markerHeight="9"
+            markerUnits="userSpaceOnUse"
+            orient="auto"
           >
-            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#ef4444" />
+            <path d="M2 2 L11 6 L2 10 Z" fill="#ef4444" />
           </marker>
           <marker
             id="editor-arrow-if"
-            viewBox="0 0 10 10"
-            refX="8"
-            refY="5"
-            markerWidth="6"
-            markerHeight="6"
-            orient="auto-start-reverse"
+            viewBox="0 0 12 12"
+            refX="11"
+            refY="6"
+            markerWidth="9"
+            markerHeight="9"
+            markerUnits="userSpaceOnUse"
+            orient="auto"
           >
-            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#16a34a" />
+            <path d="M2 2 L11 6 L2 10 Z" fill="#16a34a" />
           </marker>
           <marker
             id="editor-arrow-else"
-            viewBox="0 0 10 10"
-            refX="8"
-            refY="5"
-            markerWidth="6"
-            markerHeight="6"
-            orient="auto-start-reverse"
+            viewBox="0 0 12 12"
+            refX="11"
+            refY="6"
+            markerWidth="9"
+            markerHeight="9"
+            markerUnits="userSpaceOnUse"
+            orient="auto"
           >
-            <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#dc2626" />
+            <path d="M2 2 L11 6 L2 10 Z" fill="#dc2626" />
           </marker>
         </defs>
         <path
@@ -2840,47 +2713,51 @@ watch(
                 <defs>
                   <marker
                     id="arrow"
-                    viewBox="0 0 10 10"
-                    refX="8"
-                    refY="5"
-                    markerWidth="6"
-                    markerHeight="6"
-                    orient="auto-start-reverse"
+                    viewBox="0 0 12 12"
+                    refX="11"
+                    refY="6"
+                    markerWidth="9"
+                    markerHeight="9"
+                    markerUnits="userSpaceOnUse"
+                    orient="auto"
                   >
-                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#4f46e5" />
+                    <path d="M2 2 L11 6 L2 10 Z" fill="#4f46e5" />
                   </marker>
                   <marker
                     id="arrow-return"
-                    viewBox="0 0 10 10"
-                    refX="8"
-                    refY="5"
-                    markerWidth="6"
-                    markerHeight="6"
-                    orient="auto-start-reverse"
+                    viewBox="0 0 12 12"
+                    refX="11"
+                    refY="6"
+                    markerWidth="9"
+                    markerHeight="9"
+                    markerUnits="userSpaceOnUse"
+                    orient="auto"
                   >
-                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#ef4444" />
+                    <path d="M2 2 L11 6 L2 10 Z" fill="#ef4444" />
                   </marker>
                   <marker
                     id="arrow-if"
-                    viewBox="0 0 10 10"
-                    refX="8"
-                    refY="5"
-                    markerWidth="6"
-                    markerHeight="6"
-                    orient="auto-start-reverse"
+                    viewBox="0 0 12 12"
+                    refX="11"
+                    refY="6"
+                    markerWidth="9"
+                    markerHeight="9"
+                    markerUnits="userSpaceOnUse"
+                    orient="auto"
                   >
-                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#16a34a" />
+                    <path d="M2 2 L11 6 L2 10 Z" fill="#16a34a" />
                   </marker>
                   <marker
                     id="arrow-else"
-                    viewBox="0 0 10 10"
-                    refX="8"
-                    refY="5"
-                    markerWidth="6"
-                    markerHeight="6"
-                    orient="auto-start-reverse"
+                    viewBox="0 0 12 12"
+                    refX="11"
+                    refY="6"
+                    markerWidth="9"
+                    markerHeight="9"
+                    markerUnits="userSpaceOnUse"
+                    orient="auto"
                   >
-                    <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#dc2626" />
+                    <path d="M2 2 L11 6 L2 10 Z" fill="#dc2626" />
                   </marker>
                 </defs>
                 <path
@@ -3090,12 +2967,13 @@ watch(
   min-height: 50px;
   color: white;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  box-shadow: 0 4px 10px -2px rgb(15 23 42 / 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   border-radius: 6px;
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
 }
 
 .preview-text {
@@ -3193,15 +3071,16 @@ watch(
 
 /* Estilos de figuras en la celda de la matriz */
 .cell-flow-node {
-  margin: 6px auto;
+  margin: 8px auto;
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
   box-sizing: border-box;
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
 }
 
 .cell-flow-node.rectangulo {
