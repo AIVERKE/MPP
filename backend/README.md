@@ -148,6 +148,42 @@ Una vez que el servidor esté corriendo, puedes acceder a la documentación inte
 
 Desde aquí podrás probar todos los endpoints disponibles, incluyendo los que requieren autenticación mediante JWT (usa el botón "Authorize" con tu token).
 
+## 🔒 Despliegue con HTTPS
+
+En producción el frontend se sirve desde `https://mpp-smau.fcpn.edu.bo` (Apache, puerto 443) y llama directamente al backend en `https://mpp-smau.fcpn.edu.bo:3000`. Por eso Nest debe servir HTTPS con el certificado de Let's Encrypt: si respondiera en HTTP, el navegador bloquearía las llamadas.
+
+Nest activa HTTPS cuando están definidas `HTTPS_KEY_PATH` y `HTTPS_CERT_PATH`. Si las dos están vacías, levanta HTTP (desarrollo local). Si solo hay una, o no puede leer los archivos, el backend no arranca y muestra el error.
+
+1. **Ubicar el certificado.** El nombre de la carpeta en `/etc/letsencrypt/live/` puede variar (en MOF es `fcpn.edu.bo-0002`), así que hay que revisarlo con:
+   ```bash
+   sudo certbot certificates
+   ```
+   Usar `privkey.pem` y `fullchain.pem`, no `cert.pem`.
+
+2. **Configurar el `.env` de producción:**
+   ```env
+   NODE_ENV=production
+   PORT=3000
+   HTTPS_KEY_PATH=/etc/letsencrypt/live/mpp-smau.fcpn.edu.bo/privkey.pem
+   HTTPS_CERT_PATH=/etc/letsencrypt/live/mpp-smau.fcpn.edu.bo/fullchain.pem
+   CORS_ORIGIN=https://mpp-smau.fcpn.edu.bo
+   ```
+   Con `NODE_ENV=production`, `CORS_ORIGIN` es obligatorio y no puede ser `*`.
+
+3. **Arrancar con PM2 como root.** Los archivos de `/etc/letsencrypt/live/` solo los puede leer root:
+   ```bash
+   npm run build
+   sudo pm2 start dist/main.js --name mpp-backend
+   sudo pm2 save
+   ```
+
+4. **Renovación del certificado.** Nest carga el certificado solo al arrancar. Cuando certbot lo renueve (cada ~90 días), reiniciar:
+   ```bash
+   sudo pm2 restart mpp-backend
+   ```
+
+Para comprobarlo: `curl https://mpp-smau.fcpn.edu.bo:3000/api` debe responder `200` sin errores de certificado.
+
 ## 🔗 Conexión con el MOF
 
 MPP obtiene las unidades y los cargos del organigrama desde el MOF desplegado en [https://mof-smau.fcpn.edu.bo/](https://mof-smau.fcpn.edu.bo/). Esa URL es el frontend del MOF; el backend de MPP se conecta a su API, que escucha en el puerto `3000` del mismo dominio.
