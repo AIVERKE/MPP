@@ -2,10 +2,14 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { resolveHttpsOptions } from './common/https.util';
+import { resolveCorsOrigins } from './common/cors.util';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  app.enableCors();
+  const app = await NestFactory.create(AppModule, {
+    httpsOptions: resolveHttpsOptions(),
+  });
+  app.enableCors({ origin: resolveCorsOrigins() });
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
