@@ -12,7 +12,6 @@ import { useAllUnidadesMofStore } from "../../stores/unidades_mof";
 import { useAllTiposMofStore } from "@/stores/tipos_mof";
 import { useAllNivelesMofStore } from "@/stores/niveles_mof";
 import { useAllRelacionesMofStore } from "@/stores/relaciones_mof";
-import { useAllCargosMofStore } from "@/stores/cargos_mof";
 import { useAllClasesMofStore } from "@/stores/clases_mof";
 
 // --- PLUGINS & UTILS ---
@@ -38,15 +37,7 @@ import SelectAllTipos from "./tipos/SelectAllTipos.vue";
 import SelectAllNiveles from "./niveles/SelectAllNiveles.vue";
 import SelectAllRelaciones from "./relaciones/SelectAllRelaciones.vue";
 import SelectAllClases from "./clases/SelectAllClases.vue";
-import HierarchyManagerDrawer from "./clases/HierarchyManagerDrawer.vue";
-import UnidadFormDialog from "./unidades/UnidadFormDialog.vue";
 import UnidadDetailsDrawer from "./unidades/UnidadDetailsDrawer.vue";
-import UnidadDeleteDialog from "./unidades/UnidadDeleteDialog.vue";
-import UnidadDependencyDialog from "./unidades/UnidadDependencyDialog.vue";
-
-// --- COMPOSABLES ---
-import { useUnidadForm } from "@/composables/useUnidadForm";
-import { UMSA_CORE_URL } from "@/config/env";
 
 // --- VUE FLOW COMPOSABLES ---
 const { nodes, edges, setNodes, setEdges, fitView, onNodeClick } = useVueFlow();
@@ -56,51 +47,19 @@ const unidadesStore = useAllUnidadesMofStore();
 const tiposStore = useAllTiposMofStore();
 const nivelesStore = useAllNivelesMofStore();
 const relacionesStore = useAllRelacionesMofStore();
-const cargosStore = useAllCargosMofStore();
 const clasesStore = useAllClasesMofStore();
 
-// --- FORM COMPOSABLE ---
-const unitForm = useUnidadForm({
-  unidadesStore,
-  cargosStore,
-  clasesStore,
-  nivelesStore,
-  tiposStore,
-  relacionesStore,
-});
-
-const {
-  formData,
-  isEditMode,
-  formValid,
-  openForm: openUnitForm,
-  saveUnidad,
-  addFuncion,
-  updateFuncion,
-  removeFuncion,
-} = unitForm;
-
 // --- UI STATE ---
-const addDialog = ref(false);
-const deleteDialog = ref(false);
-const selectedNode = ref(null);
 const snackbar = ref(false);
 const snackbarText = ref("");
 const snackbarColor = ref("success");
 const vistaModo = ref("analitico");
-
-const dialog_nodo_chance = ref(false);
-const unidadACambiar = ref(null);
-const unidadDestino = ref(null);
-const unidadRazon = ref("");
 
 const mostrarDependencias = ref(false);
 const unidadDependenciaSeleccionada = ref(null);
 const detailsDrawer = ref(false);
 const detailData = ref(null);
 const loadingDetail = ref(false);
-const hierarchyDrawer = ref(false);
-const hierarchyDrawerWidth = ref(450);
 
 const graphKey = ref(0); // Clave para forzar redibujado completo
 const searchTerm = ref("");
@@ -382,85 +341,14 @@ function procesarEstructuraVisual(unidadesMapeadas) {
 }
 
 // --- METHODS ---
-async function refreshChart() {
-  console.log(">>> REFRESCO DE TABLAS INICIADO");
-  await Promise.all([
-    unidadesStore.getFetchUnidades(),
-    clasesStore.getFetchClases()
-  ]);
-  console.log(">>> REFRESCO DE TABLAS FINALIZADO");
-  updateGraph();
-}
-
-async function openForm(nodeId = null, edit = false) {
-  const node = nodeId
-    ? unidadesStore.unidades.find((u) => String(u.id) === String(nodeId))
-    : null;
-  selectedNode.value = node;
-  await openUnitForm(node, edit);
-  addDialog.value = true;
-}
-
-async function confirmAddItem() {
-  snackbarText.value = "Procesando...";
-  snackbarColor.value = "info";
-  snackbar.value = true;
-  const result = await saveUnidad();
-  if (result.success) {
-    addDialog.value = false;
-    snackbarText.value = "¡Operación exitosa!";
-    snackbarColor.value = "success";
-    refreshChart();
-  } else {
-    snackbarText.value = "Error: " + result.error;
-    snackbarColor.value = "error";
-  }
-}
-
-async function confirmDelete() {
-  if (!selectedNode.value) return;
-  const id = selectedNode.value.id;
-  if (unidadesStore.unidades.some((u) => String(u.parent) === String(id))) {
-    snackbarText.value = "No se puede eliminar: tiene dependientes.";
+async function verReporte(id) {
+  try {
+    await unidadesStore.abrirPdfUnidad(id);
+  } catch (e) {
+    snackbarText.value = "Error al generar el PDF: " + e.message;
     snackbarColor.value = "error";
     snackbar.value = true;
-    return;
   }
-  await unidadesStore.deletePersonalUnidad(id);
-  await unidadesStore.deleteUnidad(id);
-  if (!unidadesStore.error) {
-    deleteDialog.value = false;
-    snackbarText.value = "¡Eliminado!";
-    snackbarColor.value = "success";
-    refreshChart();
-  } else {
-    snackbarText.value = "Error: " + unidadesStore.error;
-    snackbarColor.value = "error";
-  }
-  snackbar.value = true;
-}
-
-async function cambiarDependencia() {
-  await unidadesStore.updateNodo(unidadACambiar.value, {
-    parentId: parseInt(unidadDestino.value) || null,
-    razon: unidadRazon.value,
-  });
-  if (!unidadesStore.error) {
-    dialog_nodo_chance.value = false;
-    snackbarText.value = "¡Cambiado!";
-    refreshChart();
-  } else {
-    snackbarText.value = "Error: " + unidadesStore.error;
-    snackbarColor.value = "error";
-  }
-  snackbar.value = true;
-}
-
-async function verReporte(id) {
-  window.open(
-    `${UMSA_CORE_URL}/api/v1/mof/unidades/pdf/${id}`,
-    "_blank",
-  );
 }
 
 async function exportarOrganigrama() {
@@ -887,9 +775,13 @@ onMounted(async () => {
     tiposStore.getFetchTipos(),
     nivelesStore.getFetchNiveles(),
     relacionesStore.getFetchRelaciones(),
-    cargosStore.getFetchCargos(),
     clasesStore.getFetchClases(),
   ]);
+  if (unidadesStore.error) {
+    snackbarText.value = unidadesStore.error;
+    snackbarColor.value = "error";
+    snackbar.value = true;
+  }
   updateGraph();
 });
 
@@ -1005,7 +897,6 @@ function resetFilters() {
                       variant="outlined"
                       clearable
                       autocomplete="off"
-                      :hide-crud="true"
                   /></v-col>
                   <v-col cols="12" md="3"
                     ><SelectAllTipos
@@ -1016,7 +907,6 @@ function resetFilters() {
                       variant="outlined"
                       clearable
                       autocomplete="off"
-                      :hide-crud="true"
                   /></v-col>
                   <v-col cols="12" md="3"
                     ><SelectAllClases
@@ -1027,7 +917,6 @@ function resetFilters() {
                       variant="outlined"
                       clearable
                       autocomplete="off"
-                      :hide-crud="true"
                   /></v-col>
                 </v-row>
                 <v-row dense align="center" class="mt-1">
@@ -1040,7 +929,6 @@ function resetFilters() {
                       variant="outlined"
                       clearable
                       autocomplete="off"
-                      :hide-crud="true"
                   /></v-col>
                 </v-row>
                 <v-divider class="my-2"></v-divider>
@@ -1089,16 +977,6 @@ function resetFilters() {
                       <v-tooltip activator="parent" location="top">Exportar organigrama actual a PDF (A3)</v-tooltip>
                     </v-btn>
                     <v-btn
-                      prepend-icon="mdi-format-list-numbered"
-                      color="info"
-                      variant="flat"
-                      size="small"
-                      @click="hierarchyDrawer = true"
-                    >
-                      Jerarquías
-                      <v-tooltip activator="parent" location="top">Gestionar catálogos y pesos jerárquicos</v-tooltip>
-                    </v-btn>
-                    <v-btn
                       prepend-icon="mdi-filter-off"
                       variant="tonal"
                       color="grey-darken-1"
@@ -1107,16 +985,6 @@ function resetFilters() {
                     >
                       Limpiar
                       <v-tooltip activator="parent" location="top">Restablecer todos los filtros de búsqueda</v-tooltip>
-                    </v-btn>
-                    <v-btn
-                      prepend-icon="mdi-swap-horizontal"
-                      color="secondary"
-                      variant="elevated"
-                      size="small"
-                      @click="dialog_nodo_chance = true"
-                    >
-                      Dependencia
-                      <v-tooltip activator="parent" location="top">Cambiar la unidad superior (Padre) de un nodo</v-tooltip>
                     </v-btn>
                   </v-col>
                 </v-row>
@@ -1349,28 +1217,6 @@ function resetFilters() {
                       @click="verDependencias(id)"
                       class="text-green-lighten-2 font-weight-black"
                     />
-                    <v-divider class="my-1" color="white" />
-                    <v-list-item
-                      prepend-icon="mdi-plus"
-                      title="Añadir Unidad Dependiente"
-                      @click="openForm(id, false)"
-                      class="text-blue-lighten-2 font-weight-black"
-                    />
-                    <v-list-item
-                      prepend-icon="mdi-pencil"
-                      title="Editar Información"
-                      @click="openForm(id, true)"
-                      class="text-orange-lighten-2 font-weight-black"
-                    />
-                    <v-list-item
-                      prepend-icon="mdi-delete"
-                      title="Eliminar Unidad"
-                      @click="
-                        selectedNode = data.rawData;
-                        deleteDialog = true;
-                      "
-                      class="text-red-accent-1 font-weight-black"
-                    />
                   </v-list>
                 </v-menu>
               </div>
@@ -1408,22 +1254,6 @@ function resetFilters() {
       </div>
     </v-card>
 
-    <!-- MODULAR COMPONENTS -->
-    <UnidadFormDialog
-      v-model="addDialog"
-      :form-data="formData"
-      :is-edit-mode="isEditMode"
-      :selected-node="selectedNode"
-      v-model:form-valid="formValid"
-      @confirm="confirmAddItem"
-      @add-funcion="({ funcion, baseLegal }) => addFuncion(funcion, baseLegal)"
-      @edit-funcion="
-        ({ index, funcion, baseLegal }) =>
-          updateFuncion(index, funcion, baseLegal)
-      "
-      @remove-funcion="(index) => removeFuncion(index)"
-    />
-
     <UnidadDetailsDrawer
       v-model="detailsDrawer"
       :detail-data="detailData"
@@ -1432,43 +1262,8 @@ function resetFilters() {
       :get-tipo-nombre="getTipoNombre"
       :get-relacion-nombre="getRelacionNombre"
       :get-clase-nombre="getClaseNombre"
-      @edit="
-        (id) => {
-          openForm(id, true);
-          detailsDrawer = false;
-        }
-      "
       @reporte="(id) => verReporte(id)"
     />
-
-    <UnidadDeleteDialog
-      v-model="deleteDialog"
-      :nombre-unidad="selectedNode?.nombre || selectedNode?.denominacion"
-      @confirm="confirmDelete"
-    />
-
-    <UnidadDependencyDialog
-      v-model="dialog_nodo_chance"
-      v-model:unidad-a-cambiar="unidadACambiar"
-      v-model:unidad-destino="unidadDestino"
-      v-model:razon="unidadRazon"
-      :unidades="unidadesStore.unidades"
-      @confirm="cambiarDependencia"
-    />
-
-    <v-navigation-drawer
-      v-model="hierarchyDrawer"
-      location="right"
-      temporary
-      :width="$vuetify.display.xs ? '100%' : hierarchyDrawerWidth"
-    >
-      <HierarchyManagerDrawer
-        :width="$vuetify.display.xs ? 360 : hierarchyDrawerWidth"
-        @close="hierarchyDrawer = false"
-        @updated="refreshChart"
-        @resize="(val) => (hierarchyDrawerWidth = val)"
-      />
-    </v-navigation-drawer>
 
     <v-snackbar v-model="snackbar" :color="snackbarColor" timeout="3000">{{
       snackbarText

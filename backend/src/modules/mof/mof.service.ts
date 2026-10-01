@@ -1,5 +1,12 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  BadGatewayException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
+import type { AxiosError } from 'axios';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
@@ -10,10 +17,19 @@ import { MofUnidadDto } from './dto/mof-unidad.dto';
 import { MofPersonalDto } from './dto/mof-personal.dto';
 import { ConfigService } from '@nestjs/config';
 
+export const MOF_CATALOGOS = [
+  'tipos',
+  'niveles',
+  'relaciones',
+  'clases',
+] as const;
+export type MofCatalogo = (typeof MOF_CATALOGOS)[number];
+
 @Injectable()
 export class MofService implements OnModuleInit {
   private readonly logger = new Logger(MofService.name);
-  private readonly unidadesPath = '/api/v1/integraciones/mpp/unidades';
+  private readonly integracionPath = '/api/v1/integraciones/mpp';
+  private readonly unidadesPath = `${this.integracionPath}/unidades`;
   private lastSync: Date | null = null;
   private syncStatus: string = 'Nunca sincronizado';
 
@@ -178,6 +194,93 @@ export class MofService implements OnModuleInit {
         `Error al obtener personal de unidad ${id_unidad}: ${message}`,
       );
       throw error;
+    }
+  }
+
+  private toProxyError(error: unknown, recurso: string): Error {
+    const response = (error as AxiosError<unknown>).response;
+    const status = response?.status;
+    if (status === 404) {
+      const mofMessage = this.extractMofMessage(response?.data);
+      // Nest responde "Cannot GET ..." cuando la ruta no existe: el MOF desplegado no tiene esta integración.
+      if (typeof mofMessage === 'string' && mofMessage.startsWith('Cannot ')) {
+        this.logger.error(
+          `El MOF no expone la ruta para ${recurso}: ${mofMessage}`,
+        );
+        return new BadGatewayException(
+          `El MOF desplegado no tiene la ruta para ${recurso}; hay que actualizar su backend`,
+        );
+      }
+      return new NotFoundException(`${recurso} no existe en el MOF`);
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    this.logger.error(`Error al obtener ${recurso} del MOF: ${message}`);
+    return new BadGatewayException(
+      `No se pudo obtener ${recurso} del MOF (${status ?? message})`,
+    );
+  }
+
+  private extractMofMessage(data: unknown): unknown {
+    if (Buffer.isBuffer(data)) {
+      try {
+        data = JSON.parse(data.toString('utf8'));
+      } catch {
+        return undefined;
+      }
+    }
+    return (data as { message?: unknown } | undefined)?.message;
+  }
+
+  private async getFromMof<T>(path: string, recurso: string): Promise<T> {
+    try {
+      const response = await firstValueFrom(
+        this.httpService.get<{ data: T }>(`${this.integracionPath}${path}`),
+      );
+      return response.data.data;
+    } catch (error: unknown) {
+      throw this.toProxyError(error, recurso);
+    }
+  }
+
+  fetchCatalogo(tipo: MofCatalogo): Promise<unknown[]> {
+    return this.getFromMof<unknown[]>(
+      `/catalogos/${tipo}`,
+      `el catálogo ${tipo}`,
+    );
+  }
+
+  fetchCargosCatalogo(): Promise<unknown[]> {
+    return this.getFromMof<unknown[]>('/cargos', 'el catálogo de cargos');
+  }
+
+  fetchUnidadDetalle(id: number): Promise<unknown> {
+    return this.getFromMof<unknown>(`/unidades/${id}`, `la unidad ${id}`);
+  }
+
+  async fetchUnidadPdf(
+    id: number,
+  ): Promise<{ pdf: Buffer; headers: Record<string, string> }> {
+    try {
+      const response = await firstValueFrom(
+        this.httpService.get<ArrayBuffer>(
+          `${this.integracionPath}/unidades/${id}/pdf`,
+          { responseType: 'arraybuffer' },
+        ),
+      );
+      const headers: Record<string, string> = {};
+      for (const name of [
+        'content-type',
+        'content-disposition',
+        'content-length',
+      ]) {
+        const value: unknown = response.headers[name];
+        if (typeof value === 'string' || typeof value === 'number') {
+          headers[name] = String(value);
+        }
+      }
+      return { pdf: Buffer.from(response.data), headers };
+    } catch (error: unknown) {
+      throw this.toProxyError(error, `el PDF de la unidad ${id}`);
     }
   }
 

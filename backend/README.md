@@ -248,7 +248,18 @@ Si el backend de MPP sirve HTTPS, cambiar `http://localhost:3000` por su URL rea
 | `GET /api/v1/integraciones/mpp/unidades` | Unidades del organigrama (`id`, `nombre`, `codigo`, `nivel`, `tipo`) |
 | `GET /api/v1/integraciones/mpp/unidades/:id/personal` | Cargos de una unidad (`id` del cargo, `descripcion`, `detalle`) |
 
-El token solo abre estas dos rutas; el resto de la API del MOF exige JWT.
+Para el organigrama del frontend, MPP también lee con el mismo token (todas de solo lectura):
+
+| Ruta del MOF | Ruta de MPP que la expone al frontend |
+|--------------|---------------------------------------|
+| `GET /api/v1/integraciones/mpp/unidades` | `GET /mof/unidades` |
+| `GET /api/v1/integraciones/mpp/unidades/:id` | `GET /mof/unidades/:id` (detalle con funciones y dependencias funcionales) |
+| `GET /api/v1/integraciones/mpp/unidades/:id/personal` | `GET /mof/unidades/:id/personal` |
+| `GET /api/v1/integraciones/mpp/unidades/:id/pdf` | `GET /mof/unidades/:id/pdf` |
+| `GET /api/v1/integraciones/mpp/cargos` | `GET /mof/cargos-catalogo` |
+| `GET /api/v1/integraciones/mpp/catalogos/{tipos,niveles,relaciones,clases}` | `GET /mof/catalogos/{tipos,niveles,relaciones,clases}` |
+
+El frontend nunca llama al MOF directamente ni conoce el token. Si el MOF no responde, estas rutas devuelven `502 Bad Gateway`; si la unidad no existe, `404`. El token solo abre las rutas de `/api/v1/integraciones/mpp`; el resto de la API del MOF exige JWT, por eso el organigrama de MPP es de solo lectura.
 
 ### Sincronización automática
 
