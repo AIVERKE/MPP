@@ -47,8 +47,8 @@ export class ExpandFigurasCatalog1785200000000 implements MigrationInterface {
       await queryRunner.query(
         `
         UPDATE "Figura"
-        SET "es_oficial" = true, "nombre" = $1
-        WHERE "codigo" = $2 AND "deleted_at" IS NULL
+        SET "es_oficial" = true, "nombre" = $1::varchar
+        WHERE "codigo" = $2::varchar AND "deleted_at" IS NULL
         `,
         [figura.nombre, figura.codigo],
       );

@@ -1091,26 +1091,28 @@
                     >
                       <defs>
                         <marker
-                          id="arrow-hist"
-                          viewBox="0 0 10 10"
-                          refX="7"
-                          refY="5"
-                          markerWidth="6"
-                          markerHeight="6"
-                          orient="auto-start-reverse"
+                          id="arrow"
+                          viewBox="0 0 12 12"
+                          refX="11"
+                          refY="6"
+                          markerWidth="9"
+                          markerHeight="9"
+                          markerUnits="userSpaceOnUse"
+                          orient="auto"
                         >
-                          <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#4f46e5" />
+                          <path d="M2 2 L11 6 L2 10 Z" fill="#4f46e5" />
                         </marker>
                         <marker
-                          id="arrow-hist-return"
-                          viewBox="0 0 10 10"
-                          refX="7"
-                          refY="5"
-                          markerWidth="6"
-                          markerHeight="6"
-                          orient="auto-start-reverse"
+                          id="arrow-return"
+                          viewBox="0 0 12 12"
+                          refX="11"
+                          refY="6"
+                          markerWidth="9"
+                          markerHeight="9"
+                          markerUnits="userSpaceOnUse"
+                          orient="auto"
                         >
-                          <path d="M 0 2 L 8 5 L 0 8 L 2 5 z" fill="#ef4444" />
+                          <path d="M2 2 L11 6 L2 10 Z" fill="#ef4444" />
                         </marker>
                       </defs>
                       <path
@@ -1121,9 +1123,10 @@
                         stroke-width="2"
                         fill="none"
                         :marker-end="
-                          path.isReturn
-                            ? 'url(#arrow-hist-return)'
-                            : 'url(#arrow-hist)'
+                          path.markerEnd ||
+                          (path.isReturn
+                            ? 'url(#arrow-return)'
+                            : 'url(#arrow)')
                         "
                       />
                     </svg>
@@ -1144,7 +1147,8 @@ import { useDisplay } from "vuetify";
 import { useRouter, useRoute } from "vue-router";
 import { useMppCoreStore } from "@/stores/mpp_core";
 import { useAuthStore } from "@/stores/auth";
-import { getFiguraVisuals } from "@/utils/figuras";
+import { resolveActionVisuals } from "@/utils/actionVisuals";
+import { buildOrthogonalPath } from "@/utils/flowGeometry";
 import axios from "axios";
 import { toPng } from "html-to-image";
 import { jsPDF } from "jspdf";
@@ -1369,6 +1373,14 @@ const loadProcedureFlow = async (procId) => {
 };
 
 // --- CÁLCULO DE CONEXIONES EN DIAGRAMA ---
+const getReturnTarget = (text) => {
+  if (!text) return null;
+  const match = text.match(
+    /(?:vuelve\s+a|vuelve\s+al|retorna\s+a|retorna\s+al|regresa\s+a|regresa\s+al|no\s*->|->|ir\s+a|paso)\s*(?:paso\s+)?(\d+)/i,
+  );
+  return match ? parseInt(match[1], 10) : null;
+};
+
 const calculateConnections = () => {
   if (!diagramContainer.value) return;
   nextTick(() => {
@@ -1394,59 +1406,42 @@ const calculateConnections = () => {
           cy,
           w: rect.width,
           h: rect.height,
-          nro: row ? row.nro : rowNro || index + 1,
+          nro: row ? Number(row.nro) : rowNro || index + 1,
           rowText: row ? row.texto_figura || row.tarea || "" : "",
+          shape: row
+            ? getActionVisuals(row.accionId)?.codigoFigura || "rectangulo"
+            : "rectangulo",
         });
       });
 
+      pts.sort((a, b) => a.nro - b.nro);
       const newPaths = [];
 
-      // Conexiones lineales ortogonales (Paso a Paso con ángulos rectos)
       for (let i = 0; i < pts.length - 1; i++) {
         const start = pts[i];
         const end = pts[i + 1];
-
-        const x1 = start.cx;
-        const y1 = start.cy + start.h / 2;
-
-        const x2 = end.cx;
-        const y2 = end.cy - end.h / 2;
-
-        let path = "";
-        if (Math.abs(x1 - x2) < 8) {
-          // Si están en la misma columna, ir recto hacia abajo
-          path = `M ${x1} ${y1} L ${x2} ${y2}`;
-        } else {
-          // Si cambian de columna, bajar a la mitad, cruzar en horizontal, y bajar hasta el destino
-          const yMid = y1 + (y2 - y1) / 2;
-          path = `M ${x1} ${y1} L ${x1} ${yMid} L ${x2} ${yMid} L ${x2} ${y2}`;
+        const returnTarget = getReturnTarget(start.rowText);
+        if (!returnTarget || returnTarget === end.nro) {
+          newPaths.push(
+            buildOrthogonalPath(start, end, {
+              type: "sequential",
+              isEditor: false,
+            }),
+          );
         }
-        newPaths.push({ path, color: "#4f46e5", isReturn: false });
       }
-
-      // Conexiones de retorno / bucle ortogonales (Por el lateral derecho)
-      const getReturnTarget = (text) => {
-        if (!text) return null;
-        const match = text.match(
-          /(?:vuelve\s+a|vuelve\s+al|retorna\s+a|retorna\s+al|regresa\s+a|regresa\s+al|no\s*->|->|ir\s+a|paso)\s*(?:paso\s+)?(\d+)/i,
-        );
-        return match ? parseInt(match[1], 10) : null;
-      };
 
       pts.forEach((start) => {
         const targetNro = getReturnTarget(start.rowText);
         if (targetNro && targetNro !== start.nro) {
           const dest = pts.find((p) => p.nro === targetNro);
           if (dest) {
-            const xStart = start.cx + start.w / 2;
-            const yStart = start.cy;
-            const xEnd = dest.cx + dest.w / 2;
-            const yEnd = dest.cy;
-
-            // Margen compartido a la derecha para subir
-            const xRight = Math.max(xStart, xEnd) + 40;
-            const path = `M ${xStart} ${yStart} L ${xRight} ${yStart} L ${xRight} ${yEnd} L ${xEnd} ${yEnd}`;
-            newPaths.push({ path, color: "#ef4444", isReturn: true });
+            newPaths.push(
+              buildOrthogonalPath(start, dest, {
+                type: "return",
+                isEditor: false,
+              }),
+            );
           }
         }
       });
@@ -1456,57 +1451,8 @@ const calculateConnections = () => {
   });
 };
 
-const getActionVisuals = (accionId) => {
-  const id = Number(accionId);
-  const accion = mppStore.acciones.find((a) => Number(a.id_accion) === id);
-  if (!accion || !accion.figura)
-    return {
-      icon: "mdi-circle",
-      color: "primary",
-      colorHex: "#6366f1",
-      codigoFigura: "rectangulo",
-    };
-
-  const { icon, codigo: codigoFigura } = getFiguraVisuals(accion.figura.codigo);
-  const nombreAccion = (accion.nombre_accion || "").toLowerCase();
-
-  let color = "primary";
-  let colorHex = "#6366f1";
-  if (
-    nombreAccion.includes("inicio") ||
-    nombreAccion.includes("empezar") ||
-    nombreAccion.includes("comenzar") ||
-    nombreAccion.includes("start")
-  ) {
-    color = "success";
-    colorHex = "#10b981";
-  } else if (
-    nombreAccion.includes("fin") ||
-    textMatchAny(nombreAccion, ["terminar", "concluir", "archivar", "end"])
-  ) {
-    color = "error";
-    colorHex = "#ef4444";
-  } else if (
-    textMatchAny(nombreAccion, [
-      "decisión",
-      "validar",
-      "aprob",
-      "revisar",
-      "control",
-      "analiz",
-      "decid",
-    ])
-  ) {
-    color = "orange-darken-2";
-    colorHex = "#f59e0b";
-  }
-
-  return { icon, color, colorHex, codigoFigura };
-};
-
-const textMatchAny = (text, list) => {
-  return list.some((item) => text.includes(item));
-};
+const getActionVisuals = (accionId) =>
+  resolveActionVisuals(mppStore.acciones, accionId);
 
 // --- GESTIÓN DE ABRIR Y SELECCIÓN EN EL DRAWER ---
 const openDetailsDrawer = async (procId) => {

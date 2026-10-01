@@ -2,7 +2,9 @@
 import { ref, onMounted } from "vue";
 import { useMppCoreStore } from "@/stores/mpp_core";
 import { FORMAS_SOPORTADAS, getFiguraVisuals } from "@/utils/figuras";
+import { getActionVisualsFromAccion } from "@/utils/actionVisuals";
 import FiguraSelect from "@/components/mpp/FiguraSelect.vue";
+import FiguraShapePreview from "@/components/mpp/FiguraShapePreview.vue";
 
 const mppStore = useMppCoreStore();
 const activeTab = ref("acciones");
@@ -120,9 +122,8 @@ const deleteFigura = async (figura) => {
   }
 };
 
-const iconForCodigo = (codigo) => getFiguraVisuals(codigo).icon;
-const formaNombre = (codigo) =>
-  FORMAS_SOPORTADAS.find((f) => f.codigo === codigo)?.nombre || codigo;
+const visualsForAccion = (accion) => getActionVisualsFromAccion(accion);
+const formaNombre = (codigo) => getFiguraVisuals(codigo).nombre;
 
 onMounted(async () => {
   await Promise.all([mppStore.fetchAcciones(), mppStore.fetchFiguras()]);
@@ -187,33 +188,42 @@ onMounted(async () => {
             <tbody>
               <tr v-for="accion in mppStore.acciones" :key="accion.id_accion">
                 <td class="font-weight-bold">{{ accion.nombre_accion }}</td>
-                <td>{{ accion.figura?.nombre || "Sin figura" }}</td>
-                <td class="text-center">
-                  <v-icon
-                    :color="
-                      accion.nombre_accion.toLowerCase().includes('inicio')
-                        ? 'success'
-                        : 'primary'
-                    "
-                  >
-                    {{ iconForCodigo(accion.figura?.codigo) }}
-                  </v-icon>
+                <td>
+                  <div class="d-flex align-center ga-3">
+                    <FiguraShapePreview
+                      v-if="accion.figura"
+                      :codigo="accion.figura.codigo"
+                      size="sm"
+                    />
+                    <span>{{ accion.figura?.nombre || "Sin figura" }}</span>
+                  </div>
+                </td>
+                <td class="text-center py-4">
+                  <div class="preview-cell">
+                    <FiguraShapePreview
+                      :codigo="visualsForAccion(accion).codigoFigura"
+                      :color-hex="visualsForAccion(accion).colorHex"
+                      size="md"
+                    />
+                  </div>
                 </td>
                 <td class="text-right">
-                  <v-btn
-                    icon="mdi-pencil"
-                    variant="text"
-                    size="small"
-                    color="info"
-                    @click="openDialog(accion)"
-                  ></v-btn>
-                  <v-btn
-                    icon="mdi-delete"
-                    variant="text"
-                    size="small"
-                    color="error"
-                    @click="deleteAccion(accion.id_accion)"
-                  ></v-btn>
+                  <div class="action-btns">
+                    <v-btn
+                      icon="mdi-pencil"
+                      variant="tonal"
+                      size="large"
+                      color="info"
+                      @click="openDialog(accion)"
+                    ></v-btn>
+                    <v-btn
+                      icon="mdi-delete"
+                      variant="tonal"
+                      size="large"
+                      color="error"
+                      @click="deleteAccion(accion.id_accion)"
+                    ></v-btn>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -242,11 +252,24 @@ onMounted(async () => {
             </thead>
             <tbody>
               <tr v-for="figura in mppStore.figuras" :key="figura.id_figura">
-                <td class="text-center">
-                  <v-icon color="primary">{{ iconForCodigo(figura.codigo) }}</v-icon>
+                <td class="text-center py-4">
+                  <div class="preview-cell">
+                    <FiguraShapePreview
+                      :codigo="figura.codigo"
+                      size="lg"
+                    />
+                  </div>
                 </td>
                 <td class="font-weight-bold">{{ figura.nombre }}</td>
-                <td>{{ formaNombre(figura.codigo) }}</td>
+                <td>
+                  <div class="d-flex align-center ga-2">
+                    <FiguraShapePreview
+                      :codigo="figura.codigo"
+                      size="sm"
+                    />
+                    <span>{{ formaNombre(figura.codigo) }}</span>
+                  </div>
+                </td>
                 <td>
                   <v-chip
                     size="small"
@@ -257,34 +280,36 @@ onMounted(async () => {
                   </v-chip>
                 </td>
                 <td class="text-right">
-                  <v-btn
-                    icon="mdi-pencil"
-                    variant="text"
-                    size="small"
-                    color="info"
-                    @click="openFiguraDialog(figura)"
-                  ></v-btn>
-                  <v-tooltip
-                    :text="
-                      figura.es_oficial
-                        ? 'Las figuras oficiales no se pueden eliminar'
-                        : 'Eliminar figura'
-                    "
-                    location="top"
-                  >
-                    <template #activator="{ props: tipProps }">
-                      <span v-bind="tipProps">
-                        <v-btn
-                          icon="mdi-delete"
-                          variant="text"
-                          size="small"
-                          color="error"
-                          :disabled="!!figura.es_oficial"
-                          @click="deleteFigura(figura)"
-                        ></v-btn>
-                      </span>
-                    </template>
-                  </v-tooltip>
+                  <div class="action-btns">
+                    <v-btn
+                      icon="mdi-pencil"
+                      variant="tonal"
+                      size="large"
+                      color="info"
+                      @click="openFiguraDialog(figura)"
+                    ></v-btn>
+                    <v-tooltip
+                      :text="
+                        figura.es_oficial
+                          ? 'Las figuras oficiales no se pueden eliminar'
+                          : 'Eliminar figura'
+                      "
+                      location="top"
+                    >
+                      <template #activator="{ props: tipProps }">
+                        <span v-bind="tipProps">
+                          <v-btn
+                            icon="mdi-delete"
+                            variant="tonal"
+                            size="large"
+                            color="error"
+                            :disabled="!!figura.es_oficial"
+                            @click="deleteFigura(figura)"
+                          ></v-btn>
+                        </span>
+                      </template>
+                    </v-tooltip>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -326,7 +351,7 @@ onMounted(async () => {
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="showFiguraDialog" max-width="500">
+    <v-dialog v-model="showFiguraDialog" max-width="520">
       <v-card class="rounded-xl pa-4">
         <v-card-title class="text-h5 font-weight-bold">
           {{ figuraMode === "create" ? "Nueva" : "Editar" }} Figura
@@ -352,23 +377,36 @@ onMounted(async () => {
             "
           >
             <template #item="{ props: itemProps, item }">
-              <v-list-item v-bind="itemProps">
+              <v-list-item v-bind="itemProps" class="forma-option">
                 <template #prepend>
-                  <v-icon class="mr-2" color="primary" size="20">
-                    {{ item.raw.icon }}
-                  </v-icon>
+                  <div class="preview-slot mr-3">
+                    <FiguraShapePreview :codigo="item.raw.codigo" size="sm" />
+                  </div>
                 </template>
               </v-list-item>
             </template>
             <template #selection="{ item }">
               <div class="d-flex align-center">
-                <v-icon class="mr-2" color="primary" size="18">
-                  {{ item.raw.icon }}
-                </v-icon>
+                <div class="preview-slot preview-slot--sm mr-2">
+                  <FiguraShapePreview :codigo="item.raw.codigo" size="sm" />
+                </div>
                 <span>{{ item.title }}</span>
               </div>
             </template>
           </v-select>
+
+          <div
+            v-if="figuraForm.codigo"
+            class="forma-preview mt-5 d-flex align-center justify-center"
+          >
+            <FiguraShapePreview :codigo="figuraForm.codigo" size="lg" />
+            <div class="ml-4">
+              <div class="text-caption text-medium-emphasis">Vista previa</div>
+              <div class="text-subtitle-1 font-weight-bold">
+                {{ formaNombre(figuraForm.codigo) }}
+              </div>
+            </div>
+          </div>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
@@ -386,3 +424,45 @@ onMounted(async () => {
     </v-dialog>
   </v-container>
 </template>
+
+<style scoped>
+.preview-cell {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-btns {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-height: 72px;
+}
+
+.preview-slot {
+  width: 48px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.preview-slot--sm {
+  width: 40px;
+  height: 40px;
+}
+
+.forma-option {
+  min-height: 60px;
+}
+
+.forma-preview {
+  padding: 18px 16px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+</style>
