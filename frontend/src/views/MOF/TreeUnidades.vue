@@ -1,15 +1,8 @@
 <script setup>
 import { ref, onMounted, computed } from "vue";
 import { useAllUnidadesMofStore } from "../../stores/unidades_mof";
-import { useAllTiposMofStore } from "@/stores/tipos_mof";
 import { useAllNivelesMofStore } from "@/stores/niveles_mof";
-import { useAllRelacionesMofStore } from "@/stores/relaciones_mof";
-import { useAllCargosMofStore } from "@/stores/cargos_mof";
 import { useAllClasesMofStore } from "@/stores/clases_mof";
-
-// Componentes modulares
-import UnidadFormDialog from "./unidades/UnidadFormDialog.vue";
-import UnidadDeleteDialog from "./unidades/UnidadDeleteDialog.vue";
 
 // --- PLUGINS & UTILS ---
 import {
@@ -19,56 +12,27 @@ import {
   highlightText,
 } from "@/utils/mofHelpers";
 
-// --- COMPOSABLES ---
-import { useUnidadForm } from "@/composables/useUnidadForm";
-
 const unidadesStore = useAllUnidadesMofStore();
-const tiposStore = useAllTiposMofStore();
 const nivelesStore = useAllNivelesMofStore();
-const relacionesStore = useAllRelacionesMofStore();
-const cargosStore = useAllCargosMofStore();
 const clasesStore = useAllClasesMofStore();
-
-// --- FORM COMPOSABLE ---
-const unitForm = useUnidadForm({
-  unidadesStore,
-  cargosStore,
-  clasesStore,
-  nivelesStore,
-  tiposStore,
-  relacionesStore,
-});
-
-const {
-  formData,
-  isEditMode,
-  formValid,
-  openForm: openUnitForm,
-  saveUnidad,
-  addFuncion,
-  updateFuncion,
-  removeFuncion,
-} = unitForm;
 
 const snackbar = ref(false);
 const snackbarText = ref("");
 const snackbarColor = ref("success");
 
-const addDialog = ref(false);
-const selectedItem = ref(null);
-const deleteDialog = ref(false);
-const itemToDelete = ref(null);
 const search = ref("");
 
 onMounted(async () => {
   await Promise.all([
     unidadesStore.getFetchUnidades(),
-    tiposStore.getFetchTipos(),
     nivelesStore.getFetchNiveles(),
-    relacionesStore.getFetchRelaciones(),
-    cargosStore.getFetchCargos(),
     clasesStore.getFetchClases(),
   ]);
+  if (unidadesStore.error) {
+    snackbarText.value = unidadesStore.error;
+    snackbarColor.value = "error";
+    snackbar.value = true;
+  }
 });
 
 function buildTree(list) {
@@ -98,68 +62,14 @@ function buildTree(list) {
 
 const treeItems = computed(() => buildTree(unidadesStore.unidades));
 
-async function editItem(item) {
-  selectedItem.value = item;
-  await openUnitForm(item, true);
-  addDialog.value = true;
-}
-
-function deleteItem(item) {
-  itemToDelete.value = item;
-  deleteDialog.value = true;
-}
-
-async function confirmDelete() {
-  const id = itemToDelete.value.id;
-  const hasChildren = unidadesStore.unidades.some((u) => {
-    let pId = null;
-    if (u.parent) {
-      pId = typeof u.parent === "object" ? u.parent.id : u.parent;
-    }
-    return String(pId) === String(id);
-  });
-  if (hasChildren) {
-    snackbarText.value = "No se puede eliminar: tiene unidades dependientes.";
+async function verReporte(id) {
+  try {
+    await unidadesStore.abrirPdfUnidad(id);
+  } catch (e) {
+    snackbarText.value = "Error al generar el PDF: " + e.message;
     snackbarColor.value = "error";
     snackbar.value = true;
-    deleteDialog.value = false;
-    return;
   }
-  await unidadesStore.deletePersonalUnidad(id);
-  await unidadesStore.deleteUnidad(id);
-  if (!unidadesStore.error) {
-    snackbarText.value = "¡Unidad eliminada!";
-    snackbarColor.value = "success";
-    deleteDialog.value = false;
-    await unidadesStore.getFetchUnidades();
-  } else {
-    snackbarText.value = "Error: " + unidadesStore.error;
-    snackbarColor.value = "error";
-  }
-  snackbar.value = true;
-}
-
-async function confirmAddItem() {
-  snackbarText.value = "Procesando...";
-  snackbarColor.value = "info";
-  snackbar.value = true;
-  const result = await saveUnidad();
-  if (result.success) {
-    addDialog.value = false;
-    snackbarText.value = "¡Operación realizada con éxito!";
-    snackbarColor.value = "success";
-    await unidadesStore.getFetchUnidades();
-  } else {
-    snackbarText.value = "Error: " + result.error;
-    snackbarColor.value = "error";
-  }
-  snackbar.value = true;
-}
-
-function openAddDialog(item) {
-  selectedItem.value = item;
-  openUnitForm(item, false);
-  addDialog.value = true;
 }
 
 const resolveClaseColor = (val) => getClaseColor(val, clasesStore.clases);
@@ -201,14 +111,6 @@ const resolveNivel = (val) => getNivelNombre(val, nivelesStore.niveles);
           clearable
         ></v-text-field>
         <v-spacer></v-spacer>
-        <v-btn
-          v-if="!unidadesStore.unidades.length"
-          color="primary"
-          prepend-icon="mdi-plus"
-          @click="openAddDialog(null)"
-        >
-          Añadir Raíz
-        </v-btn>
       </v-card-title>
 
       <v-divider></v-divider>
@@ -257,41 +159,15 @@ const resolveNivel = (val) => getNivelNombre(val, nivelesStore.niveles);
 
           <template #append="{ item }">
             <div class="d-flex align-center">
-              <v-tooltip text="Agregar Hijo" location="top">
+              <v-tooltip text="Ver reporte PDF" location="top">
                 <template v-slot:activator="{ props }">
                   <v-btn
                     v-bind="props"
-                    icon="mdi-plus"
-                    variant="text"
-                    size="x-small"
-                    color="success"
-                    @click.stop="openAddDialog(item)"
-                  ></v-btn>
-                </template>
-              </v-tooltip>
-
-              <v-tooltip text="Editar" location="top">
-                <template v-slot:activator="{ props }">
-                  <v-btn
-                    v-bind="props"
-                    icon="mdi-pencil"
-                    variant="text"
-                    size="x-small"
-                    color="orange"
-                    @click.stop="editItem(item)"
-                  ></v-btn>
-                </template>
-              </v-tooltip>
-
-              <v-tooltip text="Eliminar" location="top">
-                <template v-slot:activator="{ props }">
-                  <v-btn
-                    v-bind="props"
-                    icon="mdi-delete"
+                    icon="mdi-file-pdf-box"
                     variant="text"
                     size="x-small"
                     color="error"
-                    @click.stop="deleteItem(item)"
+                    @click.stop="verReporte(item.id)"
                   ></v-btn>
                 </template>
               </v-tooltip>
@@ -306,27 +182,6 @@ const resolveNivel = (val) => getNivelNombre(val, nivelesStore.niveles);
       </v-card-text>
     </v-card>
   </v-container>
-
-  <UnidadFormDialog
-    v-model="addDialog"
-    :form-data="formData"
-    :is-edit-mode="isEditMode"
-    :selected-node="selectedItem"
-    v-model:form-valid="formValid"
-    @confirm="confirmAddItem"
-    @add-funcion="({ funcion, baseLegal }) => addFuncion(funcion, baseLegal)"
-    @edit-funcion="
-      ({ index, funcion, baseLegal }) =>
-        updateFuncion(index, funcion, baseLegal)
-    "
-    @remove-funcion="(index) => removeFuncion(index)"
-  />
-
-  <UnidadDeleteDialog
-    v-model="deleteDialog"
-    :nombre-unidad="itemToDelete?.nombre || itemToDelete?.denominacion"
-    @confirm="confirmDelete"
-  />
 
   <v-snackbar v-model="snackbar" :color="snackbarColor" timeout="4000">{{
     snackbarText

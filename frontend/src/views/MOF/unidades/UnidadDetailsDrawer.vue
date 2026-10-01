@@ -11,7 +11,7 @@ const props = defineProps({
   getClaseNombre: Function
 });
 
-const emit = defineEmits(["update:modelValue", "edit", "reporte"]);
+const emit = defineEmits(["update:modelValue", "reporte"]);
 
 function close() {
   emit("update:modelValue", false);
@@ -118,10 +118,6 @@ function close() {
       </div>
 
       <div class="d-flex flex-column gap-1 mt-4">
-        <v-btn color="primary" block prepend-icon="mdi-pencil" size="small" @click="emit('edit', detailData.id)">
-          Editar Información
-          <v-tooltip activator="parent" location="top">Abrir formulario</v-tooltip>
-        </v-btn>
         <v-btn variant="flat" block prepend-icon="mdi-file-pdf-box" color="error" size="small" @click="emit('reporte', detailData.id)">
           Exportar PDF
           <v-tooltip activator="parent" location="top">Generar reporte oficial</v-tooltip>

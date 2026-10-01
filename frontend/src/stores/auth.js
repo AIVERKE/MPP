@@ -1,15 +1,13 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import axios from "axios";
-import { API_URL, AUTH_MODE, UMSA_TOKEN_URL } from "@/config/env";
+import { API_URL } from "@/config/env";
 
-const LOCAL_LOGIN_URL = `${API_URL}/auth/login`;
+const LOGIN_URL = `${API_URL}/auth/login`;
 const AUTH_TIMEOUT_MS = 5000;
 
 const MSG_BAD_CREDENTIALS = "Usuario o contraseña incorrectos";
 const MSG_SERVER_DOWN = "El servidor de autenticación no está disponible.";
-const MSG_REMOTE_AUTH = "Error de autenticación remota (UMSA Core).";
-const MSG_REMOTE_5XX = "Error interno en el servidor de autenticación";
 
 function withTimeout(ms) {
   const controller = new AbortController();
@@ -17,18 +15,10 @@ function withTimeout(ms) {
   return { signal: controller.signal, clear: () => clearTimeout(id) };
 }
 
-function isNetworkFailure(error) {
-  return (
-    error?.name === "AbortError" ||
-    error?.name === "TypeError" ||
-    error?.message === "Failed to fetch" ||
-    /aborted|network|fetch/i.test(error?.message || "")
-  );
-}
-
 export const useAuthStore = defineStore("auth", () => {
+  localStorage.removeItem("is_local_token");
+
   const token = ref(localStorage.getItem("token") || null);
-  const isLocalToken = ref(localStorage.getItem("is_local_token") === "true");
   const user = ref(JSON.parse(localStorage.getItem("user") || "null"));
   const isAuthenticated = computed(() => !!token.value);
 
@@ -36,11 +26,9 @@ export const useAuthStore = defineStore("auth", () => {
     axios.defaults.headers.common["Authorization"] = `Bearer ${token.value}`;
   }
 
-  function applyLocalSession(data) {
+  function applySession(data) {
     token.value = data.access_token;
-    isLocalToken.value = true;
     localStorage.setItem("token", token.value);
-    localStorage.setItem("is_local_token", "true");
 
     const roleNames = (data.user.roles || []).map((r) => r.nombre);
     user.value = {
@@ -54,156 +42,36 @@ export const useAuthStore = defineStore("auth", () => {
     axios.defaults.headers.common["Authorization"] = `Bearer ${data.access_token}`;
   }
 
-  function applyUmsaSession(data, username) {
-    token.value = data.access_token;
-    isLocalToken.value = false;
-    localStorage.setItem("token", token.value);
-    localStorage.setItem("is_local_token", "false");
-
-    user.value = {
-      username,
-      nombre: username,
-      roles: ["Usuario"],
-      rol: "Usuario",
-    };
-    localStorage.setItem("user", JSON.stringify(user.value));
-    axios.defaults.headers.common["Authorization"] = `Bearer ${data.access_token}`;
-  }
-
-  async function loginLocal(username, password) {
+  async function login(username, password) {
     const { signal, clear } = withTimeout(AUTH_TIMEOUT_MS);
+    let response;
     try {
-      const response = await fetch(LOCAL_LOGIN_URL, {
+      response = await fetch(LOGIN_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
         signal,
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        applyLocalSession(data);
-        return { ok: true };
-      }
-
-      if (response.status === 401) {
-        return { ok: false, kind: "credentials" };
-      }
-
-      return { ok: false, kind: "unavailable" };
-    } catch (error) {
-      if (isNetworkFailure(error)) {
-        return { ok: false, kind: "network" };
-      }
-      return { ok: false, kind: "unavailable" };
+    } catch {
+      throw new Error(MSG_SERVER_DOWN);
     } finally {
       clear();
     }
-  }
 
-  async function loginUmsa(username, password) {
-    const { signal, clear } = withTimeout(AUTH_TIMEOUT_MS);
-    const body = new URLSearchParams();
-    body.append("username", username);
-    body.append("password", password);
-    body.append("grant_type", "password");
-
-    try {
-      const response = await fetch(UMSA_TOKEN_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${btoa("umsacore:umsa2026")}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: body.toString(),
-        signal,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        applyUmsaSession(data, username);
-        return { ok: true };
-      }
-
-      if (response.status === 400) {
-        return { ok: false, kind: "remote_400" };
-      }
-      if (response.status === 401) {
-        return { ok: false, kind: "credentials" };
-      }
-      if (response.status >= 500) {
-        return { ok: false, kind: "remote_5xx" };
-      }
-      return { ok: false, kind: "remote_400" };
-    } catch (error) {
-      if (isNetworkFailure(error)) {
-        return { ok: false, kind: "network" };
-      }
-      return { ok: false, kind: "remote_400" };
-    } finally {
-      clear();
+    if (response.ok) {
+      applySession(await response.json());
+      return true;
     }
-  }
-
-  function throwForKind(kind) {
-    switch (kind) {
-      case "credentials":
-        throw new Error(MSG_BAD_CREDENTIALS);
-      case "remote_400":
-        throw new Error(MSG_REMOTE_AUTH);
-      case "remote_5xx":
-        throw new Error(MSG_REMOTE_5XX);
-      case "network":
-      case "unavailable":
-      default:
-        throw new Error(MSG_SERVER_DOWN);
-    }
-  }
-
-  /**
-   * Login según VITE_AUTH_MODE=local|umsa|auto (default auto).
-   * - local 401 → nunca llama a UMSA
-   * - local caído (red) en auto → intenta UMSA
-   */
-  async function login(username, password) {
-    const mode = ["local", "umsa", "auto"].includes(AUTH_MODE)
-      ? AUTH_MODE
-      : "auto";
-
-    if (mode === "umsa") {
-      const result = await loginUmsa(username, password);
-      if (result.ok) return true;
-      throwForKind(result.kind);
-    }
-
-    const localResult = await loginLocal(username, password);
-    if (localResult.ok) return true;
-
-    if (localResult.kind === "credentials") {
+    if (response.status === 401) {
       throw new Error(MSG_BAD_CREDENTIALS);
     }
-
-    // 5xx u otros status locales: no fallback a UMSA
-    if (localResult.kind === "unavailable" && mode === "auto") {
-      throw new Error(MSG_SERVER_DOWN);
-    }
-
-    if (mode === "local") {
-      throwForKind(localResult.kind);
-    }
-
-    // auto + network: intentar UMSA
-    const umsaResult = await loginUmsa(username, password);
-    if (umsaResult.ok) return true;
-    throwForKind(umsaResult.kind);
+    throw new Error(MSG_SERVER_DOWN);
   }
 
   function logout() {
     token.value = null;
     user.value = null;
-    isLocalToken.value = false;
     localStorage.removeItem("token");
-    localStorage.removeItem("is_local_token");
     localStorage.removeItem("user");
     delete axios.defaults.headers.common["Authorization"];
   }
@@ -248,7 +116,6 @@ export const useAuthStore = defineStore("auth", () => {
 
   return {
     token,
-    isLocalToken,
     isAuthenticated,
     user,
     login,

@@ -1,9 +1,9 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { UMSA_CORE_URL } from "@/config/env";
+import { getMof, mofErrorMessage } from "./mof_api";
 
 /**
- * Store para la gestión de Clases (Instancias) del MOF
+ * Store de solo lectura de las Clases (Instancias) del MOF
  */
 export const useAllClasesMofStore = defineStore(
     "clases_mof",
@@ -11,172 +11,14 @@ export const useAllClasesMofStore = defineStore(
         const clases = ref([]);
         const loading = ref(false);
         const error = ref(null);
-        
-        const API_URL = `${UMSA_CORE_URL}/api/v1/mof/clases`;
-
-        const getHeaders = () => {
-          const isLocalToken = localStorage.getItem('is_local_token') === 'true';
-          const token = localStorage.getItem('token') || '';
-          const headers = {
-            'Content-Type': 'application/json'
-          };
-          if (token && !isLocalToken) {
-            headers['Authorization'] = `Bearer ${token}`;
-          }
-          return headers;
-        };
 
         const getFetchClases = async () => {
             loading.value = true;
             error.value = null;
             try {
-                const response = await fetch(`${API_URL}?t=${Date.now()}`, { headers: getHeaders() });
-                if (!response.ok) throw new Error("Error al obtener las clases");
-                
-                const data = await response.json();
-                clases.value = data.data;
+                clases.value = await getMof("/catalogos/clases");
             } catch (err) {
-                error.value = err.message;
-            } finally {
-                loading.value = false;
-            }
-        }
-
-        const parseError = async (response) => {
-            const errorText = await response.text();
-            console.error(">>> ERROR DETALLADO DEL BACKEND:", errorText);
-            let message = "Error en la operación";
-            try {
-                const errorData = JSON.parse(errorText);
-                let backendMsg = errorData.message || errorData.data || errorData.error;
-                
-                if (!backendMsg || backendMsg === "Hay errores en la solicitud") {
-                    if (response.status === 400) {
-                        backendMsg = "No se puede realizar la acción: Existen dependencias activas en el organigrama.";
-                    }
-                }
-                message = backendMsg || message;
-            } catch (e) {
-                message = errorText || response.statusText || message;
-            }
-            return message;
-        }
-
-        const createClase = async (descripcion, color, activo = true, oficial = true) => {
-            loading.value = true;
-            error.value = null;
-            try {
-                // Probamos con booleano nativo ya que el 1/0 no parece haber funcionado.
-                const payload = { 
-                    descripcion, 
-                    color, 
-                    activo: !!activo, 
-                    oficial: !!oficial 
-                };
-                
-                console.log(">>> Enviando POST a Clases:", payload);
-
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: getHeaders(),
-                    body: JSON.stringify(payload)
-                });
-                if (!response.ok) throw new Error(await parseError(response));
-                await getFetchClases();
-                return true;
-            } catch (err) {
-                error.value = err.message;
-                return false;
-            } finally {
-                loading.value = false;
-            }
-        }
-
-        const updateClase = async (id, descripcion, color, activo = true, oficial = true) => {
-            loading.value = true;
-            error.value = null;
-            try {
-                const payload = { 
-                    descripcion, 
-                    color, 
-                    activo: !!activo, 
-                    oficial: !!oficial 
-                };
-                
-                console.log(">>> Enviando PUT a Clases (ID " + id + "):", payload);
-
-                const response = await fetch(`${API_URL}/${id}`, {
-                    method: 'PUT',
-                    headers: getHeaders(),
-                    body: JSON.stringify(payload)
-                });
-                
-                const responseClone = response.clone();
-                console.log(">>> Respuesta PUT Clases:", response.status, await responseClone.text());
-
-                if (!response.ok) throw new Error(await parseError(response));
-                await getFetchClases();
-                return true;
-            } catch (err) {
-                error.value = err.message;
-                return false;
-            } finally {
-                loading.value = false;
-            }
-        }
-
-        const deleteClase = async (id) => {
-            loading.value = true;
-            error.value = null;
-            try {
-                const response = await fetch(`${API_URL}/${id}`, {
-                    method: 'DELETE',
-                    headers: getHeaders()
-                });
-                if (!response.ok) throw new Error(await parseError(response));
-                await getFetchClases();
-                return true;
-            } catch (err) {
-                error.value = err.message;
-                return false;
-            } finally {
-                loading.value = false;
-            }
-        }
-
-        const subirClase = async (id) => {
-            loading.value = true;
-            error.value = null;
-            try {
-                const response = await fetch(`${API_URL}/${id}/subir`, {
-                    method: 'PUT',
-                    headers: getHeaders()
-                });
-                if (!response.ok) throw new Error("Error al subir la clase");
-                await getFetchClases();
-                return true;
-            } catch (err) {
-                error.value = err.message;
-                return false;
-            } finally {
-                loading.value = false;
-            }
-        }
-
-        const bajarClase = async (id) => {
-            loading.value = true;
-            error.value = null;
-            try {
-                const response = await fetch(`${API_URL}/${id}/bajar`, {
-                    method: 'PUT',
-                    headers: getHeaders()
-                });
-                if (!response.ok) throw new Error("Error al bajar la clase");
-                await getFetchClases();
-                return true;
-            } catch (err) {
-                error.value = err.message;
-                return false;
+                error.value = mofErrorMessage(err);
             } finally {
                 loading.value = false;
             }
@@ -187,11 +29,6 @@ export const useAllClasesMofStore = defineStore(
             error,
             loading,
             getFetchClases,
-            createClase,
-            updateClase,
-            deleteClase,
-            subirClase,
-            bajarClase
         }
     }
 );

@@ -1,15 +1,8 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useAllUnidadesMofStore } from '../../stores/unidades_mof'
-import { useAllTiposMofStore } from "@/stores/tipos_mof";
 import { useAllNivelesMofStore } from "@/stores/niveles_mof";
-import { useAllRelacionesMofStore } from "@/stores/relaciones_mof";
-import { useAllCargosMofStore } from "@/stores/cargos_mof";
 import { useAllClasesMofStore } from "@/stores/clases_mof";
-
-// Componentes modulares
-import UnidadFormDialog from "./unidades/UnidadFormDialog.vue";
-import UnidadDeleteDialog from "./unidades/UnidadDeleteDialog.vue";
 
 // --- PLUGINS & UTILS ---
 import {
@@ -20,42 +13,11 @@ import {
   isUnidadOficial
 } from "@/utils/mofHelpers";
 
-// --- COMPOSABLES ---
-import { useUnidadForm } from "@/composables/useUnidadForm";
-
 const unidadesStore = useAllUnidadesMofStore();
-const tiposStore = useAllTiposMofStore();
 const nivelesStore = useAllNivelesMofStore();
-const relacionesStore = useAllRelacionesMofStore();
-const cargosStore = useAllCargosMofStore();
 const clasesStore = useAllClasesMofStore();
 
-// --- FORM COMPOSABLE ---
-const unitForm = useUnidadForm({
-  unidadesStore,
-  cargosStore,
-  clasesStore,
-  nivelesStore,
-  tiposStore,
-  relacionesStore
-});
-
-const { 
-  formData, 
-  isEditMode, 
-  formValid, 
-  openForm: openUnitForm, 
-  saveUnidad,
-  addFuncion,
-  updateFuncion,
-  removeFuncion 
-} = unitForm;
-
-// Estados para diálogos y UI
 const search = ref('')
-const addDialog = ref(false)
-const deleteDialog = ref(false)
-const selectedNode = ref(null)
 const snackbar = ref(false)
 const snackbarText = ref("")
 const snackbarColor = ref("success")
@@ -107,65 +69,24 @@ const resolveClaseColor = (val) => getClaseColor(val, clasesStore.clases);
 onMounted(async () => {
   await Promise.all([
     unidadesStore.getFetchUnidades(),
-    tiposStore.getFetchTipos(),
     nivelesStore.getFetchNiveles(),
-    relacionesStore.getFetchRelaciones(),
-    cargosStore.getFetchCargos(),
     clasesStore.getFetchClases(),
   ]);
-});
-
-async function openForm(nodeId = null, edit = false) {
-  const node = nodeId ? unidadesStore.unidades.find(u => String(u.id) === String(nodeId)) : null;
-  selectedNode.value = node;
-  await openUnitForm(node, edit);
-  addDialog.value = true;
-}
-
-async function confirmAddItem() {
-  snackbarText.value = "Procesando...";
-  snackbarColor.value = "info";
-  snackbar.value = true;
-  const result = await saveUnidad();
-  if (result.success) {
-    addDialog.value = false;
-    snackbarText.value = "¡Operación realizada con éxito!";
-    snackbarColor.value = "success";
-    await unidadesStore.getFetchUnidades();
-  } else {
-    snackbarText.value = "Error: " + result.error;
-    snackbarColor.value = "error";
-  }
-  snackbar.value = true;
-}
-
-function deleteItem(item) {
-  selectedNode.value = item;
-  deleteDialog.value = true;
-}
-
-async function confirmDelete() {
-  if (!selectedNode.value) return;
-  const hasChildren = unidadesStore.unidades.some(u => String(u.parent) === String(selectedNode.value.id));
-  if (hasChildren) {
-    snackbarText.value = "No se puede eliminar: tiene unidades dependientes.";
+  if (unidadesStore.error) {
+    snackbarText.value = unidadesStore.error;
     snackbarColor.value = "error";
     snackbar.value = true;
-    deleteDialog.value = false;
-    return;
   }
-  await unidadesStore.deletePersonalUnidad(selectedNode.value.id);
-  await unidadesStore.deleteUnidad(selectedNode.value.id);
-  if (!unidadesStore.error) {
-    snackbarText.value = "¡Unidad eliminada!";
-    snackbarColor.value = "success";
-    await unidadesStore.getFetchUnidades();
-  } else {
-    snackbarText.value = "Error: " + unidadesStore.error;
+});
+
+async function verReporte(id) {
+  try {
+    await unidadesStore.abrirPdfUnidad(id);
+  } catch (e) {
+    snackbarText.value = "Error al generar el PDF: " + e.message;
     snackbarColor.value = "error";
+    snackbar.value = true;
   }
-  deleteDialog.value = false;
-  snackbar.value = true;
 }
 </script>
 
@@ -221,16 +142,6 @@ async function confirmDelete() {
             OFICIAL ESTRICTO
           </v-btn>
         </v-btn-toggle>
-        
-        <v-btn
-          color="primary"
-          prepend-icon="mdi-plus"
-          class="rounded-lg font-weight-bold"
-          @click="openForm(null, false)"
-        >
-          Nueva Unidad
-          <v-tooltip activator="parent" location="top">Registrar una nueva unidad administrativa</v-tooltip>
-        </v-btn>
       </v-card-title>
 
       <v-divider></v-divider>
@@ -297,11 +208,9 @@ async function confirmDelete() {
             <!-- Custom Slot: Acciones -->
             <td class="text-center">
               <div class="d-flex justify-center gap-1">
-                <v-btn icon variant="text" size="small" color="orange-darken-2" @click="openForm(item.id, true)">
-                  <v-icon size="20">mdi-pencil</v-icon>
-                </v-btn>
-                <v-btn icon variant="text" size="small" color="error" @click="deleteItem(item)">
-                  <v-icon size="20">mdi-delete</v-icon>
+                <v-btn icon variant="text" size="small" color="error" @click="verReporte(item.id)">
+                  <v-icon size="20">mdi-file-pdf-box</v-icon>
+                  <v-tooltip activator="parent" location="top">Ver reporte PDF</v-tooltip>
                 </v-btn>
               </div>
             </td>
@@ -309,15 +218,6 @@ async function confirmDelete() {
         </template>
       </v-data-table>
     </v-card>
-
-    <!-- COMPONENTES MODULARES -->
-    <UnidadFormDialog
-      v-model="addDialog" :form-data="formData" :is-edit-mode="isEditMode" :selected-node="selectedNode" v-model:form-valid="formValid"
-      @confirm="confirmAddItem" @add-funcion="({ funcion, baseLegal }) => addFuncion(funcion, baseLegal)"
-      @edit-funcion="({ index, funcion, baseLegal }) => updateFuncion(index, funcion, baseLegal)" @remove-funcion="(index) => removeFuncion(index)"
-    />
-
-    <UnidadDeleteDialog v-model="deleteDialog" :nombre-unidad="selectedNode?.nombre || selectedNode?.denominacion" @confirm="confirmDelete" />
 
     <v-snackbar v-model="snackbar" :color="snackbarColor" timeout="4000" class="mb-4">{{ snackbarText }}</v-snackbar>
   </v-container>

@@ -4,10 +4,21 @@ import {
   Post,
   Logger,
   Param,
+  ParseEnumPipe,
   ParseIntPipe,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
-import { MofService } from './mof.service';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiProduces,
+} from '@nestjs/swagger';
+import type { Response } from 'express';
+import { MOF_CATALOGOS, MofService } from './mof.service';
+import type { MofCatalogo } from './mof.service';
 import { MofUnidadDto } from './dto/mof-unidad.dto';
 import { MofPersonalDto } from './dto/mof-personal.dto';
 
@@ -156,5 +167,55 @@ export class MofController {
   })
   async getPersonal(@Param('id', ParseIntPipe) id: number) {
     return await this.mofService.fetchPersonalByUnidad(id);
+  }
+
+  @Get('unidades/:id/pdf')
+  @ApiOperation({
+    summary: 'Proxy al PDF de una unidad generado por el MOF',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la unidad en el MOF' })
+  @ApiProduces('application/pdf')
+  async getUnidadPdf(
+    @Param('id', ParseIntPipe) id: number,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { pdf, headers } = await this.mofService.fetchUnidadPdf(id);
+    res.set(headers);
+    return new StreamableFile(pdf);
+  }
+
+  @Get('unidades/:id')
+  @ApiOperation({
+    summary: 'Proxy al detalle de una unidad del MOF',
+    description:
+      'Incluye funciones y dependencias funcionales. No persiste nada.',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la unidad en el MOF' })
+  async getUnidad(@Param('id', ParseIntPipe) id: number) {
+    return await this.mofService.fetchUnidadDetalle(id);
+  }
+
+  @Get('cargos-catalogo')
+  @ApiOperation({
+    summary: 'Proxy al catálogo de cargos del MOF (sin persistir)',
+  })
+  async getCargosCatalogo() {
+    return await this.mofService.fetchCargosCatalogo();
+  }
+
+  @Get('catalogos/:tipo')
+  @ApiOperation({
+    summary:
+      'Proxy a un catálogo del MOF (tipos, niveles, relaciones o clases)',
+  })
+  @ApiParam({ name: 'tipo', enum: MOF_CATALOGOS })
+  async getCatalogo(
+    @Param(
+      'tipo',
+      new ParseEnumPipe(Object.fromEntries(MOF_CATALOGOS.map((c) => [c, c]))),
+    )
+    tipo: MofCatalogo,
+  ) {
+    return await this.mofService.fetchCatalogo(tipo);
   }
 }
