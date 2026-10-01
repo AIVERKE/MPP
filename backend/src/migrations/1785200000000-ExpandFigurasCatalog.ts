@@ -35,10 +35,10 @@ export class ExpandFigurasCatalog1785200000000 implements MigrationInterface {
       await queryRunner.query(
         `
         INSERT INTO "Figura" ("nombre", "codigo", "es_oficial")
-        SELECT $1, $2, true
+        SELECT $1::varchar, $2::varchar, true
         WHERE NOT EXISTS (
           SELECT 1 FROM "Figura"
-          WHERE "codigo" = $2 AND "deleted_at" IS NULL
+          WHERE "codigo" = $2::varchar AND "deleted_at" IS NULL
         )
         `,
         [figura.nombre, figura.codigo],
