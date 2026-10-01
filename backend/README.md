@@ -127,6 +127,12 @@ npm run seed -- src/database/seed-3/admin-seguridad.seeder.ts
 
 - **admin** / **Admin123!** → rol **Super admin**
 
+Para crear 3 procedimientos de ejemplo completos (matriz con varios cargos, figuras, decisiones SI/NO e Información Complementaria), reutilizando las unidades y cargos del MOF ya sincronizados. Es idempotente: regenera solo los procedimientos `PRC-DEMO-001..003` y sus procesos `PROC-DEMO-01..03`.
+
+```bash
+npm run seed -- src/database/seed-4/procedimientos-demo.seeder.ts
+```
+
 ## 🚀 Ejecución del Proyecto
 
 ```bash
