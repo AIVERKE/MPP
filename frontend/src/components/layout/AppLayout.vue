@@ -91,7 +91,6 @@ onUnmounted(() => {
 
 const isLoginPage = computed(() => route.path === "/login");
 const isMofActive = computed(() => route.path.startsWith("/mof"));
-const isMppActive = computed(() => route.path.startsWith("/mpp") || route.path === "/configuracion");
 const userName = computed(() => authStore.user?.nombre || "Usuario");
 const userInitials = computed(() => {
   const name = authStore.user?.nombre || "U";
@@ -192,6 +191,7 @@ const handleLogout = async () => {
             title="Usuarios"
             to="/usuarios"
           ></v-list-item>
+          <!--
           <v-list-group
             v-if="!isSoloConsultor"
             class="no-indent"
@@ -219,6 +219,7 @@ const handleLogout = async () => {
               to="/mof/arbol-unidades"
             ></v-list-item>
           </v-list-group>
+          -->
 
           <v-list-group
             class="no-indent"
@@ -354,38 +355,6 @@ const handleLogout = async () => {
             prepend-icon="mdi-tree"
             title="Árbol de Unidades"
             to="/mof/arbol-unidades"
-          ></v-list-item>
-        </v-list>
-      </v-menu>
-
-      <!-- Pop-up desplegable para MPP -->
-      <v-menu location="top" offset="12">
-        <template #activator="{ props }">
-          <v-btn v-bind="props" value="mpp" :color="isMppActive ? 'primary' : undefined">
-            <v-icon size="24">mdi-file-document-multiple</v-icon>
-            <span class="text-caption font-weight-medium">MPP</span>
-          </v-btn>
-        </template>
-        <v-list density="compact" rounded="lg" class="elevation-8 py-2" min-width="250">
-          <v-list-subheader class="font-weight-bold text-uppercase text-primary text-caption px-4">
-            Módulo MPP
-          </v-list-subheader>
-          <v-list-item
-            v-if="canEditMpp"
-            prepend-icon="mdi-sitemap"
-            title="Generador de Procesos"
-            to="/mpp/gestion-mpp"
-          ></v-list-item>
-          <v-list-item
-            prepend-icon="mdi-history"
-            title="Historial y Relaciones"
-            to="/mpp/historial-mpp"
-          ></v-list-item>
-          <v-list-item
-            v-if="!isSoloConsultor"
-            prepend-icon="mdi-cog"
-            title="Configuración de Figuras"
-            to="/configuracion"
           ></v-list-item>
         </v-list>
       </v-menu>
