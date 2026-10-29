@@ -4,24 +4,35 @@
  mail: jperezbenavides@gmail.com
  -->
 <script setup>
-import { ref, computed, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useTheme, useDisplay } from "vuetify";
+import { useThemeStore } from "@/stores/theme";
 
 const route = useRoute();
 const router = useRouter();
 const theme = useTheme();
-const { smAndDown } = useDisplay();
-const drawer = ref(true);
 const authStore = useAuthStore();
+const themeStore = useThemeStore();
+const { mdAndDown, smAndDown } = useDisplay();
+
 const isSoloConsultor = computed(() => authStore.isSoloConsultor);
 const canEditMpp = computed(() => authStore.canEditMpp);
 const isSuperAdmin = computed(() => authStore.hasRole('Super admin'));
 
-const toggleTheme = () => {
-  theme.global.name.value = theme.global.current.value.dark ? "light" : "dark";
-};
+// En móvil y tablet (mdAndDown) inicia colapsado, en desktop abierto
+const drawer = ref(!mdAndDown.value);
+
+watch(mdAndDown, (val) => {
+  if (val) drawer.value = false;
+});
+
+onMounted(() => {
+  if (themeStore.currentTheme && theme?.global) {
+    theme.global.name.value = themeStore.currentTheme;
+  }
+});
 
 // --- Lógica de Redimensionamiento ---
 const drawerWidth = ref(260);
@@ -87,10 +98,8 @@ onUnmounted(() => {
   stopResizing();
   stopResizingTouch();
 });
-// ------------------------------------
 
 const isLoginPage = computed(() => route.path === "/login");
-const isMofActive = computed(() => route.path.startsWith("/mof"));
 const userName = computed(() => authStore.user?.nombre || "Usuario");
 const userInitials = computed(() => {
   const name = authStore.user?.nombre || "U";
@@ -107,11 +116,15 @@ const handleLogout = async () => {
   await router.push("/login");
 };
 </script>
+
 <template>
-  <v-app style="height: 100vh; overflow: hidden;">
+  <v-app>
     <!-- Barra superior -->
-    <v-app-bar v-if="!isLoginPage" height="70" style="position: fixed; top: 0; z-index: 1005;">
-      <v-app-bar-nav-icon v-if="!smAndDown" @click="drawer = !drawer"></v-app-bar-nav-icon>
+    <v-app-bar v-if="!isLoginPage" height="70" role="banner" aria-label="Barra de herramientas superior">
+      <v-app-bar-nav-icon
+        aria-label="Alternar menú lateral"
+        @click="drawer = !drawer"
+      ></v-app-bar-nav-icon>
       <v-app-bar-title>
         <v-icon color="primary" size="32" class="mr-2"
           >mdi-file-document-multiple</v-icon
@@ -120,17 +133,61 @@ const handleLogout = async () => {
       </v-app-bar-title>
       <v-spacer></v-spacer>
 
-      <!-- Icono de Tema (Dark/Light) -->
-      <v-btn icon variant="text" class="mr-2" @click="toggleTheme">
-        <v-icon>{{
-          theme.global.current.value.dark
-            ? "mdi-weather-sunny"
-            : "mdi-weather-night"
-        }}</v-icon>
-        <v-tooltip activator="parent" location="bottom">
-          Cambiar a modo
-          {{ theme.global.current.value.dark ? "claro" : "oscuro" }}
-        </v-tooltip>
+      <!-- Menú Selector de 5 Temas y Accesibilidad Daltónica -->
+      <v-menu location="bottom end" transition="scale-transition">
+        <template v-slot:activator="{ props }">
+          <v-btn
+            icon
+            variant="text"
+            v-bind="props"
+            class="mr-2"
+            aria-label="Seleccionar tema visual y accesibilidad"
+          >
+            <v-icon :color="themeStore.isColorblind ? 'warning' : 'primary'">
+              {{ themeStore.activeThemeInfo.icon }}
+            </v-icon>
+            <v-tooltip activator="parent" location="bottom">
+              Tema: {{ themeStore.activeThemeInfo.name }}
+            </v-tooltip>
+          </v-btn>
+        </template>
+        <v-list density="compact" elevation="4" class="rounded-lg py-1" min-width="230" role="menu">
+          <v-list-subheader class="font-weight-black text-uppercase text-caption">
+            Temas y Accesibilidad
+          </v-list-subheader>
+          <v-list-item
+            v-for="t in themeStore.themeList"
+            :key="t.id"
+            :value="t.id"
+            :class="{ 'bg-primary-lighten-5 font-weight-bold text-primary': themeStore.currentTheme === t.id }"
+            class="cursor-pointer"
+            role="menuitem"
+            @click="themeStore.setTheme(t.id, theme)"
+          >
+            <template v-slot:prepend>
+              <v-icon :color="themeStore.currentTheme === t.id ? 'primary' : 'grey-darken-1'" class="mr-2">
+                {{ t.icon }}
+              </v-icon>
+            </template>
+            <v-list-item-title class="font-weight-bold text-caption">
+              {{ t.name }}
+            </v-list-item-title>
+            <v-list-item-subtitle style="font-size: 10px;">
+              {{ t.desc }}
+            </v-list-item-subtitle>
+            <template v-slot:append v-if="themeStore.currentTheme === t.id">
+              <v-icon color="primary" size="16">mdi-check</v-icon>
+            </template>
+          </v-list-item>
+        </v-list>
+      </v-menu>
+
+      <!-- Notificaciones -->
+      <v-btn icon variant="text" class="mr-2" aria-label="Notificaciones">
+        <v-icon>mdi-bell-outline</v-icon>
+        <v-tooltip activator="parent" location="bottom"
+          >Notificaciones</v-tooltip
+        >
       </v-btn>
 
       <!-- Menú de usuario con iniciales -->
@@ -169,16 +226,17 @@ const handleLogout = async () => {
       </v-menu>
     </v-app-bar>
 
-    <!-- Sidebar de navegación Fijo (solo en desktop) -->
+    <!-- Sidebar de navegación -->
     <v-navigation-drawer
-      v-if="!isLoginPage && !smAndDown"
+      v-if="!isLoginPage"
       v-model="drawer"
       app
-      :width="actualDrawerWidth"
+      :temporary="mdAndDown"
+      :permanent="!mdAndDown"
+      :width="mdAndDown ? Math.min(280, actualDrawerWidth) : actualDrawerWidth"
       class="resizable-drawer"
     >
-      <div class="pa-2 overflow-y-auto flex-grow-1">
-        <div class="sidebar-section-title">Menú</div>
+      <div class="pa-2">
         <v-list density="compact" nav>
           <v-list-item
             prepend-icon="mdi-view-dashboard"
@@ -191,35 +249,6 @@ const handleLogout = async () => {
             title="Usuarios"
             to="/usuarios"
           ></v-list-item>
-          <!--
-          <v-list-group
-            v-if="!isSoloConsultor"
-            class="no-indent"
-            prepend-icon="mdi-package-variant"
-            value="MOF"
-          >
-            <template #activator="{ props }">
-              <v-list-item v-bind="props" title="MOF"></v-list-item>
-            </template>
-            <v-list-item
-              prepend-icon="mdi-sitemap"
-              title="ESTRUCTURA ORGANIZACIONAL"
-              to="/mof/organigrama-unidades"
-            ></v-list-item>
-            <v-list-item
-              prepend-icon="mdi-list-box"
-              title="LISTAR UNIDADES"
-              to="/mof/listar-unidades"
-            >
-            </v-list-item>
-
-            <v-list-item
-              prepend-icon="mdi-tree"
-              title="ARBOL DE UNIDADES"
-              to="/mof/arbol-unidades"
-            ></v-list-item>
-          </v-list-group>
-          -->
 
           <v-list-group
             class="no-indent"
@@ -247,6 +276,7 @@ const handleLogout = async () => {
               to="/configuracion"
             ></v-list-item>
           </v-list-group>
+
           <v-list-item
             v-if="!isSoloConsultor"
             prepend-icon="mdi-shield-account-outline"
@@ -254,12 +284,11 @@ const handleLogout = async () => {
             to="/auditoria"
           ></v-list-item>
         </v-list>
-        <div class="sidebar-section-title">Sección</div>
       </div>
 
       <template v-slot:append>
         <v-divider></v-divider>
-        <div class="pa-4 bg-surface" style="border-top: 1px solid var(--color-border)">
+        <div class="pa-4" style="border-top: 1px solid var(--mof-border-nav)">
           <v-list-item
             class="px-2"
             @click="handleLogout"
@@ -283,98 +312,60 @@ const handleLogout = async () => {
         </div>
       </template>
 
-      <!-- Manejador para redimensionar -->
+      <!-- Manejador para redimensionar (solo en escritorio) -->
       <div
+        v-if="!mdAndDown"
         class="resize-handle"
         @mousedown="startResizing"
         @touchstart="startResizingTouch"
       ></div>
     </v-navigation-drawer>
 
-    <!-- Contenido principal con Scroll Independiente -->
-    <v-main
-      :style="{
-        paddingTop: '70px',
-        paddingBottom: smAndDown ? '64px' : '0px',
-        height: '100vh',
-        overflowY: 'auto',
-        overflowX: 'hidden'
-      }"
-    >
+    <!-- Contenido principal -->
+    <v-main>
       <v-container
         fluid
         :class="isLoginPage ? 'pa-0' : 'pa-6'"
-        style="min-height: calc(100vh - 70px); max-width: 100%; overflow-x: hidden;"
+        :style="smAndDown && !isLoginPage ? 'padding-bottom: 76px !important;' : ''"
+        class="fill-height"
       >
         <router-view />
       </v-container>
     </v-main>
 
-    <!-- Bottom Navigation Mobile (Estilo Instagram con Submenús Flotantes) -->
+    <!-- Barra de navegación inferior táctil para dispositivos móviles (xs/sm) -->
     <v-bottom-navigation
-      v-if="!isLoginPage && smAndDown"
-      active
+      v-if="smAndDown && !isLoginPage"
       grow
+      fixed
       color="primary"
-      class="instagram-bottom-nav"
-      elevation="6"
+      elevation="8"
+      class="border-t"
+      density="comfortable"
     >
       <v-btn to="/" value="dashboard">
-        <v-icon size="24">mdi-view-dashboard</v-icon>
-        <span class="text-caption font-weight-medium">Dashboard</span>
+        <v-icon size="20">mdi-view-dashboard</v-icon>
+        <span style="font-size: 10px;">Inicio</span>
       </v-btn>
-
       <v-btn v-if="isSuperAdmin" to="/usuarios" value="usuarios">
-        <v-icon size="24">mdi-account-multiple</v-icon>
-        <span class="text-caption font-weight-medium">Usuarios</span>
+        <v-icon size="20">mdi-account-multiple</v-icon>
+        <span style="font-size: 10px;">Usuarios</span>
       </v-btn>
-
-      <!-- Pop-up desplegable para MOF -->
-      <v-menu v-if="!isSoloConsultor" location="top" offset="12">
-        <template #activator="{ props }">
-          <v-btn v-bind="props" value="mof" :color="isMofActive ? 'primary' : undefined">
-            <v-icon size="24">mdi-package-variant</v-icon>
-            <span class="text-caption font-weight-medium">MOF</span>
-          </v-btn>
-        </template>
-        <v-list density="compact" rounded="lg" class="elevation-8 py-2" min-width="230">
-          <v-list-subheader class="font-weight-bold text-uppercase text-primary text-caption px-4">
-            Módulo MOF
-          </v-list-subheader>
-          <v-list-item
-            prepend-icon="mdi-sitemap"
-            title="Estructura Organizacional"
-            to="/mof/organigrama-unidades"
-          ></v-list-item>
-          <v-list-item
-            prepend-icon="mdi-list-box"
-            title="Listar Unidades"
-            to="/mof/listar-unidades"
-          ></v-list-item>
-          <v-list-item
-            prepend-icon="mdi-tree"
-            title="Árbol de Unidades"
-            to="/mof/arbol-unidades"
-          ></v-list-item>
-        </v-list>
-      </v-menu>
-
-      <v-btn v-if="!isSoloConsultor" to="/auditoria" value="auditoria">
-        <v-icon size="24">mdi-shield-account-outline</v-icon>
-        <span class="text-caption font-weight-medium">Auditoría</span>
+      <v-btn to="/mpp/gestion-mpp" value="mpp">
+        <v-icon size="20">mdi-sitemap</v-icon>
+        <span style="font-size: 10px;">MPP</span>
+      </v-btn>
+      <v-btn to="/mpp/historial-mpp" value="historial">
+        <v-icon size="20">mdi-history</v-icon>
+        <span style="font-size: 10px;">Historial</span>
       </v-btn>
     </v-bottom-navigation>
   </v-app>
 </template>
+
 <style scoped>
 .resizable-drawer {
-  position: fixed !important;
-  top: 70px !important;
-  height: calc(100vh - 70px) !important;
-  z-index: 1004;
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: space-between !important;
+  position: relative;
   transition: none !important;
 }
 
@@ -394,17 +385,5 @@ const handleLogout = async () => {
 .resize-handle:active {
   background: rgba(var(--v-theme-primary), 0.3);
   width: 6px;
-}
-
-.instagram-bottom-nav {
-  position: fixed !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  z-index: 1005;
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05) !important;
 }
 </style>

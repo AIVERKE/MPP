@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, onMounted, onUnmounted, watch, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useMppCoreStore } from "@/stores/mpp_core";
@@ -482,7 +482,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <v-container fluid class="pa-0 fill-height bg-slate-50 overflow-hidden d-flex flex-column">
+  <v-container fluid class="pa-0 fill-height overflow-hidden d-flex flex-column">
     <!-- PANTALLA 1: GESTIÓN POR PASOS INTEGRADA FULL-WIDTH -->
     <template v-if="currentScreen === 'setup'">
       <!-- HEADER CORPORATIVO FULL-WIDTH -->
@@ -824,7 +824,7 @@ onUnmounted(() => {
                     <div class="text-caption font-weight-bold text-grey-darken-1 text-uppercase mb-1">Responsables y Unidades</div>
                     <div v-if="selectedCargoObj || selectedUnidadesObjs.length > 0">
                       <div v-if="selectedCargoObj" class="d-flex align-center mb-2">
-                        <v-icon color="indigo-darken-1" size="20" class="mr-2">mdi-account-tie</v-icon>
+                        <v-icon color="primary" size="20" class="mr-2">mdi-account-tie</v-icon>
                         <div>
                           <div class="font-weight-bold text-body-2 text-slate-900">{{ getItemTitle(selectedCargoObj) }}</div>
                           <div class="text-caption text-grey-darken-1 font-italic">{{ selectedCargoObj.nombre_unidad_display }}</div>
@@ -953,11 +953,11 @@ onUnmounted(() => {
   transition: all 0.2s ease-in-out;
 }
 .step-pipeline-item:hover {
-  border-color: #6366f1;
+  border-color: var(--mof-turquesa);
   background-color: #f8fafc;
 }
 .border-primary-active {
-  border: 2px solid #6366f1 !important;
+  border: 2px solid var(--mof-turquesa) !important;
 }
 .border-subtle {
   border: 1px solid #e2e8f0 !important;

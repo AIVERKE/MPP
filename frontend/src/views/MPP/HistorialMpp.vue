@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <v-container
     fluid
     class="pa-6 fill-height bg-slate-50 overflow-y-auto align-start"
@@ -1100,7 +1100,7 @@
                           markerUnits="userSpaceOnUse"
                           orient="auto"
                         >
-                          <path d="M2 2 L11 6 L2 10 Z" fill="#4f46e5" />
+                          <path d="M2 2 L11 6 L2 10 Z" fill="#028191" />
                         </marker>
                         <marker
                           id="arrow-return"
@@ -1995,10 +1995,10 @@ onUnmounted(() => {
   min-height: 100vh;
 }
 .border-top-primary {
-  border-top: 8px solid #6366f1 !important;
+  border-top: 8px solid var(--mof-petroleo) !important;
 }
 .border-left-primary {
-  border-left: 8px solid #6366f1 !important;
+  border-left: 8px solid var(--mof-petroleo) !important;
 }
 .border-right {
   border-right: 1px solid #e0e0e0;
@@ -2012,8 +2012,8 @@ onUnmounted(() => {
 }
 :deep(.version-select-custom .v-field) {
   border-radius: 12px !important;
-  background-color: #eef2ff !important;
-  border: 1px solid #c7d2fe !important;
+  background-color: rgba(2, 129, 145, 0.08) !important;
+  border: 1px solid rgba(2, 129, 145, 0.25) !important;
   box-shadow: none !important;
   padding-inline-start: 10px !important;
   padding-inline-end: 6px !important;
@@ -2022,8 +2022,8 @@ onUnmounted(() => {
   transition: all 0.2s ease-in-out;
 }
 :deep(.version-select-custom .v-field:hover) {
-  border-color: #818cf8 !important;
-  background-color: #e0e7ff !important;
+  border-color: var(--mof-turquesa) !important;
+  background-color: rgba(2, 129, 145, 0.15) !important;
 }
 :deep(.version-select-custom .v-field__input) {
   min-height: 34px !important;
@@ -2038,7 +2038,7 @@ onUnmounted(() => {
   align-items: center !important;
 }
 :deep(.version-select-custom .v-field__append-inner .v-icon) {
-  color: #4f46e5 !important;
+  color: var(--mof-turquesa) !important;
   font-size: 18px !important;
   opacity: 0.9 !important;
 }

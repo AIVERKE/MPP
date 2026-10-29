@@ -1,5 +1,5 @@
-<template>
-  <div class="fill-height overflow-y-auto pa-6 d-flex justify-center align-center w-100 bg-slate-50">
+﻿<template>
+  <div class="fill-height overflow-y-auto pa-6 d-flex justify-center align-center w-100">
     <v-card
       class="rounded-xl border-top-primary overflow-hidden elevation-12 w-100 my-4"
       max-width="1100"
@@ -985,7 +985,7 @@ const showNotification = (text, color = "success") => {
 </script>
 
 <style scoped>
-.border-top-primary { border-top: 8px solid #6366f1 !important; }
+.border-top-primary { border-top: 8px solid var(--mof-petroleo) !important; }
 .transition-all {
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }

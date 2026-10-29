@@ -1,24 +1,24 @@
-import { getFiguraVisuals } from '@/utils/figuras';
+﻿import { getFiguraVisuals } from '@/utils/figuras';
 
 /** Paleta suave y única por verbo (legible con texto blanco en el flujo). */
 const ACCION_PALETTE = [
   { match: ['inicio', 'empezar', 'comenzar', 'start'], color: 'success', colorHex: '#34d399' },
   { match: ['fin', 'terminar', 'concluir', 'archivar', 'end'], color: 'error', colorHex: '#f87171' },
-  { match: ['notificar'], color: 'deep-purple', colorHex: '#a78bfa' },
-  { match: ['enviar'], color: 'indigo', colorHex: '#818cf8' },
+  { match: ['notificar'], color: 'deep-purple', colorHex: '#3C6893' },
+  { match: ['enviar'], color: 'indigo', colorHex: '#028191' },
   { match: ['recibir'], color: 'cyan', colorHex: '#22d3ee' },
   { match: ['aprob'], color: 'teal', colorHex: '#2dd4bf' },
   { match: ['revisar'], color: 'amber', colorHex: '#fbbf24' },
   { match: ['analiz'], color: 'orange', colorHex: '#fb923c' },
   { match: ['verificar', 'validar'], color: 'blue', colorHex: '#60a5fa' },
-  { match: ['registrar'], color: 'violet', colorHex: '#c084fc' },
+  { match: ['registrar'], color: 'violet', colorHex: '#1A4756' },
   { match: ['ejecutar'], color: 'blue-grey', colorHex: '#94a3b8' },
   { match: ['control'], color: 'pink', colorHex: '#f472b6' },
   { match: ['decisión', 'decid'], color: 'amber-darken-2', colorHex: '#f59e0b' },
 ];
 
 const FALLBACK_HEX = [
-  '#818cf8',
+  '#028191',
   '#38bdf8',
   '#2dd4bf',
   '#a3e635',
@@ -26,7 +26,7 @@ const FALLBACK_HEX = [
   '#fb923c',
   '#f87171',
   '#f472b6',
-  '#c084fc',
+  '#1A4756',
   '#94a3b8',
 ];
 
@@ -48,7 +48,7 @@ export function getActionVisualsFromAccion(accion) {
     return {
       icon: 'mdi-checkbox-blank-circle',
       color: 'primary',
-      colorHex: '#6366f1',
+      colorHex: '#028191',
       codigoFigura: 'rectangulo',
     };
   }

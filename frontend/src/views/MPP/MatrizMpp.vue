@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from "vue";
 import { useDisplay } from "vuetify";
 import { useMppCoreStore } from "@/stores/mpp_core";
@@ -2028,7 +2028,7 @@ watch(
             markerUnits="userSpaceOnUse"
             orient="auto"
           >
-            <path d="M2 2 L11 6 L2 10 Z" fill="#4f46e5" />
+            <path d="M2 2 L11 6 L2 10 Z" fill="#028191" />
           </marker>
           <marker
             id="editor-arrow-return"
@@ -2721,7 +2721,7 @@ watch(
                     markerUnits="userSpaceOnUse"
                     orient="auto"
                   >
-                    <path d="M2 2 L11 6 L2 10 Z" fill="#4f46e5" />
+                    <path d="M2 2 L11 6 L2 10 Z" fill="#028191" />
                   </marker>
                   <marker
                     id="arrow-return"
@@ -2831,7 +2831,7 @@ watch(
 }
 .cell-textarea:focus {
   background: #fff;
-  box-shadow: inset 0 0 0 1px #6366f1;
+  box-shadow: inset 0 0 0 1px var(--mof-turquesa);
 }
 
 .cell-input-number {
@@ -2871,13 +2871,13 @@ watch(
 }
 
 .border-left-bold {
-  border-left: 2px solid #3949ab !important;
+  border-left: 2px solid var(--mof-petroleo) !important;
 }
 
 .swimlane-header {
   background: #fdfdfd !important;
-  border-bottom: 2px solid #6366f1 !important;
-  color: #6366f1 !important;
+  border-bottom: 2px solid var(--mof-turquesa) !important;
+  color: var(--mof-turquesa) !important;
   font-size: 0.6rem !important;
 }
 .cargo-header {
@@ -2946,7 +2946,7 @@ watch(
   border: none;
   outline: none;
   font-size: 0.58rem;
-  color: #4f46e5;
+  color: #028191;
   background: transparent;
   font-family: inherit;
   padding: 1px 0;
@@ -2957,7 +2957,7 @@ watch(
   font-weight: normal;
 }
 .texto-figura-input-native:focus {
-  color: #4f46e5;
+  color: #028191;
   background: #f8fafc;
 }
 

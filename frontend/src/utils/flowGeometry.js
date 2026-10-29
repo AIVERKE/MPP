@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Anclas y rutas ortogonales para el diagrama de flujo MPP.
  * Las formas usan getBoundingClientRect (AABB); el rombo rotado
  * tiene vértices en los centros de los lados del AABB.
@@ -70,7 +70,7 @@ export function buildOrthogonalPath(start, end, options = {}) {
   const { type = 'sequential', isEditor = false } = options;
   const prefix = isEditor ? 'editor-' : '';
 
-  let color = '#4f46e5';
+  let color = '#028191';
   let markerEnd = `url(#${prefix}arrow)`;
   let isReturn = false;
 
