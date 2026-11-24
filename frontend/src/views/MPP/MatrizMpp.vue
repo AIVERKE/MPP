@@ -5,6 +5,8 @@ import { useMppCoreStore } from "@/stores/mpp_core";
 import { resolveActionVisuals } from "@/utils/actionVisuals";
 import { buildOrthogonalPath } from "@/utils/flowGeometry";
 import FiguraSelect from "@/components/mpp/FiguraSelect.vue";
+import FiguraShapePreview from "@/components/mpp/FiguraShapePreview.vue";
+import { rules } from "@/utils/rules";
 import { toPng } from "html-to-image";
 import { jsPDF } from "jspdf";
 
@@ -34,6 +36,23 @@ const showCreateAction = ref(false);
 const newActionName = ref("");
 const newActionFiguraId = ref(null);
 const isSavingAction = ref(false);
+
+const selectedFiguraObj = computed(() => {
+  if (!newActionFiguraId.value) return null;
+  return mppStore.figuras.find((f) => f.id_figura === Number(newActionFiguraId.value)) || null;
+});
+
+const selectedFiguraCodigo = computed(() => {
+  return selectedFiguraObj.value?.codigo || "rectangulo";
+});
+
+const selectedFiguraNombre = computed(() => {
+  return selectedFiguraObj.value?.nombre || "Sin figura";
+});
+
+const selectedFiguraVisuals = computed(() => {
+  return !!selectedFiguraObj.value;
+});
 
 // Panel IF/ELSE para tareas con figura Rombo
 const showCondicionPanel = ref(false);
@@ -284,7 +303,17 @@ const handleCellClick = (row, cargoId) => {
 const adjustHeight = (e) => {
   const el = e.target;
   el.style.height = "auto";
-  el.style.height = el.scrollHeight + "px";
+  el.style.height = Math.max(el.scrollHeight, 36) + "px";
+};
+
+const autoResizeAllTextareas = () => {
+  nextTick(() => {
+    const textareas = document.querySelectorAll(".cell-textarea");
+    textareas.forEach((el) => {
+      el.style.height = "auto";
+      el.style.height = Math.max(el.scrollHeight, 36) + "px";
+    });
+  });
 };
 
 // --- CÁLCULO DE COLUMNAS DINÁMICAS (Swimlanes Agrupados por Unidad + Cargo) ---
@@ -1245,6 +1274,7 @@ onMounted(async () => {
     nextTick(() => {
       isHydrating.value = false; // APAGAR ESCUDO
       calculateEditorConnections();
+      autoResizeAllTextareas();
     });
   }
 });
@@ -1624,109 +1654,136 @@ watch(
     </v-card>
   </div>
 
-  <div v-else class="matrix-designer fill-height d-flex flex-column bg-surface" style="width: 100%; max-width: 100%; overflow: hidden;">
-    <!-- ÁREA DE LA MATRIZ Y TOOLBAR EN UN SOLO CONTENEDOR CON SCROLL UNIFICADO -->
-    <div class="flex-grow-1 pa-2 bg-slate-50 overflow-x-auto" ref="matrixEditorContainer" style="width: 100%; max-width: 100%; overflow-x: auto; overflow-y: auto; box-sizing: border-box; -webkit-overflow-scrolling: touch;">
-      <div class="editor-scroll-wrapper" style="position: relative; display: inline-block; min-width: 1200px; width: max-content;">
-        
-        <!-- TOOLBAR SUPERIOR (DENTRO DEL SCROLL WRAPPER, PEGAJOSO EN SCROLL VERTICAL) -->
-        <v-toolbar
-          density="compact"
-          color="surface"
-          border
-          class="px-4 mb-2 rounded-lg flex-shrink-0"
-          style="position: sticky; top: 0; z-index: 10; min-width: 100%;"
-        >
-          <v-btn icon="mdi-arrow-left" variant="text" @click="emit('back')"></v-btn>
-          <v-divider vertical class="mx-2"></v-divider>
-          <div class="d-flex flex-column">
-            <span class="text-subtitle-2 font-weight-bold uppercase">{{
-              procesoNombre
-            }}</span>
-            <div class="d-flex align-center ga-1 mt-n1">
-              <span class="text-caption text-grey-darken-1">{{
-                procedimientoNombre
-              }}</span>
-              <v-chip size="x-small" color="primary" variant="tonal" class="font-weight-bold ml-1">
-                v{{ procedimientoVersion }}
-              </v-chip>
-              <v-chip size="x-small" :color="estadoVersionColor" variant="tonal" class="font-weight-bold uppercase">
-                {{ procedimientoEstadoVersion }}
-              </v-chip>
-            </div>
-          </div>
-          <v-spacer></v-spacer>
-
-          <v-select
-            :model-value="procedimientoEstadoVersion"
-            :items="['Borrador', 'En Revisión', 'Aprobado', 'Obsoleto']"
-            label="Estado de Versión"
-            density="compact"
-            variant="solo-filled"
-            hide-details
-            style="max-width: 170px;"
-            class="mr-2 rounded-lg"
-            @update:model-value="changeEstadoVersion"
-          ></v-select>
-
+  <div v-else class="matrix-designer fill-height d-flex flex-column bg-transparent" style="width: 100%; max-width: 100%; overflow: hidden;">
+    <!-- TOOLBAR SUPERIOR CORPORATIVO (ESTÁNDAR MOF - AMPLIO, HOMOLOGADO Y SIEMPRE VISIBLE) -->
+    <v-card elevation="2" class="ma-3 mb-2 rounded-xl border pa-4 bg-white flex-shrink-0 overflow-hidden">
+      <!-- Fila 1: Identificación y Estado -->
+      <div class="d-flex align-center justify-space-between flex-wrap ga-3">
+        <div class="d-flex align-center ga-3">
           <v-btn
+            icon="mdi-arrow-left"
             variant="tonal"
             color="primary"
-            @click="showCreateAction = true"
+            size="small"
+            class="rounded-lg"
+            @click="emit('back')"
+            title="Volver a Configuración"
+          ></v-btn>
+          <v-divider vertical class="my-1"></v-divider>
+          <v-avatar color="primary-lighten-5" class="rounded-lg" size="40">
+            <v-icon color="primary" size="22">mdi-matrix</v-icon>
+          </v-avatar>
+          <div>
+            <div class="text-subtitle-1 font-weight-bold text-slate-800 leading-tight uppercase">
+              {{ procesoNombre }}
+            </div>
+            <div class="d-flex align-center ga-2 mt-0.5">
+              <span class="text-caption text-grey-darken-1">{{ procedimientoNombre }}</span>
+              <v-chip size="x-small" color="primary" variant="tonal" class="font-weight-bold">v{{ procedimientoVersion }}</v-chip>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex align-center ga-3">
+          <v-chip v-if="lastSaved" size="small" color="success" variant="tonal" class="font-weight-bold text-uppercase">
+            <v-icon start size="14">mdi-check-circle</v-icon>
+            Sincronizado: {{ lastSaved }}
+          </v-chip>
+
+          <div class="d-flex align-center ga-2">
+            <span class="text-caption font-weight-bold text-uppercase text-grey-darken-1">Estado:</span>
+            <v-select
+              :model-value="procedimientoEstadoVersion"
+              :items="['Borrador', 'En Revisión', 'Aprobado', 'Obsoleto']"
+              density="compact"
+              variant="outlined"
+              hide-details
+              style="min-width: 145px; max-width: 160px;"
+              class="rounded-lg"
+              @update:model-value="changeEstadoVersion"
+            ></v-select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Separador homogéneo -->
+      <v-divider class="my-3"></v-divider>
+
+      <!-- Fila 2: Acciones Operativas y Botones de la Matriz -->
+      <div class="d-flex align-center justify-space-between flex-wrap ga-2">
+        <div class="d-flex align-center ga-2 flex-wrap">
+          <v-btn
+            color="primary"
+            variant="flat"
+            size="small"
+            prepend-icon="mdi-plus"
+            class="rounded-lg font-weight-bold text-none shadow-sm"
+            @click="addRow"
+          >
+            Agregar Operación
+          </v-btn>
+
+          <v-btn
+            color="primary"
+            variant="tonal"
+            size="small"
             prepend-icon="mdi-plus-box-multiple"
-            class="mr-2 rounded-lg font-weight-bold text-uppercase text-caption"
+            class="rounded-lg font-weight-bold text-none"
+            @click="showCreateAction = true"
           >
-            Crear Verbo/Acción
+            Nuevo Verbo / Acción
           </v-btn>
 
           <v-btn
-            variant="tonal"
-            color="secondary"
-            @click="showPreview = true"
-            prepend-icon="mdi-eye-outline"
-            class="mr-2 rounded-lg font-weight-bold text-uppercase text-caption"
-          >
-            Vista Previa Flujo
-          </v-btn>
-
-          <v-btn
-            variant="tonal"
             color="info"
-            @click="showLaneManager = true"
+            variant="tonal"
+            size="small"
             prepend-icon="mdi-account-multiple-plus"
-            class="mr-2 rounded-lg font-weight-bold text-uppercase text-caption"
+            class="rounded-lg font-weight-bold text-none"
+            @click="showLaneManager = true"
           >
             Gestionar Unidades
           </v-btn>
+        </div>
+
+        <div class="d-flex align-center ga-2 flex-wrap">
+          <v-btn
+            color="secondary"
+            variant="tonal"
+            size="small"
+            prepend-icon="mdi-eye-outline"
+            class="rounded-lg font-weight-bold text-none"
+            @click="showPreview = true"
+          >
+            Vista Previa
+          </v-btn>
 
           <v-btn
-            variant="flat"
             color="success"
-            @click="emit('finalize')"
+            variant="flat"
+            size="small"
             prepend-icon="mdi-check-decagram"
-            class="mr-2 rounded-lg font-weight-bold text-uppercase text-caption"
+            class="rounded-lg font-weight-bold text-none"
+            @click="emit('finalize')"
           >
             Finalizar Flujo
           </v-btn>
 
           <v-chip
-            v-if="lastSaved"
-            size="small"
-            color="success"
-            variant="tonal"
-            class="mr-4 uppercase"
-          >
-            Ult. Sincro: {{ lastSaved }}
-          </v-chip>
-          <v-chip
             size="small"
             color="primary"
             variant="flat"
-            class="uppercase px-4 font-weight-black"
+            class="text-uppercase px-3 font-weight-bold text-caption ml-1"
           >
-            Persistencia: Auto-Fila
+            Auto-Fila Activo
           </v-chip>
-        </v-toolbar>
+        </div>
+      </div>
+    </v-card>
+
+    <!-- ÁREA DE LA MATRIZ CON SCROLL UNIFICADO -->
+    <div class="flex-grow-1 pa-2 bg-slate-50 overflow-auto" ref="matrixEditorContainer" style="width: 100%; box-sizing: border-box;">
+      <div class="editor-scroll-wrapper" style="position: relative; display: inline-block; min-width: 1200px; width: max-content;">
 
         <table class="mpp-matrix-table" style="position: relative; z-index: 2; width: 100%; min-width: 1200px;">
         <thead>
@@ -1937,6 +1994,13 @@ watch(
                   IF
                 </v-chip>
               </div>
+              <div
+                v-else
+                class="empty-lane-placeholder"
+              >
+                <v-icon size="16" class="empty-lane-icon">mdi-plus-circle-outline</v-icon>
+                <span class="empty-lane-text">Asignar figura</span>
+              </div>
             </td>
             <td
               class="bg-indigo-lighten-5 border-left-bold"
@@ -1985,23 +2049,6 @@ watch(
             </td>
           </tr>
         </tbody>
-        <tfoot>
-          <tr>
-            <td :colspan="12 + allDisplayCargos.length" class="pa-3 bg-slate-50 border-0">
-              <v-btn
-                color="secondary"
-                block
-                variant="tonal"
-                @click="addRow"
-                prepend-icon="mdi-plus"
-                height="44"
-                class="border-dashed font-weight-bold rounded-lg"
-              >
-                Añadir Nueva Fila de Operación
-              </v-btn>
-            </td>
-          </tr>
-        </tfoot>
       </table>
 
       <!-- SVG para conectar nodos en el editor directo (Sólido y Elegante) -->
@@ -2085,16 +2132,17 @@ watch(
       </div>
     </div>
 
-    <!-- MODAL GESTOR DE CARRILES -->
+    <!-- MODAL GESTOR DE CARRILES (HOMOLOGADO MOF) -->
     <v-dialog v-model="showLaneManager" max-width="900">
       <v-card class="rounded-xl overflow-hidden">
-        <v-toolbar color="primary" dark density="compact">
-          <v-toolbar-title class="text-subtitle-1 font-weight-bold"
-            >GESTIÓN DE CARRILES INSTITUCIONALES</v-toolbar-title
-          >
-          <v-spacer></v-spacer>
-          <v-btn icon="mdi-close" @click="showLaneManager = false"></v-btn>
-        </v-toolbar>
+        <!-- ENCABEZADO DEL MODAL (ESTÁNDAR MOF HOMOLOGADO) -->
+        <v-card-title class="text-h6 font-weight-bold d-flex align-center justify-space-between">
+          <div class="d-flex align-center">
+            <v-icon color="primary" class="mr-2">mdi-account-multiple-plus-outline</v-icon>
+            <span>GESTIÓN DE CARRILES INSTITUCIONALES</span>
+          </div>
+          <v-btn icon="mdi-close" variant="text" size="small" density="comfortable" @click="showLaneManager = false"></v-btn>
+        </v-card-title>
 
         <div class="lane-manager-container">
           <div class="lane-manager-units">
@@ -2223,55 +2271,113 @@ watch(
       </v-card>
     </v-dialog>
 
-    <!-- MODAL REGISTRO RÁPIDO DE ACCIÓN -->
-    <v-dialog v-model="showCreateAction" max-width="450">
+    <!-- MODAL REGISTRO RÁPIDO DE ACCIÓN / VERBO (HOMOLOGADO MOF) -->
+    <v-dialog v-model="showCreateAction" max-width="580" transition="dialog-bottom-transition">
       <v-card class="rounded-xl overflow-hidden">
-        <v-toolbar color="primary" dark density="compact">
-          <v-toolbar-title class="text-subtitle-1 font-weight-bold"
-            >REGISTRO RÁPIDO DE VERBO/ACCIÓN</v-toolbar-title
-          >
-          <v-spacer></v-spacer>
-          <v-btn icon="mdi-close" @click="showCreateAction = false"></v-btn>
-        </v-toolbar>
-        <v-card-text class="pa-4">
-          <v-text-field
-            v-model="newActionName"
-            label="Nombre de la Acción (Ej: Autorizar)"
-            variant="outlined"
-            density="compact"
-            class="mb-3"
-            hide-details
-          ></v-text-field>
-          <FiguraSelect
-            v-model="newActionFiguraId"
-            :items="mppStore.figuras"
-            label="Figura Geométrica en Diagrama"
-            density="compact"
-            hide-details
-          />
+        <!-- ENCABEZADO DEL MODAL (ESTÁNDAR MOF HOMOLOGADO) -->
+        <v-card-title class="text-h6 font-weight-bold d-flex align-center justify-space-between">
+          <div class="d-flex align-center">
+            <v-icon color="primary" class="mr-2">mdi-play-network-outline</v-icon>
+            <span>NUEVO VERBO / ACCIÓN</span>
+          </div>
+          <v-btn icon="mdi-close" variant="text" size="small" density="comfortable" @click="showCreateAction = false"></v-btn>
+        </v-card-title>
+
+        <v-card-text class="px-6 py-4">
+          <v-row dense class="ga-y-3">
+            <v-col cols="12">
+              <v-text-field
+                v-model="newActionName"
+                label="Nombre de la Acción (Verbo)"
+                placeholder="Ej: Autorizar, Revisar, Registrar, Aprobar"
+                variant="outlined"
+                density="compact"
+                prepend-inner-icon="mdi-format-title"
+                :rules="[rules.required]"
+                hide-details="auto"
+              ></v-text-field>
+            </v-col>
+
+            <v-col cols="12" class="mt-1">
+              <FiguraSelect
+                v-model="newActionFiguraId"
+                :items="mppStore.figuras"
+                label="Figura Geométrica en Diagrama"
+                density="compact"
+                hide-details="auto"
+              />
+            </v-col>
+
+            <!-- VISTA PREVIA INTERACTIVA DE LA FIGURA -->
+            <v-col cols="12" class="mt-2">
+              <div class="pa-4 rounded-xl border d-flex flex-column align-center justify-center bg-slate-50">
+                <div class="text-caption font-weight-bold text-grey-darken-1 text-uppercase mb-2 align-self-start">
+                  Vista Previa en el Flujograma
+                </div>
+                
+                <div v-if="selectedFiguraVisuals" class="d-flex align-center ga-4 py-2">
+                  <div class="preview-slot">
+                    <FiguraShapePreview :codigo="selectedFiguraCodigo" size="md" />
+                  </div>
+                  <div>
+                    <div class="text-subtitle-2 font-weight-bold text-slate-800">
+                      {{ newActionName || "Nombre de la Acción" }}
+                    </div>
+                    <div class="text-caption text-grey-darken-1">
+                      Forma: <strong class="text-primary">{{ selectedFiguraNombre }}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-else class="d-flex align-center ga-2 py-3 text-grey">
+                  <v-icon size="20" color="grey-lighten-1">mdi-shape-outline</v-icon>
+                  <span class="text-caption font-italic">Seleccione una figura para previsualizar el nodo del diagrama</span>
+                </div>
+              </div>
+            </v-col>
+          </v-row>
         </v-card-text>
-        <v-divider></v-divider>
-        <v-card-actions class="pa-3">
+
+        <!-- BOTONES DE ACCIÓN HOMOLOGADOS -->
+        <v-card-actions class="px-6 pb-4 pt-1">
           <v-spacer></v-spacer>
-          <v-btn color="primary" variant="outlined" class="rounded-lg font-weight-bold text-uppercase text-caption mr-2" @click="showCreateAction = false">Cancelar</v-btn>
-          <v-btn color="primary" variant="flat" class="rounded-lg font-weight-bold text-uppercase text-caption px-4" @click="createQuickAction" :loading="isSavingAction">Guardar Acción</v-btn>
+
+          <v-btn
+            color="primary"
+            variant="outlined"
+            class="rounded-lg font-weight-bold text-uppercase text-caption mr-2"
+            @click="showCreateAction = false"
+          >
+            Cancelar
+          </v-btn>
+
+          <v-btn
+            color="primary"
+            variant="flat"
+            class="rounded-lg font-weight-bold text-uppercase text-caption px-6"
+            @click="createQuickAction"
+            :loading="isSavingAction"
+            :disabled="!newActionName || !newActionFiguraId"
+          >
+            Guardar Acción
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
 
-    <!-- MODAL CONDICIÓN IF/ELSE (Rombo) — popup visual -->
+    <!-- MODAL CONDICIÓN IF/ELSE (Rombo) — popup visual (HOMOLOGADO MOF) -->
     <v-dialog v-model="showCondicionPanel" max-width="960" scrollable>
       <v-card class="rounded-xl overflow-hidden">
-        <v-toolbar color="orange-darken-2" dark density="compact">
-          <v-toolbar-title class="text-subtitle-1 font-weight-bold">
-            CONDICIÓN IF/ELSE
-            <span v-if="condicionRow" class="text-caption font-weight-regular ml-2">
-              — Paso {{ condicionRow.nro }}
-            </span>
-          </v-toolbar-title>
-          <v-spacer></v-spacer>
-          <v-btn icon="mdi-close" @click="showCondicionPanel = false"></v-btn>
-        </v-toolbar>
+        <v-card-title class="text-h6 font-weight-bold d-flex align-center justify-space-between">
+          <div class="d-flex align-center">
+            <v-icon color="warning" class="mr-2">mdi-rhombus-split</v-icon>
+            <span>CONDICIÓN IF/ELSE</span>
+            <v-chip v-if="condicionRow" size="small" color="warning" variant="tonal" class="ml-2 font-weight-bold">
+              Paso {{ condicionRow.nro }}
+            </v-chip>
+          </div>
+          <v-btn icon="mdi-close" variant="text" size="small" density="comfortable" @click="showCondicionPanel = false"></v-btn>
+        </v-card-title>
 
         <v-card-text class="pa-0" :class="{ 'opacity-50': isLoadingCondicion }">
           <div class="condicion-dialog-grid">
@@ -2582,41 +2688,40 @@ watch(
       </v-card>
     </v-dialog>
 
-    <!-- DIÁLOGO DE PREVISUALIZACIÓN -->
+    <!-- DIÁLOGO DE PREVISUALIZACIÓN (HOMOLOGADO MOF) -->
     <v-dialog v-model="showPreview" max-width="950">
       <v-card class="rounded-xl overflow-hidden">
-        <v-toolbar color="primary" dark density="compact">
-          <v-toolbar-title class="text-subtitle-1 font-weight-bold"
-            >VISTA PREVIA DEL DIAGRAMA DE FLUJO (SWIMLANES)</v-toolbar-title
-          >
-          <v-spacer></v-spacer>
-          
-          <v-btn
-            variant="flat"
-            color="white"
-            size="small"
-            class="mr-2 text-indigo font-weight-bold"
-            prepend-icon="mdi-image-outline"
-            @click="exportDiagramPng"
-            :disabled="allDisplayCargos.length === 0"
-          >
-            PNG
-          </v-btn>
-          
-          <v-btn
-            variant="flat"
-            color="white"
-            size="small"
-            class="mr-2 text-indigo font-weight-bold"
-            prepend-icon="mdi-file-pdf-box"
-            @click="exportDiagramPdf"
-            :disabled="allDisplayCargos.length === 0"
-          >
-            PDF
-          </v-btn>
-
-          <v-btn icon="mdi-close" @click="showPreview = false"></v-btn>
-        </v-toolbar>
+        <v-card-title class="text-h6 font-weight-bold d-flex align-center justify-space-between flex-wrap ga-2">
+          <div class="d-flex align-center">
+            <v-icon color="primary" class="mr-2">mdi-chart-timeline-variant-shimmer</v-icon>
+            <span>VISTA PREVIA DEL FLUJOGRAMA (SWIMLANES)</span>
+          </div>
+          <div class="d-flex align-center ga-2">
+            <v-btn
+              variant="tonal"
+              color="primary"
+              size="small"
+              class="font-weight-bold rounded-lg text-uppercase text-caption"
+              prepend-icon="mdi-image-outline"
+              @click="exportDiagramPng"
+              :disabled="allDisplayCargos.length === 0"
+            >
+              PNG
+            </v-btn>
+            <v-btn
+              variant="tonal"
+              color="primary"
+              size="small"
+              class="font-weight-bold rounded-lg text-uppercase text-caption"
+              prepend-icon="mdi-file-pdf-box"
+              @click="exportDiagramPdf"
+              :disabled="allDisplayCargos.length === 0"
+            >
+              PDF
+            </v-btn>
+            <v-btn icon="mdi-close" variant="text" size="small" density="comfortable" @click="showPreview = false"></v-btn>
+          </div>
+        </v-card-title>
 
         <div class="pa-8 bg-slate-50 overflow-y-auto" style="max-height: 75vh">
           <div 
@@ -2794,7 +2899,7 @@ watch(
 <style scoped>
 .mpp-matrix-table {
   border-collapse: collapse;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   background: white;
   min-width: 100%;
 }
@@ -2806,68 +2911,78 @@ watch(
 
 .mpp-matrix-table th {
   background: #f8fafc;
-  font-weight: 900;
+  font-weight: 800;
   text-transform: uppercase;
-  color: #334155;
-  padding: 4px;
+  color: #1e293b;
+  padding: 6px 6px;
   resize: none;
+  font-size: 0.72rem;
+  line-height: 1.25;
 }
 
 .cell-textarea {
-  min-width: 70px;
-  min-height: 28px;
-  padding: 4px 6px;
+  min-width: 80px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 8px;
   border: none;
   outline: none;
-  resize: both;
+  resize: none;
   font-family: inherit;
-  font-size: 0.65rem;
-  line-height: 1.2;
+  font-size: 0.75rem;
+  line-height: 1.35;
   display: block;
   background: transparent;
-  overflow: auto;
+  overflow: hidden;
   box-sizing: border-box;
   margin: 0;
+  color: var(--mof-text-main);
 }
 .cell-textarea:focus {
   background: #fff;
-  box-shadow: inset 0 0 0 1px var(--mof-turquesa);
+  box-shadow: inset 0 0 0 1.5px var(--mof-turquesa);
 }
 
 .cell-input-number {
   width: 100%;
-  height: 28px;
+  height: 36px;
   border: none;
   outline: none;
-  font-size: 0.65rem;
+  font-size: 0.75rem;
+  color: var(--mof-text-main);
 }
 
 .group-header {
   background: #e2e8f0 !important;
-  font-size: 0.6rem !important;
+  font-size: 0.7rem !important;
+  font-weight: 700 !important;
 }
 .sub-header {
   background: #f1f5f9 !important;
-  font-size: 0.55rem !important;
+  font-size: 0.65rem !important;
+  font-weight: 600 !important;
+  color: #475569 !important;
 }
 
 .solicitante-header {
   background: #e3f2fd !important;
   border-bottom: none !important;
-  font-size: 0.6rem !important;
+  font-size: 0.7rem !important;
 }
 .solicitante-sub {
   background: #e3f2fd !important;
   border-top: none !important;
+  font-size: 0.65rem !important;
 }
 .accion-header {
   background: #e8eaf6 !important;
   border-bottom: none !important;
-  font-size: 0.6rem !important;
+  font-size: 0.7rem !important;
 }
 .accion-sub {
   background: #e8eaf6 !important;
   border-top: none !important;
+  font-size: 0.65rem !important;
 }
 
 .border-left-bold {
@@ -2878,13 +2993,15 @@ watch(
   background: #fdfdfd !important;
   border-bottom: 2px solid var(--mof-turquesa) !important;
   color: var(--mof-turquesa) !important;
-  font-size: 0.6rem !important;
+  font-size: 0.72rem !important;
+  font-weight: 800 !important;
 }
 .cargo-header {
   background: #ffffff !important;
-  font-size: 0.55rem !important;
-  font-weight: 600;
-  color: #475569;
+  font-size: 0.68rem !important;
+  font-weight: 700;
+  color: #334155;
+  padding: 4px 6px !important;
 }
 
 .diagram-cell {
@@ -2893,9 +3010,34 @@ watch(
   transition: background 0.2s;
   border-left: 1px dashed #cbd5e1 !important;
   border-right: 1px dashed #cbd5e1 !important;
+  min-width: 150px;
 }
 .diagram-cell:hover {
   background: #f5f3ff;
+}
+
+.empty-lane-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 48px;
+  opacity: 0.25;
+  transition: all 0.2s ease-in-out;
+  padding: 4px;
+}
+.diagram-cell:hover .empty-lane-placeholder {
+  opacity: 0.9;
+  background: rgba(var(--v-theme-primary), 0.06);
+}
+.empty-lane-icon {
+  color: var(--mof-turquesa);
+}
+.empty-lane-text {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--mof-turquesa);
 }
 
 .flow-node {
@@ -2918,13 +3060,16 @@ watch(
 }
 
 .nro-col {
-  width: 35px;
+  width: 40px;
+  min-width: 40px;
 }
 .data-col {
-  width: 90px;
+  width: 130px;
+  min-width: 120px;
 }
 .plazo-col {
-  width: 35px;
+  width: 50px;
+  min-width: 50px;
 }
 .uppercase {
   text-transform: uppercase;

@@ -1,84 +1,77 @@
 ﻿<template>
-  <v-container
-    fluid
-    class="pa-6 fill-height bg-slate-50 overflow-y-auto align-start"
-  >
-    <v-row justify="center" class="w-100 ma-0">
-      <v-col cols="12" xl="11">
-        <!-- HEADER BANNER -->
-        <v-card
-          elevation="12"
-          class="rounded-xl border-top-primary overflow-hidden mb-6"
-        >
-          <div
-            class="px-6 py-5 border-bottom d-flex flex-column flex-md-row align-start align-md-center justify-space-between ga-4 bg-surface"
-          >
-            <div>
-              <div class="d-flex align-center">
-                <v-icon color="primary" class="mr-2" size="28"
-                  >mdi-history</v-icon
-                >
-                <h1 class="text-h5 font-weight-bold text-slate-800">
-                  HISTORIAL Y RELACIONES DEL MPP
-                </h1>
-              </div>
-              <div class="text-caption text-slate-500 mt-1">
-                Explore y compare las versiones de procedimientos, sus marcos
-                legales, indicadores y flujos operacionales mapeados en el
-                sistema.
-              </div>
+  <div class="fill-height d-flex flex-column bg-transparent px-3 pt-3 pb-3 overflow-y-auto" style="width: 100%;">
+    <!-- HEADER BANNER (ESTÁNDAR MOF - HOMOLOGADO) -->
+    <v-card
+      elevation="2"
+      class="rounded-xl border pa-4 mb-4 bg-white flex-shrink-0 overflow-hidden"
+    >
+      <div
+        class="d-flex flex-column flex-md-row align-start align-md-center justify-space-between ga-4"
+      >
+        <div class="d-flex align-center">
+          <v-avatar color="primary-lighten-5" class="mr-3 rounded-lg" size="44">
+            <v-icon color="primary" size="24">mdi-history</v-icon>
+          </v-avatar>
+          <div>
+            <div class="text-h6 font-weight-bold text-slate-800 leading-tight">
+              Historial y Relaciones del MPP
             </div>
-            <div
-              class="d-flex align-center flex-wrap ga-3 w-100 w-md-auto justify-start justify-md-end"
-            >
-              <v-select
-                v-model="statusFilter"
-                :items="statusFilterItems"
-                label="Estado"
-                variant="solo-filled"
-                density="compact"
-                hide-details
-                style="max-width: 170px; min-width: 140px"
-                class="rounded-lg flex-grow-1 flex-md-grow-0"
-              ></v-select>
-              <v-select
-                v-model="unidadFilter"
-                :items="unidadFilterItems"
-                item-title="title"
-                item-value="value"
-                label="Unidad"
-                variant="solo-filled"
-                density="compact"
-                hide-details
-                clearable
-                style="max-width: 200px; min-width: 160px"
-                class="rounded-lg flex-grow-1 flex-md-grow-0"
-              ></v-select>
-              <v-select
-                v-model="categoriaFilter"
-                :items="categoriaFilterItems"
-                label="Categoría"
-                variant="solo-filled"
-                density="compact"
-                hide-details
-                clearable
-                style="max-width: 170px; min-width: 140px"
-                class="rounded-lg flex-grow-1 flex-md-grow-0"
-              ></v-select>
-              <v-text-field
-                v-model="searchQuery"
-                label="Buscar proceso, procedimiento o código..."
-                prepend-inner-icon="mdi-magnify"
-                variant="solo-filled"
-                density="compact"
-                hide-details
-                clearable
-                style="max-width: 350px; min-width: 250px; width: 100%"
-                class="rounded-lg flex-grow-1 flex-md-grow-0"
-              ></v-text-field>
+            <div class="text-caption text-grey-darken-1">
+              Explore y compare las versiones de procedimientos, sus marcos legales, indicadores y flujos operacionales mapeados en el sistema
             </div>
           </div>
-        </v-card>
+        </div>
+        <div
+          class="d-flex align-center flex-wrap ga-3 w-100 w-md-auto justify-start justify-md-end"
+        >
+          <v-select
+            v-model="statusFilter"
+            :items="statusFilterItems"
+            label="Estado"
+            variant="outlined"
+            density="compact"
+            hide-details
+            style="max-width: 160px; min-width: 130px"
+            class="rounded-lg flex-grow-1 flex-md-grow-0"
+          ></v-select>
+          <v-select
+            v-model="unidadFilter"
+            :items="unidadFilterItems"
+            item-title="title"
+            item-value="value"
+            label="Unidad"
+            variant="outlined"
+            density="compact"
+            hide-details
+            clearable
+            style="max-width: 200px; min-width: 150px"
+            class="rounded-lg flex-grow-1 flex-md-grow-0"
+          ></v-select>
+          <v-select
+            v-model="categoriaFilter"
+            :items="categoriaFilterItems"
+            label="Categoría"
+            variant="outlined"
+            density="compact"
+            hide-details
+            clearable
+            style="max-width: 160px; min-width: 130px"
+            class="rounded-lg flex-grow-1 flex-md-grow-0"
+          ></v-select>
+          <v-text-field
+            v-model="searchQuery"
+            label="Buscar proceso, procedimiento o código..."
+            prepend-inner-icon="mdi-magnify"
+            variant="outlined"
+            density="compact"
+            hide-details
+            clearable
+            style="max-width: 320px; min-width: 220px; width: 100%"
+            class="rounded-lg flex-grow-1 flex-md-grow-0"
+          ></v-text-field>
+        </div>
+      </div>
+    </v-card>
 
         <!-- CARGANDO / LOADING -->
         <v-card
@@ -117,7 +110,7 @@
           <v-expansion-panel
             v-for="proceso in filteredProcesos"
             :key="proceso.id_proceso"
-            class="rounded-xl mb-4 overflow-hidden border elevation-3"
+            class="rounded-xl mb-4 overflow-hidden border elevation-2"
           >
             <!-- Cabecera del Proceso -->
             <v-expansion-panel-title class="py-4">
@@ -212,7 +205,7 @@
 
               <div class="overflow-x-auto w-100 rounded-lg border mb-3">
                 <v-table class="bg-surface" style="min-width: 800px">
-                  <thead class="bg-indigo-lighten-5">
+                  <thead class="bg-slate-50">
                     <tr class="text-uppercase text-caption font-weight-bold">
                       <th class="font-weight-bold text-left" width="140">
                         Código
@@ -268,7 +261,7 @@
                           :items="grupo.versiones"
                           item-title="versionLabel"
                           item-value="id_procedimiento"
-                          variant="solo-filled"
+                          variant="outlined"
                           density="compact"
                           hide-details
                           flat
@@ -395,8 +388,6 @@
             </v-expansion-panel-text>
           </v-expansion-panel>
         </v-expansion-panels>
-      </v-col>
-    </v-row>
 
     <!-- DRAWER DE DETALLES Y RELACIONES DEL PROCEDIMIENTO SELECCIONADO -->
     <v-navigation-drawer
@@ -404,7 +395,7 @@
       location="right"
       temporary
       :width="smAndDown ? '100%' : '820'"
-      class="elevation-16 rounded-l-xl overflow-hidden border-left-primary"
+      class="elevation-8 rounded-l-xl overflow-hidden border-s bg-white"
     >
       <div v-if="selectedProcedure" class="bg-surface">
         <!-- CABECERA DEL DRAWER -->
@@ -1138,7 +1129,7 @@
         </div>
       </div>
     </v-navigation-drawer>
-  </v-container>
+  </div>
 </template>
 
 <script setup>
@@ -1993,12 +1984,6 @@ onUnmounted(() => {
 <style scoped>
 .fill-height {
   min-height: 100vh;
-}
-.border-top-primary {
-  border-top: 8px solid var(--mof-petroleo) !important;
-}
-.border-left-primary {
-  border-left: 8px solid var(--mof-petroleo) !important;
 }
 .border-right {
   border-right: 1px solid #e0e0e0;

@@ -26,17 +26,36 @@ export const useAuthStore = defineStore("auth", () => {
     axios.defaults.headers.common["Authorization"] = `Bearer ${token.value}`;
   }
 
+  function formatDisplayName(username, nombre) {
+    if (nombre && !nombre.includes("@")) return nombre;
+    const raw = (nombre || username || "Usuario").trim();
+    if (raw.includes("@")) {
+      const prefix = raw.split("@")[0];
+      return prefix.toLowerCase() === "admin"
+        ? "Administrador"
+        : prefix.charAt(0).toUpperCase() + prefix.slice(1);
+    }
+    if (/^user\d+$/i.test(raw)) {
+      return `Usuario ${raw.replace(/\D/g, "")}`;
+    }
+    if (raw.toLowerCase() === "admin") {
+      return "Administrador";
+    }
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  }
+
   function applySession(data) {
     token.value = data.access_token;
     localStorage.setItem("token", token.value);
 
     const roleNames = (data.user.roles || []).map((r) => r.nombre);
+    const friendlyName = formatDisplayName(data.user.username, data.user.nombre);
     user.value = {
       id: data.user.id,
       username: data.user.username,
-      nombre: data.user.username,
+      nombre: friendlyName,
       roles: roleNames,
-      rol: roleNames[0] || "Usuario",
+      rol: roleNames.length ? roleNames.join(", ") : "Usuario",
     };
     localStorage.setItem("user", JSON.stringify(user.value));
     axios.defaults.headers.common["Authorization"] = `Bearer ${data.access_token}`;
