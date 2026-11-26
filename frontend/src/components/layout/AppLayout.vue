@@ -100,9 +100,32 @@ onUnmounted(() => {
 });
 
 const isLoginPage = computed(() => route.path === "/login");
-const userName = computed(() => authStore.user?.nombre || "Usuario");
+const userName = computed(() => {
+  const raw = authStore.user?.nombre || authStore.user?.username || "Usuario";
+  if (raw.includes("@")) {
+    const prefix = raw.split("@")[0];
+    return prefix.toLowerCase() === "admin"
+      ? "Administrador"
+      : prefix.charAt(0).toUpperCase() + prefix.slice(1);
+  }
+  if (/^user\d+$/i.test(raw)) {
+    return `Usuario ${raw.replace(/\D/g, "")}`;
+  }
+  if (raw.toLowerCase() === "admin") {
+    return "Administrador";
+  }
+  return raw;
+});
+
+const userRole = computed(() => {
+  if (authStore.user?.roles && authStore.user.roles.length) {
+    return authStore.user.roles.join(", ");
+  }
+  return authStore.user?.rol || "Usuario";
+});
+
 const userInitials = computed(() => {
-  const name = authStore.user?.nombre || "U";
+  const name = userName.value || "U";
   return name
     .split(" ")
     .map((n) => n[0])
@@ -287,8 +310,7 @@ const handleLogout = async () => {
       </div>
 
       <template v-slot:append>
-        <v-divider></v-divider>
-        <div class="pa-4" style="border-top: 1px solid var(--mof-border-nav)">
+        <div class="pa-4">
           <v-list-item
             class="px-2"
             @click="handleLogout"
@@ -303,7 +325,7 @@ const handleLogout = async () => {
               userName
             }}</v-list-item-title>
             <v-list-item-subtitle class="text-caption">{{
-              authStore.user?.rol || "Usuario"
+              userRole
             }}</v-list-item-subtitle>
             <template v-slot:append>
               <v-icon color="error">mdi-power</v-icon>

@@ -696,10 +696,11 @@ a:hover,
 }
 
 /* Texto ingresado en campos, áreas de texto, selects y autocompletes */
-.v-field__input,
-.v-field input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]),
+.v-text-field:not(.v-select) .v-field--active input,
+.v-text-field:not(.v-select) .v-field--no-label input,
+.v-autocomplete .v-field input,
+.v-combobox .v-field input,
 .v-field textarea,
-input.v-field__input,
 textarea.v-field__input,
 .v-select__selection,
 .v-select__selection-text,
@@ -711,7 +712,37 @@ textarea.v-field__input,
   -webkit-text-fill-color: var(--mof-text-main) !important;
   font-family: "Urbanist", sans-serif !important;
   font-weight: 500 !important;
-  opacity: 1 !important;
+}
+
+/* Ocultar input inactivo con etiqueta para que el placeholder nativo del navegador no solape la etiqueta */
+.v-text-field .v-field:not(.v-field--no-label):not(.v-field--active) input {
+  opacity: 0 !important;
+}
+
+.v-field:not(.v-field--active):not(.v-field--no-label) input::placeholder,
+.v-field:not(.v-field--active):not(.v-field--no-label) textarea::placeholder {
+  opacity: 0 !important;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+/* Ocultar input interno auxiliar de v-select para que no se solape con el texto de selección */
+.v-select:not(.v-autocomplete):not(.v-combobox) input,
+.v-select:not(.v-autocomplete):not(.v-combobox) .v-field input,
+.v-select--selected .v-field .v-field__input > input {
+  opacity: 0 !important;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  position: absolute !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
 }
 
 /* Cursor de inserción de texto institucional */
@@ -798,12 +829,15 @@ textarea.v-field__input {
   --v-field-border-width: 2px !important;
 }
 
-/* Textos Placeholder ("tipo fantasmita" permitido exclusivamente aquí) */
-.v-field__input::placeholder,
-input::placeholder,
-textarea::placeholder,
-.v-field input::placeholder,
-.v-field textarea::placeholder {
+/* Textos Placeholder ("tipo fantasmita" permitido exclusivamente aquí cuando el campo está activo o sin etiqueta) */
+.v-field--active input::placeholder,
+.v-field--active textarea::placeholder,
+.v-field--no-label input::placeholder,
+.v-field--no-label textarea::placeholder,
+.v-field--focused input::placeholder,
+.v-field--focused textarea::placeholder,
+input:focus::placeholder,
+textarea:focus::placeholder {
   color: var(--mof-placeholder) !important;
   -webkit-text-fill-color: var(--mof-placeholder) !important;
   opacity: 0.85 !important;
@@ -991,10 +1025,12 @@ tr.v-data-table__tr:hover {
   color: var(--mof-petroleo) !important;
   font-weight: 800 !important;
   border-bottom: 1px solid var(--mof-border-nav);
+  padding: 18px 24px 14px 24px !important;
 }
 
 .v-dialog .v-card-text {
   color: var(--mof-text-main) !important;
+  padding: 24px 24px 16px 24px !important;
 }
 
 .v-dialog input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]),
@@ -1004,15 +1040,49 @@ tr.v-data-table__tr:hover {
   -webkit-text-fill-color: var(--mof-text-main) !important;
 }
 
-.v-menu .v-overlay__content > .v-list {
+/* Menús desplegables (Dropdowns de Selects) limpios, unificados y sin fondo cuadrado tras curvas */
+.v-menu > .v-overlay__content.v-select__content,
+.v-menu .v-overlay__content {
+  border-radius: 10px !important;
+  overflow: hidden !important;
   background-color: var(--mof-surface) !important;
   border: 1px solid var(--mof-border-nav) !important;
-  border-radius: 12px !important;
-  box-shadow: 0 8px 24px rgba(26, 71, 86, 0.12) !important;
+  box-shadow: 0 8px 24px rgba(26, 71, 86, 0.14) !important;
 }
 
+.v-menu .v-overlay__content > .v-list,
+.v-select__content > .v-list {
+  background-color: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.v-select__content .v-list-item,
+.v-menu .v-list-item {
+  border-radius: 0 !important;
+  margin: 0 !important;
+  transition: background-color 0.15s ease;
+}
+
+.v-select__content .v-list-item:hover,
 .v-menu .v-list-item:hover {
   background-color: var(--mof-marfil) !important;
+}
+
+.v-select__content .v-list-item--active,
+.v-menu .v-list-item--active {
+  background-color: rgba(2, 129, 145, 0.12) !important;
+  color: var(--mof-turquesa) !important;
+}
+
+.v-select__content .v-list-item__underlay,
+.v-select__content .v-list-item__overlay,
+.v-menu .v-list-item__underlay,
+.v-menu .v-list-item__overlay {
+  border-radius: 0 !important;
 }
 
 /* Tooltips Flotantes: Fondo #1A4756 oscuro, texto blanco, radio 6px */

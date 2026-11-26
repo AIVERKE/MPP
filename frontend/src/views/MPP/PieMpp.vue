@@ -1,115 +1,102 @@
 ﻿<template>
-  <div class="fill-height overflow-y-auto pa-6 d-flex justify-center align-center w-100">
-    <v-card
-      class="rounded-xl border-top-primary overflow-hidden elevation-12 w-100 my-4"
-      max-width="1100"
-    >
-    <!-- Encabezado unificado y serio como la cabecera -->
-    <v-toolbar
-      color="surface"
-      flat
-      class="px-6 py-4 border-bottom d-flex align-center"
-      height="auto"
-    >
-      <div>
-        <div class="d-flex align-center">
-          <v-icon color="primary" class="mr-2"
-            >mdi-check-decagram-outline</v-icon
+  <div class="fill-height d-flex flex-column bg-transparent px-3 pt-3 pb-3 overflow-hidden" style="width: 100%;">
+    <!-- TOOLBAR SUPERIOR CORPORATIVO (ESTÁNDAR MOF - AMPLIO, HOMOLOGADO Y SIEMPRE VISIBLE) -->
+    <v-card elevation="2" class="mb-3 rounded-xl border pa-4 bg-white flex-shrink-0 overflow-hidden">
+      <!-- Fila 1: Identificación y Estado -->
+      <div class="d-flex align-center justify-space-between flex-wrap ga-3">
+        <div class="d-flex align-center ga-3">
+          <v-btn
+            icon="mdi-arrow-left"
+            variant="tonal"
+            color="primary"
+            size="small"
+            class="rounded-lg"
+            @click="$emit('back')"
+            title="Volver a la Matriz"
+          ></v-btn>
+          <v-divider vertical class="my-1"></v-divider>
+          <v-avatar color="primary-lighten-5" class="rounded-lg" size="40">
+            <v-icon color="primary" size="22">mdi-check-decagram-outline</v-icon>
+          </v-avatar>
+          <div>
+            <div class="text-subtitle-1 font-weight-bold text-slate-800 leading-tight uppercase">
+              Información Complementaria
+            </div>
+            <div class="d-flex align-center ga-2 mt-0.5">
+              <span class="text-caption text-grey-darken-1">{{ procesoNombre }} — {{ procedimientoNombre }}</span>
+              <v-chip size="x-small" color="primary" variant="tonal" class="font-weight-bold">v{{ procedimientoVersion }}</v-chip>
+              <v-chip size="x-small" :color="estadoVersionColor" variant="tonal" class="font-weight-bold uppercase">
+                {{ procedimientoEstadoVersion }}
+              </v-chip>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex align-center ga-3">
+          <div class="d-flex align-center ga-2">
+            <span class="text-caption font-weight-bold text-uppercase text-grey-darken-1">Estado:</span>
+            <v-select
+              v-model="procedimientoEstadoVersion"
+              :items="['Borrador', 'En Revisión', 'Aprobado', 'Obsoleto']"
+              density="compact"
+              variant="outlined"
+              hide-details
+              style="min-width: 145px; max-width: 160px;"
+              class="rounded-lg"
+              @update:model-value="changeEstadoVersion"
+            ></v-select>
+          </div>
+
+          <v-btn
+            color="success"
+            variant="flat"
+            size="small"
+            prepend-icon="mdi-content-save-all"
+            class="rounded-lg font-weight-bold text-none px-4"
+            @click="handleSaveAndExit"
           >
-          <h1 class="text-h5 font-weight-bold text-slate-800">
-            INFORMACIÓN COMPLEMENTARIA
-          </h1>
-        </div>
-        <div class="text-caption text-slate-500 mt-1 d-flex flex-column ga-1">
-          <div>
-            Proceso activo:
-            <v-chip size="x-small" color="primary" variant="tonal" class="font-weight-bold text-uppercase ml-1">
-              {{ procesoNombre }}
-            </v-chip>
-          </div>
-          <div>
-            Procedimiento activo:
-            <v-chip size="x-small" color="secondary" variant="tonal" class="font-weight-bold text-uppercase ml-1">
-              {{ procedimientoNombre }}
-            </v-chip>
-            <v-chip size="x-small" color="primary" variant="tonal" class="font-weight-bold ml-2">
-              v{{ procedimientoVersion }}
-            </v-chip>
-            <v-chip size="x-small" :color="estadoVersionColor" variant="tonal" class="font-weight-bold uppercase ml-1">
-              {{ procedimientoEstadoVersion }}
-            </v-chip>
-          </div>
+            Guardar y Salir
+          </v-btn>
         </div>
       </div>
-      <v-spacer></v-spacer>
-      <div class="d-flex align-center ga-4">
-        <v-select
-          v-model="procedimientoEstadoVersion"
-          :items="['Borrador', 'En Revisión', 'Aprobado', 'Obsoleto']"
-          label="Estado de Versión"
-          density="compact"
-          variant="solo-filled"
-          hide-details
-          style="max-width: 170px;"
-          class="rounded-lg"
-          @update:model-value="changeEstadoVersion"
-        ></v-select>
-        <v-btn
-          color="primary"
-          variant="outlined"
-          prepend-icon="mdi-arrow-left"
-          class="rounded-lg font-weight-bold text-uppercase text-caption"
-          @click="$emit('back')"
-        >
-          Volver al Diagrama
-        </v-btn>
-        <v-btn
-          color="success"
-          variant="flat"
-          prepend-icon="mdi-content-save-all"
-          class="rounded-lg font-weight-bold text-uppercase text-caption px-4"
-          @click="handleSaveAndExit"
-        >
-          Guardar y Salir
-        </v-btn>
-      </div>
-    </v-toolbar>
 
-    <!-- Pestañas de Vuetify con iconos y colores estilizados -->
-    <v-tabs
-      v-model="activeTab"
-      bg-color="surface"
-      color="primary"
-      grow
-      align-tabs="center"
-      height="60"
-      class="border-bottom"
-    >
-      <v-tab value="instalaciones" class="font-weight-bold">
-        <v-icon start>mdi-office-building-cog</v-icon>
-        Instalaciones
-      </v-tab>
-      <v-tab value="indicadores" class="font-weight-bold">
-        <v-icon start>mdi-chart-line</v-icon>
-        KPIs (Indicadores)
-      </v-tab>
-      <v-tab value="normativas" class="font-weight-bold">
-        <v-icon start>mdi-gavel</v-icon>
-        Marco Normativo
-      </v-tab>
-      <v-tab value="sistemas" class="font-weight-bold">
-        <v-icon start>mdi-laptop-account</v-icon>
-        Sistemas
-      </v-tab>
-      <v-tab value="equipos" class="font-weight-bold">
-        <v-icon start>mdi-toolbox-outline</v-icon>
-        Equipos
-      </v-tab>
-    </v-tabs>
+      <!-- Separador homogéneo -->
+      <v-divider class="my-3"></v-divider>
 
-    <!-- Contenido de las pestañas -->
-    <v-card-text class="pa-6">
-      <v-window v-model="activeTab">
+      <!-- Fila 2: Pestañas de Navegación Homologadas -->
+      <v-tabs
+        v-model="activeTab"
+        color="primary"
+        density="comfortable"
+        class="custom-mpp-tabs"
+      >
+        <v-tab value="instalaciones" class="font-weight-bold text-none">
+          <v-icon start size="18">mdi-office-building-cog</v-icon>
+          Instalaciones
+        </v-tab>
+        <v-tab value="indicadores" class="font-weight-bold text-none">
+          <v-icon start size="18">mdi-chart-line</v-icon>
+          KPIs (Indicadores)
+        </v-tab>
+        <v-tab value="normativas" class="font-weight-bold text-none">
+          <v-icon start size="18">mdi-gavel</v-icon>
+          Marco Normativo
+        </v-tab>
+        <v-tab value="sistemas" class="font-weight-bold text-none">
+          <v-icon start size="18">mdi-laptop-account</v-icon>
+          Sistemas
+        </v-tab>
+        <v-tab value="equipos" class="font-weight-bold text-none">
+          <v-icon start size="18">mdi-toolbox-outline</v-icon>
+          Equipos
+        </v-tab>
+      </v-tabs>
+    </v-card>
+
+    <!-- TARJETA DE CONTENIDO DE LA PESTAÑA ACTIVA -->
+    <v-card elevation="2" class="flex-grow-1 rounded-xl border bg-white overflow-hidden d-flex flex-column">
+      <v-card-text class="pa-6 flex-grow-1 overflow-y-auto">
+        <v-window v-model="activeTab">
         <!-- PESTAÑA: INSTALACIONES -->
         <v-window-item value="instalaciones">
           <div class="mb-4">
@@ -133,7 +120,8 @@
               chips
               closable-chips
               clearable
-              variant="solo-filled"
+              variant="outlined"
+              density="comfortable"
               prepend-inner-icon="mdi-office-building-cog"
               no-data-text="No se encontraron dependencias"
             >
@@ -141,7 +129,7 @@
                 <v-chip
                   v-bind="props"
                   color="primary"
-                  variant="flat"
+                  variant="tonal"
                   class="font-weight-bold"
                 >
                   <template v-slot:prepend>
@@ -464,16 +452,20 @@
         </v-window-item>
       </v-window>
     </v-card-text>
+    </v-card>
 
-    <!-- DIALOGO COMPARTIDO DE EDICIÓN/CREACIÓN -->
-    <v-dialog v-model="showModal" max-width="600px" persistent>
-      <v-card class="rounded-xl pa-4">
-        <v-card-title class="text-h5 font-weight-bold d-flex align-center">
-          <v-icon color="primary" class="mr-2">{{ modalIcon }}</v-icon>
-          {{ mode === "create" ? "Agregar" : "Editar" }} {{ modalTitle }}
+    <!-- DIALOGO COMPARTIDO DE EDICIÓN/CREACIÓN (HOMOLOGADO MOF) -->
+    <v-dialog v-model="showModal" max-width="600px">
+      <v-card class="rounded-xl overflow-hidden">
+        <v-card-title class="text-h6 font-weight-bold d-flex align-center justify-space-between">
+          <div class="d-flex align-center">
+            <v-icon color="primary" class="mr-2">{{ modalIcon }}</v-icon>
+            <span>{{ mode === "create" ? "AGREGAR" : "EDITAR" }} {{ modalTitle.toUpperCase() }}</span>
+          </div>
+          <v-btn icon="mdi-close" variant="text" size="small" density="comfortable" @click="showModal = false"></v-btn>
         </v-card-title>
 
-        <v-card-text>
+        <v-card-text class="px-6 py-4">
           <v-form ref="formRef" class="mt-2">
             <!-- Campos para INDICADOR -->
             <v-row dense v-if="modalType === 'indicador'">
@@ -665,7 +657,6 @@
         <v-btn icon="mdi-close" variant="text" @click="sb.show = false"></v-btn>
       </template>
     </v-snackbar>
-    </v-card>
   </div>
 </template>
 
@@ -985,7 +976,6 @@ const showNotification = (text, color = "success") => {
 </script>
 
 <style scoped>
-.border-top-primary { border-top: 8px solid var(--mof-petroleo) !important; }
 .transition-all {
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }

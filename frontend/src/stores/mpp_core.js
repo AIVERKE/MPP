@@ -30,9 +30,9 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
             title: "Proceso",
             icon: "mdi-hexagon-multiple",
             fields: [
-                { key: "nombre", label: "Nombre del Proceso", type: "text", required: true },
-                { key: "codigo", label: "Código Único", type: "text" },
-                { key: "descripcion", label: "Descripción Detallada", type: "textarea" }
+                { key: "nombre", label: "Nombre del Proceso", type: "text", required: true, cols: 8 },
+                { key: "codigo", label: "Código Único", type: "text", cols: 4 },
+                { key: "descripcion", label: "Descripción Detallada", type: "textarea", cols: 12 }
             ],
             endpoints: { save: "procesos", update: "procesos", fetch: "procesos" }
         },
@@ -40,16 +40,16 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
             title: "Procedimiento",
             icon: "mdi-file-edit",
             fields: [
-                { key: "nombre", label: "Nombre del Procedimiento", type: "text", required: true },
-                { key: "codigo", label: "Código Único", type: "text" },
+                { key: "nombre", label: "Nombre del Procedimiento", type: "text", required: true, cols: 8 },
+                { key: "codigo", label: "Código Único", type: "text", cols: 4 },
                 { key: "id_proceso", label: "Proceso Padre", type: "hidden" },
-                { key: "objetivos", label: "Objetivos", type: "textarea" },
-                { key: "alcance", label: "Alcance", type: "textarea" },
-                { key: "periodicidad", label: "Periodicidad", type: "text" },
-                { key: "estado_version", label: "Estado de Versión", type: "select", options: ["Borrador", "En revisión", "Aprobado", "Renovado"], default: "Borrador" },
-                { key: "version", label: "Versión (automática)", type: "readonly" },
-                { key: "estado", label: "Estado", type: "select", options: ["Activo", "Inactivo", "En Revisión"], default: "Activo" },
-                { key: "id_instalaciones", label: "Instalaciones", type: "select-multiple", optionsSource: "instalaciones", itemTitle: "nombre", itemValue: "id_instalacion" }
+                { key: "objetivos", label: "Objetivos", type: "textarea", cols: 6 },
+                { key: "alcance", label: "Alcance", type: "textarea", cols: 6 },
+                { key: "periodicidad", label: "Periodicidad", type: "text", cols: 6 },
+                { key: "estado_version", label: "Estado de Versión", type: "select", options: ["Borrador", "En revisión", "Aprobado", "Renovado"], default: "Borrador", cols: 6 },
+                { key: "version", label: "Versión (automática)", type: "readonly", cols: 6 },
+                { key: "estado", label: "Estado", type: "select", options: ["Activo", "Inactivo", "En Revisión"], default: "Activo", cols: 6 },
+                { key: "id_instalaciones", label: "Instalaciones", type: "select-multiple", optionsSource: "instalaciones", itemTitle: "nombre", itemValue: "id_instalacion", cols: 12 }
             ],
             endpoints: { save: "procedimientos", update: "procedimientos", fetch: "procedimientos" }
         },
@@ -57,11 +57,11 @@ export const useMppCoreStore = defineStore("mpp_core", () => {
             title: "Marco Normativo",
             icon: "mdi-gavel",
             fields: [
-                { key: "nombre", label: "Nombre de la Norma", type: "text", required: true },
-                { key: "codigo", label: "Código / Referencia", type: "text" },
-                { key: "url", label: "Enlace al Documento", type: "text" },
-                { key: "fecha_emision", label: "Fecha de Emisión", type: "date" },
-                { key: "descripcion", label: "Resumen / Detalle", type: "textarea" }
+                { key: "nombre", label: "Nombre de la Norma", type: "text", required: true, cols: 8 },
+                { key: "codigo", label: "Código / Referencia", type: "text", cols: 4 },
+                { key: "url", label: "Enlace al Documento", type: "text", cols: 6 },
+                { key: "fecha_emision", label: "Fecha de Emisión", type: "date", cols: 6 },
+                { key: "descripcion", label: "Resumen / Detalle", type: "textarea", cols: 12 }
             ],
             endpoints: { save: "normativas", update: "normativas", fetch: "normativas" },
             parentLink: { key: "id_procedimientos", type: "array" }
